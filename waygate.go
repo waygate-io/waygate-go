@@ -112,9 +112,12 @@ func (s *Server) Run() {
 
 		domain := r.URL.Query().Get("domain")
 
-		c, err := websocket.Accept(w, r, nil)
+		c, err := websocket.Accept(w, r, &websocket.AcceptOptions{
+			OriginPatterns: []string{"*"},
+		})
 		if err != nil {
 			w.WriteHeader(500)
+			log.Println(err)
 			return
 		}
 
@@ -181,7 +184,7 @@ func NewClient(config *ClientConfig) *Client {
 		NextProtos: []string{"http/1.1", "acme-tls/1"},
 	}
 
-	wsConn, _, err := websocket.Dial(ctx, fmt.Sprintf("wss://%s?domain=%s", config.ServerDomain, tunnelDomain), nil)
+	wsConn, _, err := websocket.Dial(ctx, fmt.Sprintf("wss://%s/?domain=%s", config.ServerDomain, tunnelDomain), nil)
 	if err != nil {
 		panic(err)
 	}
