@@ -15,6 +15,11 @@ import (
 	"nhooyr.io/websocket"
 )
 
+type Tunnel struct {
+	terminationType string
+	muxSess         muxado.Session
+}
+
 type ServerConfig struct {
 	AdminDomain string
 }
@@ -36,7 +41,22 @@ func (s *Server) Run() {
 	certmagic.DefaultACME.Agreed = true
 	//certmagic.DefaultACME.CA = certmagic.LetsEncryptStagingCA
 
+	certmagic.Default.OnDemand = &certmagic.OnDemandConfig{
+		DecisionFunc: func(ctx context.Context, name string) error {
+			// TODO: verify domain is in tunnels
+			//if name != tunnelDomain {
+			//	return fmt.Errorf("not allowed")
+			//}
+			return nil
+		},
+	}
 	certConfig := certmagic.NewDefault()
+
+	tlsConfig := &tls.Config{
+		GetCertificate: certConfig.GetCertificate,
+		// TODO: can we drop h2 here as long as we're not doing server TLS termination?
+		NextProtos: []string{"http/1.1", "acme-tls/1"},
+	}
 
 	err := certConfig.ManageSync(context.Background(), []string{s.config.AdminDomain})
 	if err != nil {
@@ -56,7 +76,7 @@ func (s *Server) Run() {
 
 	waygateListener := NewPassthroughListener()
 
-	tunnels := make(map[string]muxado.Session)
+	tunnels := make(map[string]*Tunnel)
 	mut := &sync.Mutex{}
 	ctx := context.Background()
 
@@ -80,8 +100,12 @@ func (s *Server) Run() {
 				waygateListener.PassConn(passConn)
 			} else {
 				mut.Lock()
-				muxSess, exists := tunnels[clientHello.ServerName]
+				tun, exists := tunnels[clientHello.ServerName]
+				tunnel := *tun
 				mut.Unlock()
+
+				muxSess := tunnel.muxSess
+				terminationType := tunnel.terminationType
 
 				if !exists {
 					log.Println("No such tunnel")
@@ -95,22 +119,25 @@ func (s *Server) Run() {
 				}
 
 				go func() {
-					ConnectConns(passConn, upstreamConn)
+
+					var conn net.Conn = passConn
+
+					if terminationType == "server" {
+						conn = tls.Server(passConn, tlsConfig)
+					}
+
+					ConnectConns(conn, upstreamConn)
 				}()
 			}
 		}
 	}()
 
-	tlsConfig := &tls.Config{
-		GetCertificate: certConfig.GetCertificate,
-		// TODO: can we drop h2 here as long as we're not doing server TLS termination?
-		NextProtos: []string{"h2", "acme-tls/1"},
-	}
 	tlsListener := tls.NewListener(waygateListener, tlsConfig)
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 
 		domain := r.URL.Query().Get("domain")
+		terminationType := r.URL.Query().Get("termination-type")
 
 		c, err := websocket.Accept(w, r, &websocket.AcceptOptions{
 			OriginPatterns: []string{"*"},
@@ -127,7 +154,10 @@ func (s *Server) Run() {
 
 		mut.Lock()
 		defer mut.Unlock()
-		tunnels[domain] = muxSess
+		tunnels[domain] = &Tunnel{
+			terminationType: terminationType,
+			muxSess:         muxSess,
+		}
 	})
 
 	http.Serve(tlsListener, mux)
@@ -144,6 +174,7 @@ type Client struct {
 func NewClient(config *ClientConfig) *Client {
 
 	tunnelDomain := config.AdminDomain
+	tlsTermination := "client"
 
 	// Use random unprivileged port for ACME challenges. This is necessary
 	// because of the way certmagic works, in that if it fails to bind
@@ -184,7 +215,7 @@ func NewClient(config *ClientConfig) *Client {
 		NextProtos: []string{"http/1.1", "acme-tls/1"},
 	}
 
-	wsConn, _, err := websocket.Dial(ctx, fmt.Sprintf("wss://%s/?domain=%s", config.ServerDomain, tunnelDomain), nil)
+	wsConn, _, err := websocket.Dial(ctx, fmt.Sprintf("wss://%s/?domain=%s&termination-type=%s", config.ServerDomain, tunnelDomain, tlsTermination), nil)
 	if err != nil {
 		panic(err)
 	}
@@ -206,26 +237,19 @@ func NewClient(config *ClientConfig) *Client {
 
 			log.Println("Got stream")
 
-			tlsConn := tls.Server(downstreamConn, tlsConfig)
+			var conn net.Conn = downstreamConn
 
-			err := tlsConn.Handshake()
+			if tlsTermination == "client" {
+				conn = tls.Server(downstreamConn, tlsConfig)
+			}
+
+			upstreamConn, err := net.Dial("tcp", "127.0.0.1:8080")
 			if err != nil {
-				log.Println(err)
+				log.Println("Error dialing")
+				return
 			}
 
-			connState := tlsConn.ConnectionState()
-
-			if connState.ServerName == tunnelDomain {
-
-				upstreamConn, err := net.Dial("tcp", "127.0.0.1:8080")
-				if err != nil {
-					log.Println("Error dialing")
-					return
-				}
-
-				ConnectConns(tlsConn, upstreamConn)
-			} else {
-			}
+			ConnectConns(conn, upstreamConn)
 		}()
 	}
 
