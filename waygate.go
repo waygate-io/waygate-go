@@ -76,7 +76,7 @@ func (s *Server) Run() {
 
 	waygateListener := NewPassthroughListener()
 
-	tunnels := make(map[string]*Tunnel)
+	tunnels := make(map[string]Tunnel)
 	mut := &sync.Mutex{}
 	ctx := context.Background()
 
@@ -87,6 +87,8 @@ func (s *Server) Run() {
 				fmt.Println(err)
 				continue
 			}
+
+			log.Println("got tcpConn")
 
 			clientHello, clientReader, err := peekClientHello(tcpConn)
 			if err != nil {
@@ -100,8 +102,7 @@ func (s *Server) Run() {
 				waygateListener.PassConn(passConn)
 			} else {
 				mut.Lock()
-				tun, exists := tunnels[clientHello.ServerName]
-				tunnel := *tun
+				tunnel, exists := tunnels[clientHello.ServerName]
 				mut.Unlock()
 
 				muxSess := tunnel.muxSess
@@ -154,7 +155,7 @@ func (s *Server) Run() {
 
 		mut.Lock()
 		defer mut.Unlock()
-		tunnels[domain] = &Tunnel{
+		tunnels[domain] = Tunnel{
 			terminationType: terminationType,
 			muxSess:         muxSess,
 		}
