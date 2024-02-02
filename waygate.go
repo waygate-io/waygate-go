@@ -289,10 +289,14 @@ func pipeConns(readConn net.Conn, writeConn net.Conn) {
 	case *net.TCPConn:
 		log.Println("close TCPConn")
 		conn.CloseWrite()
+	case *tls.Conn:
+		log.Println("close tls.Conn")
+		conn.CloseWrite()
 	case muxado.Stream:
 		log.Println("close muxado.Stream")
 		conn.CloseWrite()
 	default:
 		log.Printf("pipeConns close: %T\n", writeConn)
+		panic("invalid conn type")
 	}
 }
