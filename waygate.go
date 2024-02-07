@@ -18,12 +18,13 @@ import (
 )
 
 type Tunnel struct {
-	terminationType string
-	muxSess         muxado.Session
+	muxSess muxado.Session
+	config  TunnelConfig
 }
 
 type TunnelConfig struct {
-	Domain string `json:"domain"`
+	Domain          string `json:"domain"`
+	TerminationType string `json:"termination_type"`
 }
 
 type ServerConfig struct {
@@ -112,7 +113,7 @@ func (s *Server) Run() {
 				mut.Unlock()
 
 				muxSess := tunnel.muxSess
-				terminationType := tunnel.terminationType
+				terminationType := tunnel.config.TerminationType
 
 				if !exists {
 					log.Println("No such tunnel")
@@ -164,7 +165,8 @@ func (s *Server) Run() {
 		}
 
 		tunConfig := TunnelConfig{
-			Domain: domain,
+			Domain:          domain,
+			TerminationType: terminationType,
 		}
 
 		bytes, err := json.Marshal(tunConfig)
@@ -188,8 +190,8 @@ func (s *Server) Run() {
 		mut.Lock()
 		defer mut.Unlock()
 		tunnels[domain] = Tunnel{
-			terminationType: terminationType,
-			muxSess:         muxSess,
+			muxSess: muxSess,
+			config:  tunConfig,
 		}
 	})
 
@@ -198,7 +200,7 @@ func (s *Server) Run() {
 
 type ClientConfig struct {
 	ServerDomain string
-	AdminDomain  string
+	Token        string
 }
 
 type Client struct {
@@ -206,7 +208,8 @@ type Client struct {
 
 func NewClient(config *ClientConfig) *Client {
 
-	tunnelDomain := config.AdminDomain
+	var tunConfig TunnelConfig
+
 	tlsTermination := "client"
 
 	// Use random unprivileged port for ACME challenges. This is necessary
@@ -230,7 +233,7 @@ func NewClient(config *ClientConfig) *Client {
 
 	certmagic.Default.OnDemand = &certmagic.OnDemandConfig{
 		DecisionFunc: func(ctx context.Context, name string) error {
-			if name != tunnelDomain {
+			if name != tunConfig.Domain {
 				return fmt.Errorf("not allowed")
 			}
 			return nil
@@ -248,7 +251,17 @@ func NewClient(config *ClientConfig) *Client {
 		NextProtos: []string{"http/1.1", "acme-tls/1"},
 	}
 
-	wsConn, _, err := websocket.Dial(ctx, fmt.Sprintf("wss://%s/?domain=%s&termination-type=%s", config.ServerDomain, tunnelDomain, tlsTermination), nil)
+	wsConn, _, err := websocket.Dial(ctx, fmt.Sprintf("wss://%s/?token=%s&termination-type=%s", config.ServerDomain, config.Token, tlsTermination), nil)
+	if err != nil {
+		panic(err)
+	}
+
+	_, tunConfigBytes, err := wsConn.Read(ctx)
+	if err != nil {
+		panic(err)
+	}
+
+	err = json.Unmarshal(tunConfigBytes, &tunConfig)
 	if err != nil {
 		panic(err)
 	}
@@ -326,6 +339,9 @@ func pipeConns(readConn net.Conn, writeConn net.Conn) {
 		conn.CloseWrite()
 	case muxado.Stream:
 		log.Println("close muxado.Stream")
+		conn.CloseWrite()
+	case *ProxyConn:
+		log.Println("close ProxyConn")
 		conn.CloseWrite()
 	default:
 		log.Printf("pipeConns close: %T\n", writeConn)

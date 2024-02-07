@@ -8,17 +8,11 @@ import (
 
 func main() {
 	serverDomainArg := flag.String("server-domain", "", "Server domain")
-	adminDomainArg := flag.String("admin-domain", "", "Admin domain")
 	flag.Parse()
-
-	adminDomain := *adminDomainArg
-	if adminDomain == "" {
-		panic("Must provide admin domain")
-	}
 
 	config := &waygate.ClientConfig{
 		ServerDomain: *serverDomainArg,
-		AdminDomain:  adminDomain,
+		Token:        "yolo",
 	}
 
 	waygate.NewClient(config)
