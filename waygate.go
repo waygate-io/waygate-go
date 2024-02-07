@@ -3,6 +3,8 @@ package waygate
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -18,6 +20,10 @@ import (
 type Tunnel struct {
 	terminationType string
 	muxSess         muxado.Session
+}
+
+type TunnelConfig struct {
+	Domain string `json:"domain"`
 }
 
 type ServerConfig struct {
@@ -137,12 +143,38 @@ func (s *Server) Run() {
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 
-		domain := r.URL.Query().Get("domain")
+		token := r.URL.Query().Get("token")
+		if token != "yolo" {
+			w.WriteHeader(401)
+			log.Println(errors.New("Invalid token"))
+			return
+		}
+
+		domain := fmt.Sprintf("test.%s", s.config.AdminDomain)
+
 		terminationType := r.URL.Query().Get("termination-type")
 
 		c, err := websocket.Accept(w, r, &websocket.AcceptOptions{
 			OriginPatterns: []string{"*"},
 		})
+		if err != nil {
+			w.WriteHeader(500)
+			log.Println(err)
+			return
+		}
+
+		tunConfig := TunnelConfig{
+			Domain: domain,
+		}
+
+		bytes, err := json.Marshal(tunConfig)
+		if err != nil {
+			w.WriteHeader(500)
+			log.Println(err)
+			return
+		}
+
+		err = c.Write(ctx, websocket.MessageBinary, bytes)
 		if err != nil {
 			w.WriteHeader(500)
 			log.Println(err)
