@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 
-	"github.com/anderspitman/waygate-muxado-go"
+	"github.com/waygate-io/waygate-go"
 )
 
 func main() {

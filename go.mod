@@ -1,4 +1,4 @@
-module github.com/anderspitman/waygate-muxado-go
+module github.com/waygate-io/waygate-go
 
 go 1.21.4
 
