@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"net/http"
 
 	"github.com/caddyserver/certmagic"
+	"github.com/lastlogin-io/obligator"
 	"golang.ngrok.com/muxado/v2"
 	"nhooyr.io/websocket"
 )
@@ -66,7 +68,16 @@ func NewClient(config *ClientConfig) *Client {
 		NextProtos: []string{"http/1.1", "acme-tls/1"},
 	}
 
-	wsConn, _, err := websocket.Dial(ctx, fmt.Sprintf("wss://%s/waygate?token=%s&termination-type=%s", config.ServerDomain, config.Token, tlsTermination), nil)
+	token := config.Token
+
+	if token == "" {
+		token, err = getToken(fmt.Sprintf("https://%s/oauth2/authorize", config.ServerDomain))
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	wsConn, _, err := websocket.Dial(ctx, fmt.Sprintf("wss://%s/waygate?token=%s&termination-type=%s", config.ServerDomain, token, tlsTermination), nil)
 	if err != nil {
 		panic(err)
 	}
@@ -115,4 +126,45 @@ func NewClient(config *ClientConfig) *Client {
 	}
 
 	return nil
+}
+
+func getToken(authServerUri string) (string, error) {
+	port, err := randomOpenPort()
+	if err != nil {
+		return "", err
+	}
+
+	localUri := fmt.Sprintf("http://localhost:%d", port)
+
+	authUri := obligator.AuthUri(authServerUri, &obligator.OAuth2AuthRequest{
+		ClientId:     localUri,
+		RedirectUri:  fmt.Sprintf("%s/oauth2/callback", localUri),
+		ResponseType: "code",
+		Scope:        "waygate",
+		State:        "TODO",
+	})
+
+	fmt.Println(authUri)
+
+	mux := http.NewServeMux()
+
+	listenStr := fmt.Sprintf(":%d", port)
+	server := &http.Server{
+		Addr:    listenStr,
+		Handler: mux,
+	}
+
+	token := ""
+
+	mux.HandleFunc("/oauth2/callback", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Println("callback")
+		token = "yolo"
+		go func() {
+			server.Shutdown(context.Background())
+		}()
+	})
+
+	server.ListenAndServe()
+
+	return token, nil
 }

@@ -8,11 +8,12 @@ import (
 
 func main() {
 	serverDomainArg := flag.String("server-domain", "", "Server domain")
+	tokenArg := flag.String("token", "", "Token")
 	flag.Parse()
 
 	config := &waygate.ClientConfig{
 		ServerDomain: *serverDomainArg,
-		Token:        "yolo",
+		Token:        *tokenArg,
 	}
 
 	waygate.NewClient(config)
