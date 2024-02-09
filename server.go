@@ -44,13 +44,14 @@ func (m *ServerMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		_, err := m.authServer.Validate(r)
 		if err != nil {
 
-			redirectUri := fmt.Sprintf("https://%s/oauth2/callback", m.adminDomain)
+			redirectUri := fmt.Sprintf("https://%s", m.adminDomain)
 
 			authUri := m.authServer.AuthUri(&obligator.OAuth2AuthRequest{
-				ClientId:    "https://" + m.adminDomain,
-				RedirectUri: redirectUri,
-				State:       "TODO",
-				Scope:       "TODO",
+				ResponseType: "none",
+				ClientId:     "https://" + m.adminDomain,
+				RedirectUri:  redirectUri,
+				State:        "TODO",
+				Scope:        "TODO",
 			})
 
 			http.Redirect(w, r, authUri, 303)
@@ -216,13 +217,6 @@ func (s *Server) Run() {
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("<h1>Hi there</h1>"))
-	})
-
-	// TODO: It would be nice if there was a way to tell obligator not to
-	// include query params when redirecting back so we can avoid this
-	// extra redirect to strip them.
-	mux.HandleFunc("/oauth2/callback", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, fmt.Sprintf("https://%s", s.config.AdminDomain), 307)
 	})
 
 	mux.HandleFunc("/waygate", func(w http.ResponseWriter, r *http.Request) {
