@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	"github.com/caddyserver/certmagic"
+	"github.com/lastlogin-io/obligator"
 	"golang.ngrok.com/muxado/v2"
 	"nhooyr.io/websocket"
 )
@@ -34,6 +35,21 @@ func NewServer(config *ServerConfig) *Server {
 }
 
 func (s *Server) Run() {
+	// Use random unprivileged port for ACME challenges. This is necessary
+	// because of the way certmagic works, in that if it fails to bind
+	// HTTPSPort (443 by default) and doesn't detect anything else binding
+	// it, it fails. Obviously the boringproxy client is likely to be
+	// running on a machine where 443 isn't bound, so we need a different
+	// port to hack around this. See here for more details:
+	// https://github.com/caddyserver/certmagic/issues/111
+	var err error
+	certmagic.HTTPSPort, err = randomOpenPort()
+	if err != nil {
+		log.Println("Failed get random port for TLS challenges")
+		panic(err)
+	}
+
+	certmagic.DefaultACME.DisableHTTPChallenge = true
 	certmagic.DefaultACME.Agreed = true
 	//certmagic.DefaultACME.CA = certmagic.LetsEncryptStagingCA
 
@@ -54,16 +70,13 @@ func (s *Server) Run() {
 		NextProtos: []string{"http/1.1", "acme-tls/1"},
 	}
 
-	err := certConfig.ManageSync(context.Background(), []string{s.config.AdminDomain})
-	if err != nil {
-		log.Fatal(err)
+	authDomain := "auth." + s.config.AdminDomain
+	authConfig := obligator.ServerConfig{
+		RootUri: "https://" + authDomain,
 	}
+	authServer := obligator.NewServer(authConfig)
 
 	mux := http.NewServeMux()
-
-	mux.HandleFunc("/ui", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("Hi there"))
-	})
 
 	tcpListener, err := net.Listen("tcp", ":9443")
 	if err != nil {
@@ -94,7 +107,7 @@ func (s *Server) Run() {
 
 			passConn := NewProxyConn(tcpConn, clientReader)
 
-			if clientHello.ServerName == s.config.AdminDomain {
+			if clientHello.ServerName == s.config.AdminDomain || clientHello.ServerName == authDomain {
 				waygateListener.PassConn(passConn)
 			} else {
 				mut.Lock()
@@ -132,6 +145,32 @@ func (s *Server) Run() {
 	tlsListener := tls.NewListener(waygateListener, tlsConfig)
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		host := r.Host
+
+		switch host {
+		case s.config.AdminDomain:
+			_, err := authServer.Validate(r)
+			if err != nil {
+				redirectUri := fmt.Sprintf("https://%s/oauth2/callback", s.config.AdminDomain)
+				url := fmt.Sprintf("https://%s/auth?client_id=%s&redirect_uri=%s&response_type=code&state=&scope=",
+					authDomain, redirectUri, redirectUri)
+				http.Redirect(w, r, url, 303)
+				return
+			}
+
+			w.Write([]byte("<h1>Hi there</h1>"))
+		case authDomain:
+			authServer.ServeHTTP(w, r)
+		}
+	})
+
+	// It would be nice if there was a way to tell obligator not to include query params
+	// when redirecting back so we can avoid this extra redirect to strip them.
+	mux.HandleFunc("/oauth2/callback", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, fmt.Sprintf("https://%s", s.config.AdminDomain), 307)
+	})
+
+	mux.HandleFunc("/waygate", func(w http.ResponseWriter, r *http.Request) {
 
 		token := r.URL.Query().Get("token")
 		if token != "yolo" {

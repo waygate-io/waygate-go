@@ -66,7 +66,7 @@ func NewClient(config *ClientConfig) *Client {
 		NextProtos: []string{"http/1.1", "acme-tls/1"},
 	}
 
-	wsConn, _, err := websocket.Dial(ctx, fmt.Sprintf("wss://%s/?token=%s&termination-type=%s", config.ServerDomain, config.Token, tlsTermination), nil)
+	wsConn, _, err := websocket.Dial(ctx, fmt.Sprintf("wss://%s/waygate?token=%s&termination-type=%s", config.ServerDomain, config.Token, tlsTermination), nil)
 	if err != nil {
 		panic(err)
 	}
