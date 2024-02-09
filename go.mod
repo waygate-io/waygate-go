@@ -2,6 +2,8 @@ module github.com/waygate-io/waygate-go
 
 go 1.21.4
 
+replace github.com/lastlogin-io/obligator => ../obligator
+
 require (
 	github.com/caddyserver/certmagic v0.20.0
 	github.com/lastlogin-io/obligator v0.0.0-20240209015740-b72ea8f4b27f

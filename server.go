@@ -17,6 +17,71 @@ import (
 	"nhooyr.io/websocket"
 )
 
+type ServerMux struct {
+	mux         *http.ServeMux
+	authServer  *obligator.Server
+	adminDomain string
+}
+
+func NewServerMux(authServer *obligator.Server, adminDomain string) *ServerMux {
+	m := &ServerMux{
+		mux:         http.NewServeMux(),
+		authServer:  authServer,
+		adminDomain: adminDomain,
+	}
+	return m
+}
+
+func (m *ServerMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Security-Policy", "frame-ancestors 'none'; script-src 'none'")
+	w.Header().Set("Referrer-Policy", "no-referrer")
+
+	host := r.Host
+
+	authDomain := m.authServer.AuthDomains()[0]
+
+	if r.URL.Path != "/waygate" && host != authDomain {
+		_, err := m.authServer.Validate(r)
+		if err != nil {
+
+			redirectUri := fmt.Sprintf("https://%s/oauth2/callback", m.adminDomain)
+
+			authUri := m.authServer.AuthUri(&obligator.OAuth2AuthRequest{
+				ClientId:    "https://" + m.adminDomain,
+				RedirectUri: redirectUri,
+				State:       "TODO",
+				Scope:       "TODO",
+			})
+
+			http.Redirect(w, r, authUri, 303)
+			return
+		}
+	} else if host == authDomain {
+		m.authServer.ServeHTTP(w, r)
+		return
+	}
+
+	//timestamp := time.Now().Format(time.RFC3339)
+
+	//remoteIp, err := getRemoteIp(r, s.behindProxy)
+	//if err != nil {
+	//	w.WriteHeader(500)
+	//	io.WriteString(w, err.Error())
+	//	return
+	//}
+
+	//fmt.Println(fmt.Sprintf("%s\t%s\t%s\t%s\t%s", timestamp, remoteIp, r.Method, r.Host, r.URL.Path))
+	m.mux.ServeHTTP(w, r)
+}
+
+func (s *ServerMux) Handle(p string, h http.Handler) {
+	s.mux.Handle(p, h)
+}
+
+func (s *ServerMux) HandleFunc(p string, f func(w http.ResponseWriter, r *http.Request)) {
+	s.mux.HandleFunc(p, f)
+}
+
 type ServerConfig struct {
 	AdminDomain string
 }
@@ -76,7 +141,12 @@ func (s *Server) Run() {
 	}
 	authServer := obligator.NewServer(authConfig)
 
-	mux := http.NewServeMux()
+	oauth2Handler := NewOAuth2Handler()
+
+	//mux := http.NewServeMux()
+	mux := NewServerMux(authServer, s.config.AdminDomain)
+
+	mux.Handle("/oauth2/", oauth2Handler)
 
 	tcpListener, err := net.Listen("tcp", ":9443")
 	if err != nil {
@@ -145,27 +215,12 @@ func (s *Server) Run() {
 	tlsListener := tls.NewListener(waygateListener, tlsConfig)
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		host := r.Host
-
-		switch host {
-		case s.config.AdminDomain:
-			_, err := authServer.Validate(r)
-			if err != nil {
-				redirectUri := fmt.Sprintf("https://%s/oauth2/callback", s.config.AdminDomain)
-				url := fmt.Sprintf("https://%s/auth?client_id=%s&redirect_uri=%s&response_type=code&state=&scope=",
-					authDomain, redirectUri, redirectUri)
-				http.Redirect(w, r, url, 303)
-				return
-			}
-
-			w.Write([]byte("<h1>Hi there</h1>"))
-		case authDomain:
-			authServer.ServeHTTP(w, r)
-		}
+		w.Write([]byte("<h1>Hi there</h1>"))
 	})
 
-	// It would be nice if there was a way to tell obligator not to include query params
-	// when redirecting back so we can avoid this extra redirect to strip them.
+	// TODO: It would be nice if there was a way to tell obligator not to
+	// include query params when redirecting back so we can avoid this
+	// extra redirect to strip them.
 	mux.HandleFunc("/oauth2/callback", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, fmt.Sprintf("https://%s", s.config.AdminDomain), 307)
 	})
