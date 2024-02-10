@@ -47,6 +47,7 @@ func (m *ServerMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			redirectUri := fmt.Sprintf("https://%s", m.adminDomain)
 
 			authUri := m.authServer.AuthUri(&obligator.OAuth2AuthRequest{
+				// https://openid.net/specs/oauth-v2-multiple-response-types-1_0.html#none
 				ResponseType: "none",
 				ClientId:     "https://" + m.adminDomain,
 				RedirectUri:  redirectUri,
@@ -142,12 +143,13 @@ func (s *Server) Run() {
 	}
 	authServer := obligator.NewServer(authConfig)
 
-	oauth2Handler := NewOAuth2Handler()
+	oauth2Prefix := "/oauth2"
+	oauth2Handler := NewOAuth2Handler(oauth2Prefix)
 
 	//mux := http.NewServeMux()
 	mux := NewServerMux(authServer, s.config.AdminDomain)
 
-	mux.Handle("/oauth2/", oauth2Handler)
+	mux.Handle(oauth2Prefix+"/", http.StripPrefix(oauth2Prefix, oauth2Handler))
 
 	tcpListener, err := net.Listen("tcp", ":9443")
 	if err != nil {
