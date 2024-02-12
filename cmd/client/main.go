@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	serverDomainArg := flag.String("server-domain", "", "Server domain")
+	serverDomainArg := flag.String("server-domain", "waygate.io", "Server domain")
 	tokenArg := flag.String("token", "", "Token")
 	flag.Parse()
 
