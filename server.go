@@ -9,10 +9,12 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"sync"
 
 	"github.com/caddyserver/certmagic"
 	"github.com/lastlogin-io/obligator"
+	"github.com/waygate-io/waygate-go/josencillo"
 	"golang.ngrok.com/muxado/v2"
 	"nhooyr.io/websocket"
 )
@@ -40,7 +42,7 @@ func (m *ServerMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	authDomain := m.authServer.AuthDomains()[0]
 
-	if r.URL.Path != "/waygate" && host != authDomain {
+	if r.URL.Path != "/waygate" && host != authDomain && r.URL.Path != "/oauth2/token" {
 		_, err := m.authServer.Validate(r)
 		if err != nil {
 
@@ -51,8 +53,8 @@ func (m *ServerMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				ResponseType: "none",
 				ClientId:     "https://" + m.adminDomain,
 				RedirectUri:  redirectUri,
-				State:        "TODO",
-				Scope:        "TODO",
+				State:        "",
+				Scope:        "",
 			})
 
 			http.Redirect(w, r, authUri, 303)
@@ -140,11 +142,18 @@ func (s *Server) Run() {
 	authDomain := "auth." + s.config.AdminDomain
 	authConfig := obligator.ServerConfig{
 		RootUri: "https://" + authDomain,
+		Prefix:  "waygate_auth_",
 	}
 	authServer := obligator.NewServer(authConfig)
 
+	jose, err := josencillo.NewJOSE()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+		os.Exit(1)
+	}
+
 	oauth2Prefix := "/oauth2"
-	oauth2Handler := NewOAuth2Handler(oauth2Prefix)
+	oauth2Handler := NewOAuth2Handler(oauth2Prefix, jose)
 
 	//mux := http.NewServeMux()
 	mux := NewServerMux(authServer, s.config.AdminDomain)
@@ -223,14 +232,22 @@ func (s *Server) Run() {
 
 	mux.HandleFunc("/waygate", func(w http.ResponseWriter, r *http.Request) {
 
-		token := r.URL.Query().Get("token")
-		if token != "yolo" {
+		tokenJwt := r.URL.Query().Get("token")
+		if tokenJwt == "" {
 			w.WriteHeader(401)
-			log.Println(errors.New("Invalid token"))
+			log.Println(errors.New("Missing token"))
 			return
 		}
 
-		domain := fmt.Sprintf("test.%s", s.config.AdminDomain)
+		claims, err := jose.ParseJWT(tokenJwt)
+		if err != nil {
+			w.WriteHeader(401)
+			log.Println(err)
+			return
+		}
+
+		//domain := fmt.Sprintf("test.%s", s.config.AdminDomain)
+		domain := claims["domain"].(string)
 
 		terminationType := r.URL.Query().Get("termination-type")
 

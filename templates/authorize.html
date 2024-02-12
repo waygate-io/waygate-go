@@ -2,5 +2,6 @@
 
 <form action='{{.Prefix}}/approve'>
   <input type='hidden' name='redirect_uri' value='{{.RedirectUri}}' />
+  <input type='text' name='domain' />
   <button type='submit'>Approve</button>
 </form>
