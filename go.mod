@@ -7,6 +7,8 @@ replace github.com/lastlogin-io/obligator => ../obligator
 require (
 	github.com/caddyserver/certmagic v0.20.0
 	github.com/lastlogin-io/obligator v0.0.0-20240209015740-b72ea8f4b27f
+	github.com/lestrrat-go/jwx/v2 v2.0.11
+	github.com/pires/go-proxyproto v0.7.0
 	golang.ngrok.com/muxado/v2 v2.0.0
 	nhooyr.io/websocket v1.8.10
 )
@@ -21,7 +23,6 @@ require (
 	github.com/lestrrat-go/httpcc v1.0.1 // indirect
 	github.com/lestrrat-go/httprc v1.0.4 // indirect
 	github.com/lestrrat-go/iter v1.0.2 // indirect
-	github.com/lestrrat-go/jwx/v2 v2.0.11 // indirect
 	github.com/lestrrat-go/option v1.0.1 // indirect
 	github.com/libdns/libdns v0.2.1 // indirect
 	github.com/mattn/go-sqlite3 v1.14.18 // indirect

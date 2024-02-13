@@ -14,6 +14,7 @@ import (
 
 	"github.com/caddyserver/certmagic"
 	"github.com/lastlogin-io/obligator"
+	proxyproto "github.com/pires/go-proxyproto"
 	"github.com/waygate-io/waygate-go/josencillo"
 	"golang.ngrok.com/muxado/v2"
 	"nhooyr.io/websocket"
@@ -196,15 +197,12 @@ func (s *Server) Run() {
 				tunnel, exists := tunnels[clientHello.ServerName]
 				mut.Unlock()
 
-				muxSess := tunnel.muxSess
-				terminationType := tunnel.config.TerminationType
-
 				if !exists {
 					log.Println("No such tunnel")
 					continue
 				}
 
-				upstreamConn, err := muxSess.Open()
+				upstreamConn, err := tunnel.muxSess.OpenStream()
 				if err != nil {
 					log.Println(err)
 					panic(err)
@@ -212,10 +210,45 @@ func (s *Server) Run() {
 
 				go func() {
 
-					var conn net.Conn = passConn
+					var conn connCloseWriter = passConn
 
-					if terminationType == "server" {
+					if tunnel.config.TerminationType == "server" {
 						conn = tls.Server(passConn, tlsConfig)
+					}
+
+					host, port, err := addrToHostPort(conn.RemoteAddr())
+					if err != nil {
+						log.Println(err)
+						panic(err)
+					}
+
+					localHost, localPort, err := addrToHostPort(conn.LocalAddr())
+					if err != nil {
+						log.Println(err)
+						panic(err)
+					}
+
+					if tunnel.config.UseProxyProtocol {
+						proxyHeader := &proxyproto.Header{
+							Version:           2,
+							Command:           proxyproto.PROXY,
+							TransportProtocol: proxyproto.TCPv4,
+							SourceAddr: &net.TCPAddr{
+								IP:   net.ParseIP(host),
+								Port: port,
+							},
+							DestinationAddr: &net.TCPAddr{
+								IP:   net.ParseIP(localHost),
+								Port: localPort,
+							},
+						}
+
+						// TODO: I think this can possibly block and deadlock
+						n, err := proxyHeader.WriteTo(upstreamConn)
+						if err != nil {
+							fmt.Println("ruh roh", n, err)
+						}
+						fmt.Println("done writing")
 					}
 
 					ConnectConns(conn, upstreamConn)
@@ -260,9 +293,12 @@ func (s *Server) Run() {
 			return
 		}
 
+		useProxyProto := r.URL.Query().Get("use-proxy-protocol") == "true"
+
 		tunConfig := TunnelConfig{
-			Domain:          domain,
-			TerminationType: terminationType,
+			Domain:           domain,
+			TerminationType:  terminationType,
+			UseProxyProtocol: useProxyProto,
 		}
 
 		bytes, err := json.Marshal(tunConfig)

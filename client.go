@@ -1,6 +1,7 @@
 package waygate
 
 import (
+	"bufio"
 	"context"
 	"crypto/tls"
 	"encoding/json"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/caddyserver/certmagic"
 	"github.com/lastlogin-io/obligator"
+	proxyproto "github.com/pires/go-proxyproto"
 	"golang.ngrok.com/muxado/v2"
 	"nhooyr.io/websocket"
 )
@@ -31,6 +33,8 @@ func NewClient(config *ClientConfig) *Client {
 	var tunConfig TunnelConfig
 
 	tlsTermination := "client"
+	//tlsTermination := "server"
+	useProxyProtoStr := "true"
 
 	// Use random unprivileged port for ACME challenges. This is necessary
 	// because of the way certmagic works, in that if it fails to bind
@@ -83,7 +87,14 @@ func NewClient(config *ClientConfig) *Client {
 	fmt.Println("Token")
 	printJson(token)
 
-	wsConn, _, err := websocket.Dial(ctx, fmt.Sprintf("wss://%s/waygate?token=%s&termination-type=%s", config.ServerDomain, token, tlsTermination), nil)
+	uri := fmt.Sprintf("wss://%s/waygate?token=%s&termination-type=%s&use-proxy-protocol=%s",
+		config.ServerDomain,
+		token,
+		tlsTermination,
+		useProxyProtoStr,
+	)
+
+	wsConn, _, err := websocket.Dial(ctx, uri, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -105,8 +116,9 @@ func NewClient(config *ClientConfig) *Client {
 	log.Println("Got client")
 
 	for {
-		downstreamConn, err := muxSess.Accept()
+		downstreamConn, err := muxSess.AcceptStream()
 		if err != nil {
+			// TODO: close on error
 			log.Println(err)
 			continue
 		}
@@ -115,13 +127,27 @@ func NewClient(config *ClientConfig) *Client {
 
 			log.Println("Got stream")
 
-			var conn net.Conn = downstreamConn
+			var conn connCloseWriter = downstreamConn
 
-			if tlsTermination == "client" {
-				conn = tls.Server(downstreamConn, tlsConfig)
+			if tunConfig.UseProxyProtocol {
+				reader := bufio.NewReader(conn)
+				_, err := proxyproto.Read(reader)
+				if err != nil {
+					// TODO: close on error
+					log.Println(err)
+					return
+				}
+
 			}
 
-			upstreamConn, err := net.Dial("tcp", "127.0.0.1:8080")
+			if tlsTermination == "client" {
+				conn = tls.Server(conn, tlsConfig)
+			}
+
+			upstreamConn, err := net.DialTCP("tcp", nil, &net.TCPAddr{
+				IP:   net.ParseIP("127.0.0.1"),
+				Port: 8080,
+			})
 			if err != nil {
 				log.Println("Error dialing")
 				return

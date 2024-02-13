@@ -2,7 +2,6 @@ package waygate
 
 import (
 	"crypto/rand"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,12 +10,16 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
-
-	"golang.ngrok.com/muxado/v2"
 )
+
+type connCloseWriter interface {
+	net.Conn
+	CloseWrite() error
+}
 
 func randomOpenPort() (int, error) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
@@ -40,7 +43,7 @@ func printJson(data interface{}) {
 	fmt.Println(string(d))
 }
 
-func ConnectConns(downstreamConn net.Conn, upstreamConn net.Conn) {
+func ConnectConns(downstreamConn connCloseWriter, upstreamConn connCloseWriter) {
 
 	defer downstreamConn.Close()
 	defer upstreamConn.Close()
@@ -61,30 +64,14 @@ func ConnectConns(downstreamConn net.Conn, upstreamConn net.Conn) {
 	wg.Wait()
 }
 
-func pipeConns(readConn net.Conn, writeConn net.Conn) {
+func pipeConns(readConn net.Conn, writeConn connCloseWriter) {
 	_, err := io.Copy(writeConn, readConn)
 	if err != nil {
-		log.Println("here")
 		log.Println(err.Error())
 	}
 
-	switch conn := writeConn.(type) {
-	case *net.TCPConn:
-		log.Println("close TCPConn")
-		conn.CloseWrite()
-	case *tls.Conn:
-		log.Println("close tls.Conn")
-		conn.CloseWrite()
-	case muxado.Stream:
-		log.Println("close muxado.Stream")
-		conn.CloseWrite()
-	case *ProxyConn:
-		log.Println("close ProxyConn")
-		conn.CloseWrite()
-	default:
-		log.Printf("pipeConns close: %T\n", writeConn)
-		panic("invalid conn type")
-	}
+	writeConn.CloseWrite()
+	log.Println("CloseWrite:", reflect.TypeOf(writeConn))
 }
 
 func genRandomText(length int) (string, error) {
@@ -137,4 +124,18 @@ func buildCookieDomain(fullUrl string) (string, error) {
 		cookieDomain := strings.Join(hostParts[1:], ".")
 		return cookieDomain, nil
 	}
+}
+
+func addrToHostPort(addr net.Addr) (string, int, error) {
+	host, portStr, err := net.SplitHostPort(addr.String())
+	if err != nil {
+		return "", 0, err
+	}
+
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return "", 0, err
+	}
+
+	return host, port, nil
 }

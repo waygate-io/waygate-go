@@ -10,6 +10,7 @@ type Tunnel struct {
 }
 
 type TunnelConfig struct {
-	Domain          string `json:"domain"`
-	TerminationType string `json:"termination_type"`
+	Domain           string `json:"domain"`
+	TerminationType  string `json:"termination_type"`
+	UseProxyProtocol bool   `json:"use_proxy_protocol"`
 }

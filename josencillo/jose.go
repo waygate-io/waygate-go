@@ -86,7 +86,6 @@ func (j *JOSE) ParseJWT(jwt_ string) (claims map[string]interface{}, err error) 
 	if err != nil {
 		return nil, err
 	}
-	printJson(m)
 
 	claims = make(map[string]interface{})
 
