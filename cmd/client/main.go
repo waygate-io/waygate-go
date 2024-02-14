@@ -16,5 +16,6 @@ func main() {
 		Token:        *tokenArg,
 	}
 
-	waygate.NewClient(config)
+	client := waygate.NewClient(config)
+	client.Run()
 }

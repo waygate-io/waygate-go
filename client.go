@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/caddyserver/certmagic"
@@ -20,15 +21,64 @@ import (
 	"nhooyr.io/websocket"
 )
 
+type TunnelConnectedEvent struct {
+	TunnelConfig TunnelConfig
+}
+
+type OAuth2AuthUriEvent struct {
+	Uri string
+}
+
 type ClientConfig struct {
 	ServerDomain string
 	Token        string
 }
 
 type Client struct {
+	config   *ClientConfig
+	eventCh  chan interface{}
+	proxyMap map[string]string
 }
 
 func NewClient(config *ClientConfig) *Client {
+
+	configCopy := *config
+
+	if configCopy.ServerDomain == "" {
+		configCopy.ServerDomain = "waygate.io"
+	}
+
+	return &Client{
+		config:   &configCopy,
+		eventCh:  make(chan interface{}),
+		proxyMap: make(map[string]string),
+	}
+}
+
+func (c *Client) ListenEvents(eventCh chan interface{}) {
+	c.eventCh = eventCh
+}
+
+func (c *Client) Proxy(domain, addr string) {
+	if domain == "" || addr == "" {
+		return
+	}
+
+	c.proxyMap[domain] = addr
+	printJson(c.proxyMap)
+}
+
+func (c *Client) Run() error {
+
+	token := c.config.Token
+
+	if token == "" {
+		var err error
+		token, err = c.getToken(fmt.Sprintf("https://%s/oauth2", c.config.ServerDomain))
+		if err != nil {
+			panic(err)
+		}
+	}
 
 	var tunConfig TunnelConfig
 
@@ -75,20 +125,8 @@ func NewClient(config *ClientConfig) *Client {
 		NextProtos: []string{"http/1.1", "acme-tls/1"},
 	}
 
-	token := config.Token
-
-	if token == "" {
-		token, err = getToken(fmt.Sprintf("https://%s/oauth2", config.ServerDomain))
-		if err != nil {
-			panic(err)
-		}
-	}
-
-	fmt.Println("Token")
-	printJson(token)
-
 	uri := fmt.Sprintf("wss://%s/waygate?token=%s&termination-type=%s&use-proxy-protocol=%s",
-		config.ServerDomain,
+		c.config.ServerDomain,
 		token,
 		tlsTermination,
 		useProxyProtoStr,
@@ -113,7 +151,9 @@ func NewClient(config *ClientConfig) *Client {
 
 	muxSess := muxado.Client(sessConn, nil)
 
-	log.Println("Got client")
+	c.eventCh <- TunnelConnectedEvent{
+		TunnelConfig: tunConfig,
+	}
 
 	for {
 		downstreamConn, err := muxSess.AcceptStream()
@@ -144,9 +184,23 @@ func NewClient(config *ClientConfig) *Client {
 				conn = tls.Server(conn, tlsConfig)
 			}
 
+			proxyAddr := c.proxyMap[tunConfig.Domain]
+
+			ip, portStr, err := net.SplitHostPort(proxyAddr)
+			if err != nil {
+				log.Println("Error splitting address")
+				return
+			}
+
+			port, err := strconv.Atoi(portStr)
+			if err != nil {
+				log.Println("Error parsing port")
+				return
+			}
+
 			upstreamConn, err := net.DialTCP("tcp", nil, &net.TCPAddr{
-				IP:   net.ParseIP("127.0.0.1"),
-				Port: 8080,
+				IP:   net.ParseIP(ip),
+				Port: port,
 			})
 			if err != nil {
 				log.Println("Error dialing")
@@ -156,11 +210,9 @@ func NewClient(config *ClientConfig) *Client {
 			ConnectConns(conn, upstreamConn)
 		}()
 	}
-
-	return nil
 }
 
-func getToken(authServerUri string) (string, error) {
+func (c *Client) getToken(authServerUri string) (string, error) {
 	port, err := randomOpenPort()
 	if err != nil {
 		return "", err
@@ -181,7 +233,9 @@ func getToken(authServerUri string) (string, error) {
 		State:        state,
 	})
 
-	fmt.Println(authUri)
+	c.eventCh <- OAuth2AuthUriEvent{
+		Uri: authUri,
+	}
 
 	mux := http.NewServeMux()
 
@@ -212,11 +266,7 @@ func getToken(authServerUri string) (string, error) {
 		params.Set("code", code)
 		body := strings.NewReader(params.Encode())
 
-		fmt.Println("params", params.Encode())
-
 		tokenUri := fmt.Sprintf("%s/token", authServerUri)
-
-		fmt.Println("tokenUri", tokenUri)
 
 		req, err := http.NewRequest(http.MethodPost, tokenUri, body)
 		if err != nil {
