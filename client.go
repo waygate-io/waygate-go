@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -20,6 +21,10 @@ import (
 	"golang.ngrok.com/muxado/v2"
 	"nhooyr.io/websocket"
 )
+
+type UsersUpdatedEvent struct {
+	Users []obligator.User
+}
 
 type TunnelConnectedEvent struct {
 	TunnelConfig TunnelConfig
@@ -78,8 +83,6 @@ func (m *ClientMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, authUri, 303)
 			return
 		}
-
-		fmt.Println("here")
 	} else {
 		m.authServer.ServeHTTP(w, r)
 		return
@@ -95,9 +98,10 @@ type ClientConfig struct {
 }
 
 type Client struct {
-	config   *ClientConfig
-	eventCh  chan interface{}
-	proxyMap map[string]string
+	config     *ClientConfig
+	eventCh    chan interface{}
+	proxyMap   map[string]string
+	authServer *obligator.Server
 }
 
 func NewClient(config *ClientConfig) *Client {
@@ -106,10 +110,6 @@ func NewClient(config *ClientConfig) *Client {
 
 	if configCopy.ServerDomain == "" {
 		configCopy.ServerDomain = "waygate.io"
-	}
-
-	if len(configCopy.Users) == 0 {
-		panic("Must provide a user")
 	}
 
 	return &Client{
@@ -220,18 +220,13 @@ func (c *Client) Run() error {
 
 	muxSess := muxado.Client(sessConn, nil)
 
-	if c.eventCh != nil {
-		c.eventCh <- TunnelConnectedEvent{
-			TunnelConfig: tunConfig,
-		}
-	}
-
 	authDomain := "auth." + tunConfig.Domain
 	authConfig := obligator.ServerConfig{
 		RootUri: "https://" + authDomain,
 		Prefix:  "waygate_client_auth_",
 	}
 	authServer := obligator.NewServer(authConfig)
+	c.authServer = authServer
 	err = authServer.SetOAuth2Provider(obligator.OAuth2Provider{
 		ID:            "lastlogin",
 		Name:          "LastLogin",
@@ -243,13 +238,6 @@ func (c *Client) Run() error {
 		panic(err)
 	}
 
-	err = authServer.AddUser(obligator.User{
-		Email: c.config.Users[0],
-	})
-	if err != nil {
-		fmt.Println(err)
-	}
-
 	mux := NewClientMux(authServer, tunConfig.Domain)
 
 	listener := NewPassthroughListener()
@@ -259,6 +247,21 @@ func (c *Client) Run() error {
 	})
 
 	go http.Serve(listener, mux)
+
+	users, err := c.authServer.GetUsers()
+	if err != nil {
+		panic(err)
+	}
+
+	if c.eventCh != nil {
+		c.eventCh <- TunnelConnectedEvent{
+			TunnelConfig: tunConfig,
+		}
+
+		c.eventCh <- UsersUpdatedEvent{
+			Users: users,
+		}
+	}
 
 	for {
 		downstreamConn, err := muxSess.AcceptStream()
@@ -345,6 +348,38 @@ func (c *Client) Run() error {
 			//ConnectConns(conn, upstreamConn)
 		}()
 	}
+}
+
+func (c *Client) GetUsers() ([]obligator.User, error) {
+	if c.authServer == nil {
+		return nil, errors.New("No auth server")
+	}
+
+	return c.authServer.GetUsers()
+}
+
+func (c *Client) AddUser(user obligator.User) error {
+	if c.authServer == nil {
+		return errors.New("No auth server")
+	}
+
+	err := c.authServer.AddUser(user)
+	if err != nil {
+		return err
+	}
+
+	users, err := c.authServer.GetUsers()
+	if err != nil {
+		return err
+	}
+
+	if c.eventCh != nil {
+		c.eventCh <- UsersUpdatedEvent{
+			Users: users,
+		}
+	}
+
+	return nil
 }
 
 func (c *Client) getToken(authServerUri string, redirUriCh chan string) (string, error) {

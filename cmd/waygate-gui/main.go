@@ -7,6 +7,7 @@ import (
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
+	"github.com/lastlogin-io/obligator"
 	"github.com/skip2/go-qrcode"
 	"github.com/waygate-io/waygate-go"
 )
@@ -59,14 +60,24 @@ func main() {
 	)
 
 	domainLabel := widget.NewLabel("Domain")
-	addrEntry := widget.NewEntry()
+	//addrEntry := widget.NewEntry()
+	userEntry := widget.NewEntry()
+	userList := container.NewVBox()
 	connectedPage := container.NewVBox(
 		widget.NewLabel("Connected"),
 		domainLabel,
-		widget.NewLabel("Update Proxy Address:"),
-		addrEntry,
-		widget.NewButton("Update", func() {
-			waygateClient.Proxy(tunnelConfig.Domain, addrEntry.Text)
+		//widget.NewLabel("Update Proxy Address:"),
+		//addrEntry,
+		//widget.NewButton("Update", func() {
+		//	waygateClient.Proxy(tunnelConfig.Domain, addrEntry.Text)
+		//}),
+		widget.NewLabel("Users:"),
+		userList,
+		userEntry,
+		widget.NewButton("Add User", func() {
+			waygateClient.AddUser(obligator.User{
+				Email: userEntry.Text,
+			})
 		}),
 		widget.NewButton("Disconnect", func() {
 		}),
@@ -87,6 +98,14 @@ func main() {
 				tunnelConfig = evt.TunnelConfig
 				domainLabel.SetText(tunnelConfig.Domain)
 				w.SetContent(connectedPage)
+
+			case waygate.UsersUpdatedEvent:
+
+				userList.RemoveAll()
+
+				for _, user := range evt.Users {
+					userList.Add(widget.NewLabel(user.Email))
+				}
 			}
 		}
 	}()
