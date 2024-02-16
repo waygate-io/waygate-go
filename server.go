@@ -180,103 +180,7 @@ func (s *Server) Run() {
 				continue
 			}
 
-			log.Println("got tcpConn")
-
-			clientHello, clientReader, err := peekClientHello(tcpConn)
-			if err != nil {
-				log.Println("peekClientHello error", err)
-				continue
-			}
-
-			passConn := NewProxyConn(tcpConn, clientReader)
-
-			if clientHello.ServerName == s.config.AdminDomain || clientHello.ServerName == authDomain {
-				waygateListener.PassConn(passConn)
-			} else {
-				mut.Lock()
-				tunnel, exists := tunnels[clientHello.ServerName]
-				mut.Unlock()
-
-				if !exists {
-					log.Println("No such tunnel")
-					continue
-				}
-
-				upstreamConn, err := tunnel.muxSess.OpenStream()
-				if err != nil {
-					log.Println(err)
-					panic(err)
-				}
-
-				go func() {
-
-					var conn connCloseWriter = passConn
-
-					negotiatedProto := ""
-					if tunnel.config.TerminationType == "server" {
-						tlsConn := tls.Server(passConn, tlsConfig)
-						tlsConn.Handshake()
-						if err != nil {
-							log.Println(err)
-							panic(err)
-						}
-
-						connState := tlsConn.ConnectionState()
-						printJson(connState)
-						negotiatedProto = connState.NegotiatedProtocol
-
-						conn = tlsConn
-					}
-
-					host, port, err := addrToHostPort(conn.RemoteAddr())
-					if err != nil {
-						log.Println(err)
-						panic(err)
-					}
-
-					localHost, localPort, err := addrToHostPort(conn.LocalAddr())
-					if err != nil {
-						log.Println(err)
-						panic(err)
-					}
-
-					if tunnel.config.UseProxyProtocol {
-						proxyHeader := &proxyproto.Header{
-							Version:           2,
-							Command:           proxyproto.PROXY,
-							TransportProtocol: proxyproto.TCPv4,
-							SourceAddr: &net.TCPAddr{
-								IP:   net.ParseIP(host),
-								Port: port,
-							},
-							DestinationAddr: &net.TCPAddr{
-								IP:   net.ParseIP(localHost),
-								Port: localPort,
-							},
-						}
-
-						if negotiatedProto != "" {
-							proxyHeader.SetTLVs([]proxyproto.TLV{
-								proxyproto.TLV{
-									Type:  proxyproto.PP2_TYPE_MIN_CUSTOM,
-									Value: []byte(negotiatedProto),
-								},
-							})
-						}
-
-						printJson(proxyHeader)
-
-						// TODO: I think this can possibly block and deadlock
-						n, err := proxyHeader.WriteTo(upstreamConn)
-						if err != nil {
-							fmt.Println("ruh roh", n, err)
-						}
-						fmt.Println("done writing")
-					}
-
-					ConnectConns(conn, upstreamConn)
-				}()
-			}
+			go s.handleConn(tcpConn, authDomain, waygateListener, mut, tunnels, tlsConfig)
 		}
 	}()
 
@@ -351,4 +255,108 @@ func (s *Server) Run() {
 	})
 
 	http.Serve(tlsListener, mux)
+}
+
+func (s *Server) handleConn(
+	tcpConn net.Conn,
+	authDomain string,
+	waygateListener *PassthroughListener,
+	mut *sync.Mutex,
+	tunnels map[string]Tunnel,
+	tlsConfig *tls.Config) {
+
+	log.Println("got tcpConn")
+
+	clientHello, clientReader, err := peekClientHello(tcpConn)
+	if err != nil {
+		log.Println("peekClientHello error", err)
+		return
+	}
+
+	passConn := NewProxyConn(tcpConn, clientReader)
+
+	if clientHello.ServerName == s.config.AdminDomain || clientHello.ServerName == authDomain {
+		waygateListener.PassConn(passConn)
+	} else {
+		mut.Lock()
+		tunnel, exists := tunnels[clientHello.ServerName]
+		mut.Unlock()
+
+		if !exists {
+			log.Println("No such tunnel")
+			return
+		}
+
+		upstreamConn, err := tunnel.muxSess.OpenStream()
+		if err != nil {
+			log.Println(err)
+			panic(err)
+		}
+
+		var conn connCloseWriter = passConn
+
+		negotiatedProto := ""
+		if tunnel.config.TerminationType == "server" {
+			tlsConn := tls.Server(passConn, tlsConfig)
+			tlsConn.Handshake()
+			if err != nil {
+				log.Println(err)
+				panic(err)
+			}
+
+			connState := tlsConn.ConnectionState()
+			printJson(connState)
+			negotiatedProto = connState.NegotiatedProtocol
+
+			conn = tlsConn
+		}
+
+		host, port, err := addrToHostPort(conn.RemoteAddr())
+		if err != nil {
+			log.Println(err)
+			panic(err)
+		}
+
+		localHost, localPort, err := addrToHostPort(conn.LocalAddr())
+		if err != nil {
+			log.Println(err)
+			panic(err)
+		}
+
+		if tunnel.config.UseProxyProtocol {
+			proxyHeader := &proxyproto.Header{
+				Version:           2,
+				Command:           proxyproto.PROXY,
+				TransportProtocol: proxyproto.TCPv4,
+				SourceAddr: &net.TCPAddr{
+					IP:   net.ParseIP(host),
+					Port: port,
+				},
+				DestinationAddr: &net.TCPAddr{
+					IP:   net.ParseIP(localHost),
+					Port: localPort,
+				},
+			}
+
+			if negotiatedProto != "" {
+				proxyHeader.SetTLVs([]proxyproto.TLV{
+					proxyproto.TLV{
+						Type:  proxyproto.PP2_TYPE_MIN_CUSTOM,
+						Value: []byte(negotiatedProto),
+					},
+				})
+			}
+
+			printJson(proxyHeader)
+
+			// TODO: I think this can possibly block and deadlock
+			n, err := proxyHeader.WriteTo(upstreamConn)
+			if err != nil {
+				fmt.Println("ruh roh", n, err)
+			}
+			fmt.Println("done writing")
+		}
+
+		ConnectConns(conn, upstreamConn)
+	}
 }
