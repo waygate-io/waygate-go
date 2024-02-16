@@ -82,8 +82,8 @@ func (c *Client) Run() error {
 
 	var tunConfig TunnelConfig
 
-	tlsTermination := "client"
-	//tlsTermination := "server"
+	//tlsTermination := "client"
+	tlsTermination := "server"
 	useProxyProtoStr := "true"
 
 	// Use random unprivileged port for ACME challenges. This is necessary
@@ -168,15 +168,28 @@ func (c *Client) Run() error {
 			log.Println("Got stream")
 
 			var conn connCloseWriter = downstreamConn
+			defer downstreamConn.Close()
 
 			if tunConfig.UseProxyProtocol {
 				reader := bufio.NewReader(conn)
-				_, err := proxyproto.Read(reader)
+				ppHeader, err := proxyproto.Read(reader)
 				if err != nil {
 					// TODO: close on error
 					log.Println(err)
 					return
 				}
+
+				tlvs, err := ppHeader.TLVs()
+				if err != nil {
+					log.Println(err)
+					return
+				}
+
+				proto := string(tlvs[0].Value)
+
+				printJson(ppHeader)
+				printJson(tlvs)
+				fmt.Println(proto)
 
 			}
 
@@ -199,13 +212,17 @@ func (c *Client) Run() error {
 			}
 
 			upstreamConn, err := net.DialTCP("tcp", nil, &net.TCPAddr{
-				IP:   net.ParseIP(ip),
+				IP: net.ParseIP(ip),
+				//IP:   "127.0.0.1",
 				Port: port,
+				//Port: 8000,
 			})
 			if err != nil {
 				log.Println("Error dialing")
 				return
 			}
+
+			defer upstreamConn.Close()
 
 			ConnectConns(conn, upstreamConn)
 		}()

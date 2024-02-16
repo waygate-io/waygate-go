@@ -212,8 +212,20 @@ func (s *Server) Run() {
 
 					var conn connCloseWriter = passConn
 
+					negotiatedProto := ""
 					if tunnel.config.TerminationType == "server" {
-						conn = tls.Server(passConn, tlsConfig)
+						tlsConn := tls.Server(passConn, tlsConfig)
+						tlsConn.Handshake()
+						if err != nil {
+							log.Println(err)
+							panic(err)
+						}
+
+						connState := tlsConn.ConnectionState()
+						printJson(connState)
+						negotiatedProto = connState.NegotiatedProtocol
+
+						conn = tlsConn
 					}
 
 					host, port, err := addrToHostPort(conn.RemoteAddr())
@@ -242,6 +254,17 @@ func (s *Server) Run() {
 								Port: localPort,
 							},
 						}
+
+						if negotiatedProto != "" {
+							proxyHeader.SetTLVs([]proxyproto.TLV{
+								proxyproto.TLV{
+									Type:  proxyproto.PP2_TYPE_MIN_CUSTOM,
+									Value: []byte(negotiatedProto),
+								},
+							})
+						}
+
+						printJson(proxyHeader)
 
 						// TODO: I think this can possibly block and deadlock
 						n, err := proxyHeader.WriteTo(upstreamConn)
