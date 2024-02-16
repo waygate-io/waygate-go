@@ -285,7 +285,6 @@ func (s *Server) handleConn(
 		var tunnel Tunnel
 		matched := false
 		for _, tun := range tunnels {
-			fmt.Println("suf", tun.config.Domain, clientHello.ServerName)
 			if strings.HasSuffix(clientHello.ServerName, tun.config.Domain) {
 				tunnel = tun
 				matched = true

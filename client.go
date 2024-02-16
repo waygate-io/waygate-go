@@ -89,6 +89,7 @@ func (m *ClientMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type ClientConfig struct {
+	Users        []string
 	ServerDomain string
 	Token        string
 }
@@ -105,6 +106,10 @@ func NewClient(config *ClientConfig) *Client {
 
 	if configCopy.ServerDomain == "" {
 		configCopy.ServerDomain = "waygate.io"
+	}
+
+	if len(configCopy.Users) == 0 {
+		panic("Must provide a user")
 	}
 
 	return &Client{
@@ -130,10 +135,11 @@ func (c *Client) Proxy(domain, addr string) {
 func (c *Client) Run() error {
 
 	token := c.config.Token
+	redirUriCh := make(chan string)
 
 	if token == "" {
 		var err error
-		token, err = c.getToken(fmt.Sprintf("https://%s/oauth2", c.config.ServerDomain))
+		token, err = c.getToken(fmt.Sprintf("https://%s/oauth2", c.config.ServerDomain), redirUriCh)
 		if err != nil {
 			panic(err)
 		}
@@ -207,6 +213,9 @@ func (c *Client) Run() error {
 		panic(err)
 	}
 
+	dashUri := "https://dash." + tunConfig.Domain
+	redirUriCh <- dashUri
+
 	sessConn := websocket.NetConn(ctx, wsConn, websocket.MessageBinary)
 
 	muxSess := muxado.Client(sessConn, nil)
@@ -223,13 +232,30 @@ func (c *Client) Run() error {
 		Prefix:  "waygate_client_auth_",
 	}
 	authServer := obligator.NewServer(authConfig)
+	err = authServer.SetOAuth2Provider(obligator.OAuth2Provider{
+		ID:            "lastlogin",
+		Name:          "LastLogin",
+		URI:           "https://lastlogin.io",
+		ClientID:      "https://" + authDomain,
+		OpenIDConnect: true,
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	err = authServer.AddUser(obligator.User{
+		Email: c.config.Users[0],
+	})
+	if err != nil {
+		fmt.Println(err)
+	}
 
 	mux := NewClientMux(authServer, tunConfig.Domain)
 
 	listener := NewPassthroughListener()
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Println("Hi there", r.Host)
+		w.Write([]byte("<h1>Welcome to Waygate Client</h1>"))
 	})
 
 	go http.Serve(listener, mux)
@@ -321,7 +347,7 @@ func (c *Client) Run() error {
 	}
 }
 
-func (c *Client) getToken(authServerUri string) (string, error) {
+func (c *Client) getToken(authServerUri string, redirUriCh chan string) (string, error) {
 	port, err := randomOpenPort()
 	if err != nil {
 		return "", err
@@ -356,7 +382,7 @@ func (c *Client) getToken(authServerUri string) (string, error) {
 		Handler: mux,
 	}
 
-	token := ""
+	tokenCh := make(chan string)
 
 	mux.HandleFunc("/oauth2/callback", func(w http.ResponseWriter, r *http.Request) {
 
@@ -424,14 +450,20 @@ func (c *Client) getToken(authServerUri string) (string, error) {
 		//	return
 		//}
 
-		token = tokenRes.AccessToken
+		tokenCh <- tokenRes.AccessToken
+
+		redirUri := <-redirUriCh
 
 		go func() {
 			server.Shutdown(context.Background())
 		}()
+
+		http.Redirect(w, r, redirUri, 303)
 	})
 
-	server.ListenAndServe()
+	go server.ListenAndServe()
+
+	token := <-tokenCh
 
 	return token, nil
 }
