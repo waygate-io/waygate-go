@@ -4,11 +4,11 @@ import (
 	"net/url"
 
 	"fyne.io/fyne/v2/app"
-	"fyne.io/fyne/v2/canvas"
+	//"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
 	"github.com/lastlogin-io/obligator"
-	"github.com/skip2/go-qrcode"
+	//"github.com/skip2/go-qrcode"
 	"github.com/waygate-io/waygate-go"
 )
 
@@ -46,17 +46,17 @@ func main() {
 				label.SetText(err.Error())
 			}
 		}),
-		widget.NewButton("Show QR", func() {
-			qr, err := qrcode.New(oauth2Uri, qrcode.Medium)
-			if err != nil {
-				label.SetText(err.Error())
-			}
+		//widget.NewButton("Show QR", func() {
+		//	qr, err := qrcode.New(oauth2Uri, qrcode.Medium)
+		//	if err != nil {
+		//		label.SetText(err.Error())
+		//	}
 
-			img := canvas.NewImageFromImage(qr.Image(256))
-			img.FillMode = canvas.ImageFillOriginal
+		//	img := canvas.NewImageFromImage(qr.Image(256))
+		//	img.FillMode = canvas.ImageFillOriginal
 
-			w.SetContent(img)
-		}),
+		//	w.SetContent(img)
+		//}),
 	)
 
 	domainLabel := widget.NewLabel("Domain")
