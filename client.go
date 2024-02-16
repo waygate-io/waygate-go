@@ -50,7 +50,7 @@ func NewClient(config *ClientConfig) *Client {
 
 	return &Client{
 		config:   &configCopy,
-		eventCh:  make(chan interface{}),
+		eventCh:  nil,
 		proxyMap: make(map[string]string),
 	}
 }
@@ -151,8 +151,10 @@ func (c *Client) Run() error {
 
 	muxSess := muxado.Client(sessConn, nil)
 
-	c.eventCh <- TunnelConnectedEvent{
-		TunnelConfig: tunConfig,
+	if c.eventCh != nil {
+		c.eventCh <- TunnelConnectedEvent{
+			TunnelConfig: tunConfig,
+		}
 	}
 
 	for {
@@ -197,25 +199,28 @@ func (c *Client) Run() error {
 				conn = tls.Server(conn, tlsConfig)
 			}
 
-			proxyAddr := c.proxyMap[tunConfig.Domain]
+			ip := "127.0.0.1"
+			port := 8000
 
-			ip, portStr, err := net.SplitHostPort(proxyAddr)
-			if err != nil {
-				log.Println("Error splitting address")
-				return
-			}
+			proxyAddr, exists := c.proxyMap[tunConfig.Domain]
+			if exists {
+				var portStr string
+				ip, portStr, err = net.SplitHostPort(proxyAddr)
+				if err != nil {
+					log.Println("Error splitting address")
+					return
+				}
 
-			port, err := strconv.Atoi(portStr)
-			if err != nil {
-				log.Println("Error parsing port")
-				return
+				port, err = strconv.Atoi(portStr)
+				if err != nil {
+					log.Println("Error parsing port")
+					return
+				}
 			}
 
 			upstreamConn, err := net.DialTCP("tcp", nil, &net.TCPAddr{
-				IP: net.ParseIP(ip),
-				//IP:   "127.0.0.1",
+				IP:   net.ParseIP(ip),
 				Port: port,
-				//Port: 8000,
 			})
 			if err != nil {
 				log.Println("Error dialing")
@@ -250,8 +255,10 @@ func (c *Client) getToken(authServerUri string) (string, error) {
 		State:        state,
 	})
 
-	c.eventCh <- OAuth2AuthUriEvent{
-		Uri: authUri,
+	if c.eventCh != nil {
+		c.eventCh <- OAuth2AuthUriEvent{
+			Uri: authUri,
+		}
 	}
 
 	mux := http.NewServeMux()

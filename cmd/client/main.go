@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 
 	"github.com/waygate-io/waygate-go"
 )
@@ -17,5 +18,15 @@ func main() {
 	}
 
 	client := waygate.NewClient(config)
-	client.Run()
+	eventCh := make(chan interface{})
+	client.ListenEvents(eventCh)
+	go client.Run()
+
+	for {
+		event := <-eventCh
+		switch evt := event.(type) {
+		case waygate.OAuth2AuthUriEvent:
+			fmt.Println(evt.Uri)
+		}
+	}
 }
