@@ -14,12 +14,36 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 type connCloseWriter interface {
 	net.Conn
 	CloseWrite() error
 }
+
+type addr struct {
+	network string
+}
+
+func (a addr) Network() string { return a.network }
+func (a addr) String() string  { return a.network }
+
+type wrapperConn struct {
+	conn       connCloseWriter
+	localAddr  net.Addr
+	remoteAddr net.Addr
+}
+
+func (c wrapperConn) CloseWrite() error                  { return c.conn.CloseWrite() }
+func (c wrapperConn) Read(p []byte) (int, error)         { return c.conn.Read(p) }
+func (c wrapperConn) Write(p []byte) (int, error)        { return c.conn.Write(p) }
+func (c wrapperConn) Close() error                       { return c.conn.Close() }
+func (c wrapperConn) LocalAddr() net.Addr                { return c.localAddr }
+func (c wrapperConn) RemoteAddr() net.Addr               { return c.remoteAddr }
+func (c wrapperConn) SetDeadline(t time.Time) error      { return c.conn.SetDeadline(t) }
+func (c wrapperConn) SetReadDeadline(t time.Time) error  { return c.conn.SetReadDeadline(t) }
+func (c wrapperConn) SetWriteDeadline(t time.Time) error { return c.conn.SetWriteDeadline(t) }
 
 func randomOpenPort() (int, error) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")

@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 
 	"github.com/caddyserver/certmagic"
@@ -180,7 +181,10 @@ func (s *Server) Run() {
 				continue
 			}
 
-			go s.handleConn(tcpConn, authDomain, waygateListener, mut, tunnels, tlsConfig)
+			mut.Lock()
+			tunnelsCopy := tunnels
+			mut.Unlock()
+			go s.handleConn(tcpConn, authDomain, waygateListener, tunnelsCopy, tlsConfig)
 		}
 	}()
 
@@ -261,7 +265,6 @@ func (s *Server) handleConn(
 	tcpConn net.Conn,
 	authDomain string,
 	waygateListener *PassthroughListener,
-	mut *sync.Mutex,
 	tunnels map[string]Tunnel,
 	tlsConfig *tls.Config) {
 
@@ -278,11 +281,19 @@ func (s *Server) handleConn(
 	if clientHello.ServerName == s.config.AdminDomain || clientHello.ServerName == authDomain {
 		waygateListener.PassConn(passConn)
 	} else {
-		mut.Lock()
-		tunnel, exists := tunnels[clientHello.ServerName]
-		mut.Unlock()
 
-		if !exists {
+		var tunnel Tunnel
+		matched := false
+		for _, tun := range tunnels {
+			fmt.Println("suf", tun.config.Domain, clientHello.ServerName)
+			if strings.HasSuffix(clientHello.ServerName, tun.config.Domain) {
+				tunnel = tun
+				matched = true
+				break
+			}
+		}
+
+		if !matched {
 			log.Println("No such tunnel")
 			return
 		}
@@ -350,11 +361,11 @@ func (s *Server) handleConn(
 			printJson(proxyHeader)
 
 			// TODO: I think this can possibly block and deadlock
-			n, err := proxyHeader.WriteTo(upstreamConn)
-			if err != nil {
-				fmt.Println("ruh roh", n, err)
-			}
-			fmt.Println("done writing")
+			//n, err := proxyHeader.WriteTo(upstreamConn)
+			//if err != nil {
+			//	fmt.Println("ruh roh", n, err)
+			//}
+			//fmt.Println("done writing")
 		}
 
 		ConnectConns(conn, upstreamConn)

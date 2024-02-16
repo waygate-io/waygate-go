@@ -8,10 +8,10 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net"
+	//"net"
 	"net/http"
 	"net/url"
-	"strconv"
+	//"strconv"
 	"strings"
 
 	"github.com/caddyserver/certmagic"
@@ -27,6 +27,65 @@ type TunnelConnectedEvent struct {
 
 type OAuth2AuthUriEvent struct {
 	Uri string
+}
+
+type ClientMux struct {
+	mux         *http.ServeMux
+	authServer  *obligator.Server
+	adminDomain string
+}
+
+func NewClientMux(authServer *obligator.Server, adminDomain string) *ClientMux {
+	m := &ClientMux{
+		mux:         http.NewServeMux(),
+		authServer:  authServer,
+		adminDomain: adminDomain,
+	}
+	return m
+}
+
+func (s *ClientMux) Handle(p string, h http.Handler) {
+	s.mux.Handle(p, h)
+}
+
+func (s *ClientMux) HandleFunc(p string, f func(w http.ResponseWriter, r *http.Request)) {
+	s.mux.HandleFunc(p, f)
+}
+
+func (m *ClientMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Security-Policy", "frame-ancestors 'none'; script-src 'none'")
+	w.Header().Set("Referrer-Policy", "no-referrer")
+
+	host := r.Host
+
+	authDomain := m.authServer.AuthDomains()[0]
+
+	if host != authDomain {
+		_, err := m.authServer.Validate(r)
+		if err != nil {
+
+			redirectUri := fmt.Sprintf("https://%s", m.adminDomain)
+
+			authUri := m.authServer.AuthUri(&obligator.OAuth2AuthRequest{
+				// https://openid.net/specs/oauth-v2-multiple-response-types-1_0.html#none
+				ResponseType: "none",
+				ClientId:     "https://" + m.adminDomain,
+				RedirectUri:  redirectUri,
+				State:        "",
+				Scope:        "",
+			})
+
+			http.Redirect(w, r, authUri, 303)
+			return
+		}
+
+		fmt.Println("here")
+	} else {
+		m.authServer.ServeHTTP(w, r)
+		return
+	}
+
+	m.mux.ServeHTTP(w, r)
 }
 
 type ClientConfig struct {
@@ -82,9 +141,10 @@ func (c *Client) Run() error {
 
 	var tunConfig TunnelConfig
 
-	//tlsTermination := "client"
-	tlsTermination := "server"
-	useProxyProtoStr := "true"
+	tlsTermination := "client"
+	//tlsTermination := "server"
+	//useProxyProtoStr := "true"
+	useProxyProtoStr := "false"
 
 	// Use random unprivileged port for ACME challenges. This is necessary
 	// because of the way certmagic works, in that if it fails to bind
@@ -107,7 +167,7 @@ func (c *Client) Run() error {
 
 	certmagic.Default.OnDemand = &certmagic.OnDemandConfig{
 		DecisionFunc: func(ctx context.Context, name string) error {
-			if name != tunConfig.Domain {
+			if !strings.HasSuffix(name, tunConfig.Domain) {
 				return fmt.Errorf("not allowed")
 			}
 			return nil
@@ -157,6 +217,23 @@ func (c *Client) Run() error {
 		}
 	}
 
+	authDomain := "auth." + tunConfig.Domain
+	authConfig := obligator.ServerConfig{
+		RootUri: "https://" + authDomain,
+		Prefix:  "waygate_client_auth_",
+	}
+	authServer := obligator.NewServer(authConfig)
+
+	mux := NewClientMux(authServer, tunConfig.Domain)
+
+	listener := NewPassthroughListener()
+
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Println("Hi there", r.Host)
+	})
+
+	go http.Serve(listener, mux)
+
 	for {
 		downstreamConn, err := muxSess.AcceptStream()
 		if err != nil {
@@ -170,7 +247,6 @@ func (c *Client) Run() error {
 			log.Println("Got stream")
 
 			var conn connCloseWriter = downstreamConn
-			defer downstreamConn.Close()
 
 			if tunConfig.UseProxyProtocol {
 				reader := bufio.NewReader(conn)
@@ -199,37 +275,48 @@ func (c *Client) Run() error {
 				conn = tls.Server(conn, tlsConfig)
 			}
 
-			ip := "127.0.0.1"
-			port := 8000
-
-			proxyAddr, exists := c.proxyMap[tunConfig.Domain]
-			if exists {
-				var portStr string
-				ip, portStr, err = net.SplitHostPort(proxyAddr)
-				if err != nil {
-					log.Println("Error splitting address")
-					return
-				}
-
-				port, err = strconv.Atoi(portStr)
-				if err != nil {
-					log.Println("Error parsing port")
-					return
-				}
+			// TODO: use addrs from PROXY protocol
+			conn = wrapperConn{
+				conn: conn,
+				localAddr: addr{
+					network: "dummy-network:0",
+				},
+				remoteAddr: addr{
+					network: "dummy-network:0",
+				},
 			}
 
-			upstreamConn, err := net.DialTCP("tcp", nil, &net.TCPAddr{
-				IP:   net.ParseIP(ip),
-				Port: port,
-			})
-			if err != nil {
-				log.Println("Error dialing")
-				return
-			}
+			listener.PassConn(conn)
 
-			defer upstreamConn.Close()
+			//ip := "127.0.0.1"
+			//port := 8000
 
-			ConnectConns(conn, upstreamConn)
+			//proxyAddr, exists := c.proxyMap[tunConfig.Domain]
+			//if exists {
+			//	var portStr string
+			//	ip, portStr, err = net.SplitHostPort(proxyAddr)
+			//	if err != nil {
+			//		log.Println("Error splitting address")
+			//		return
+			//	}
+
+			//	port, err = strconv.Atoi(portStr)
+			//	if err != nil {
+			//		log.Println("Error parsing port")
+			//		return
+			//	}
+			//}
+
+			//upstreamConn, err := net.DialTCP("tcp", nil, &net.TCPAddr{
+			//	IP:   net.ParseIP(ip),
+			//	Port: port,
+			//})
+			//if err != nil {
+			//	log.Println("Error dialing")
+			//	return
+			//}
+
+			//ConnectConns(conn, upstreamConn)
 		}()
 	}
 }
