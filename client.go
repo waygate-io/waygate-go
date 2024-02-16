@@ -35,16 +35,14 @@ type OAuth2AuthUriEvent struct {
 }
 
 type ClientMux struct {
-	mux         *http.ServeMux
-	authServer  *obligator.Server
-	adminDomain string
+	mux        *http.ServeMux
+	authServer *obligator.Server
 }
 
-func NewClientMux(authServer *obligator.Server, adminDomain string) *ClientMux {
+func NewClientMux(authServer *obligator.Server) *ClientMux {
 	m := &ClientMux{
-		mux:         http.NewServeMux(),
-		authServer:  authServer,
-		adminDomain: adminDomain,
+		mux:        http.NewServeMux(),
+		authServer: authServer,
 	}
 	return m
 }
@@ -69,12 +67,12 @@ func (m *ClientMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		_, err := m.authServer.Validate(r)
 		if err != nil {
 
-			redirectUri := fmt.Sprintf("https://%s", m.adminDomain)
+			redirectUri := fmt.Sprintf("https://%s%s", host, r.URL.Path)
 
 			authUri := m.authServer.AuthUri(&obligator.OAuth2AuthRequest{
 				// https://openid.net/specs/oauth-v2-multiple-response-types-1_0.html#none
 				ResponseType: "none",
-				ClientId:     "https://" + m.adminDomain,
+				ClientId:     "https://" + host,
 				RedirectUri:  redirectUri,
 				State:        "",
 				Scope:        "",
@@ -238,7 +236,7 @@ func (c *Client) Run() error {
 		panic(err)
 	}
 
-	mux := NewClientMux(authServer, tunConfig.Domain)
+	mux := NewClientMux(authServer)
 
 	listener := NewPassthroughListener()
 
