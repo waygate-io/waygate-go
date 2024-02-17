@@ -28,7 +28,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	listener, err := waygate.Listen(token, nil)
+	listener, err := waygate.Listen(token)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, err.Error())
 		os.Exit(1)

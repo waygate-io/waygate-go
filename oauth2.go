@@ -303,7 +303,6 @@ func (f *TokenFlow) GetTokenWithRedirect(redirUriCh chan string) (string, error)
 
 		go func() {
 			server.Shutdown(context.Background())
-			fmt.Println("OAuth2 callback server shut down")
 		}()
 	})
 
