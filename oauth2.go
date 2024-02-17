@@ -1,13 +1,16 @@
 package waygate
 
 import (
+	"context"
 	"embed"
 	"encoding/json"
 	"fmt"
 	"html/template"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/lastlogin-io/obligator"
@@ -171,4 +174,142 @@ func NewOAuth2Handler(prefix string, jose *josencillo.JOSE) *OAuth2Handler {
 
 func (h *OAuth2Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.mux.ServeHTTP(w, r)
+}
+
+type TokenFlow struct {
+	authUri       string
+	authServerUri string
+	port          int
+	state         string
+}
+
+func NewTokenFlow() (*TokenFlow, error) {
+	authServerUri := fmt.Sprintf("https://%s/oauth2", WaygateServerDomain)
+
+	port, err := randomOpenPort()
+	if err != nil {
+		return nil, err
+	}
+
+	localUri := fmt.Sprintf("http://localhost:%d", port)
+
+	state, err := genRandomText(32)
+	if err != nil {
+		return nil, err
+	}
+
+	authUri := obligator.AuthUri(authServerUri+"/authorize", &obligator.OAuth2AuthRequest{
+		ClientId:     localUri,
+		RedirectUri:  fmt.Sprintf("%s/oauth2/callback", localUri),
+		ResponseType: "code",
+		Scope:        "waygate",
+		State:        state,
+	})
+
+	flow := &TokenFlow{
+		authUri:       authUri,
+		authServerUri: authServerUri,
+		port:          port,
+		state:         state,
+	}
+
+	return flow, nil
+}
+
+func (f *TokenFlow) GetAuthUri() string {
+	return f.authUri
+}
+
+func (f *TokenFlow) GetToken() (string, error) {
+	return f.GetTokenWithRedirect(nil)
+}
+
+func (f *TokenFlow) GetTokenWithRedirect(redirUriCh chan string) (string, error) {
+	mux := http.NewServeMux()
+
+	listenStr := fmt.Sprintf(":%d", f.port)
+	server := &http.Server{
+		Addr:    listenStr,
+		Handler: mux,
+	}
+
+	tokenCh := make(chan string)
+
+	mux.HandleFunc("/oauth2/callback", func(w http.ResponseWriter, r *http.Request) {
+
+		r.ParseForm()
+
+		stateParam := r.Form.Get("state")
+		if stateParam != f.state {
+			w.WriteHeader(500)
+			io.WriteString(w, "Invalid state param")
+			return
+		}
+
+		code := r.Form.Get("code")
+
+		httpClient := &http.Client{}
+
+		params := url.Values{}
+		params.Set("code", code)
+		body := strings.NewReader(params.Encode())
+
+		tokenUri := fmt.Sprintf("%s/token", f.authServerUri)
+
+		req, err := http.NewRequest(http.MethodPost, tokenUri, body)
+		if err != nil {
+			w.WriteHeader(500)
+			io.WriteString(w, err.Error())
+			return
+		}
+
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+
+		res, err := httpClient.Do(req)
+		if err != nil {
+			w.WriteHeader(500)
+			io.WriteString(w, err.Error())
+			return
+		}
+
+		//if res.StatusCode != 200 {
+		//	w.WriteHeader(500)
+		//	io.WriteString(w, "Bad HTTP response code")
+		//	return
+		//}
+
+		var tokenRes obligator.OAuth2TokenResponse
+
+		bodyBytes, err := io.ReadAll(res.Body)
+		if err != nil {
+			w.WriteHeader(500)
+			io.WriteString(w, err.Error())
+			return
+		}
+
+		err = json.Unmarshal(bodyBytes, &tokenRes)
+		if err != nil {
+			w.WriteHeader(500)
+			io.WriteString(w, err.Error())
+			return
+		}
+
+		tokenCh <- tokenRes.AccessToken
+
+		if redirUriCh != nil {
+			redirUri := <-redirUriCh
+			http.Redirect(w, r, redirUri, 303)
+		}
+
+		go func() {
+			server.Shutdown(context.Background())
+			fmt.Println("OAuth2 callback server shut down")
+		}()
+	})
+
+	go server.ListenAndServe()
+
+	token := <-tokenCh
+
+	return token, nil
 }

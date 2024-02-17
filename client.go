@@ -7,12 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log"
-	//"net"
+	"net"
 	"net/http"
-	"net/url"
-	//"strconv"
 	"strings"
 
 	"github.com/caddyserver/certmagic"
@@ -21,6 +18,25 @@ import (
 	"golang.ngrok.com/muxado/v2"
 	"nhooyr.io/websocket"
 )
+
+var WaygateServerDomain string = "waygate.io"
+
+func Listen(token string, mux *http.ServeMux) (*Listener, error) {
+	return nil, nil
+}
+
+type Listener struct {
+}
+
+func (l *Listener) Accept() (net.Conn, error) {
+	return nil, nil
+}
+func (l *Listener) Addr() net.Addr {
+	return nil
+}
+func (l *Listener) Close() error {
+	return nil
+}
 
 type UsersUpdatedEvent struct {
 	Users []obligator.User
@@ -136,10 +152,21 @@ func (c *Client) Run() error {
 	redirUriCh := make(chan string)
 
 	if token == "" {
-		var err error
-		token, err = c.getToken(fmt.Sprintf("https://%s/oauth2", c.config.ServerDomain), redirUriCh)
+
+		tokenFlow, err := NewTokenFlow()
 		if err != nil {
-			panic(err)
+			return err
+		}
+
+		if c.eventCh != nil {
+			c.eventCh <- OAuth2AuthUriEvent{
+				Uri: tokenFlow.GetAuthUri(),
+			}
+		}
+
+		token, err = tokenFlow.GetTokenWithRedirect(redirUriCh)
+		if err != nil {
+			return nil
 		}
 	}
 
@@ -378,125 +405,4 @@ func (c *Client) AddUser(user obligator.User) error {
 	}
 
 	return nil
-}
-
-func (c *Client) getToken(authServerUri string, redirUriCh chan string) (string, error) {
-	port, err := randomOpenPort()
-	if err != nil {
-		return "", err
-	}
-
-	localUri := fmt.Sprintf("http://localhost:%d", port)
-
-	state, err := genRandomText(32)
-	if err != nil {
-		return "", err
-	}
-
-	authUri := obligator.AuthUri(authServerUri+"/authorize", &obligator.OAuth2AuthRequest{
-		ClientId:     localUri,
-		RedirectUri:  fmt.Sprintf("%s/oauth2/callback", localUri),
-		ResponseType: "code",
-		Scope:        "waygate",
-		State:        state,
-	})
-
-	if c.eventCh != nil {
-		c.eventCh <- OAuth2AuthUriEvent{
-			Uri: authUri,
-		}
-	}
-
-	mux := http.NewServeMux()
-
-	listenStr := fmt.Sprintf(":%d", port)
-	server := &http.Server{
-		Addr:    listenStr,
-		Handler: mux,
-	}
-
-	tokenCh := make(chan string)
-
-	mux.HandleFunc("/oauth2/callback", func(w http.ResponseWriter, r *http.Request) {
-
-		r.ParseForm()
-
-		stateParam := r.Form.Get("state")
-		if stateParam != state {
-			w.WriteHeader(500)
-			io.WriteString(w, "Invalid state param")
-			return
-		}
-
-		code := r.Form.Get("code")
-
-		httpClient := &http.Client{}
-
-		params := url.Values{}
-		params.Set("code", code)
-		body := strings.NewReader(params.Encode())
-
-		tokenUri := fmt.Sprintf("%s/token", authServerUri)
-
-		req, err := http.NewRequest(http.MethodPost, tokenUri, body)
-		if err != nil {
-			w.WriteHeader(500)
-			io.WriteString(w, err.Error())
-			return
-		}
-
-		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-
-		res, err := httpClient.Do(req)
-		if err != nil {
-			w.WriteHeader(500)
-			io.WriteString(w, err.Error())
-			return
-		}
-
-		//if res.StatusCode != 200 {
-		//	w.WriteHeader(500)
-		//	io.WriteString(w, "Bad HTTP response code")
-		//	return
-		//}
-
-		var tokenRes obligator.OAuth2TokenResponse
-
-		bodyBytes, err := io.ReadAll(res.Body)
-		if err != nil {
-			w.WriteHeader(500)
-			io.WriteString(w, err.Error())
-			return
-		}
-
-		err = json.Unmarshal(bodyBytes, &tokenRes)
-		if err != nil {
-			w.WriteHeader(500)
-			io.WriteString(w, err.Error())
-			return
-		}
-
-		//err = json.NewDecoder(res.Body).Decode(&tokenRes)
-		//if err != nil {
-		//	w.WriteHeader(500)
-		//	io.WriteString(w, err.Error())
-		//	return
-		//}
-
-		tokenCh <- tokenRes.AccessToken
-
-		redirUri := <-redirUriCh
-
-		go func() {
-			server.Shutdown(context.Background())
-		}()
-
-		http.Redirect(w, r, redirUri, 303)
-	})
-
-	go server.ListenAndServe()
-
-	token := <-tokenCh
-
-	return token, nil
 }
