@@ -63,6 +63,7 @@ type ClientSession struct {
 }
 
 func NewClientSession(token string) (*ClientSession, error) {
+
 	var tunConfig TunnelConfig
 
 	tlsTermination := "client"

@@ -184,6 +184,7 @@ type TokenFlow struct {
 }
 
 func NewTokenFlow() (*TokenFlow, error) {
+
 	authServerUri := fmt.Sprintf("https://%s/oauth2", WaygateServerDomain)
 
 	port, err := randomOpenPort()
@@ -225,6 +226,15 @@ func (f *TokenFlow) GetToken() (string, error) {
 }
 
 func (f *TokenFlow) GetTokenWithRedirect(redirUriCh chan string) (string, error) {
+
+	debugToken := os.Getenv("WAYGATE_DEBUG_TOKEN")
+	if debugToken != "" {
+		if redirUriCh != nil {
+			fmt.Println("would redirect to", <-redirUriCh)
+		}
+		return debugToken, nil
+	}
+
 	mux := http.NewServeMux()
 
 	listenStr := fmt.Sprintf(":%d", f.port)
