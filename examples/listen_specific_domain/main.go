@@ -22,10 +22,15 @@ func main() {
 	token, err := tokenFlow.GetToken()
 	checkErr(err)
 
-	listener, err := waygate.Listen("tcp", "", token)
+	clientSession, err := waygate.NewClientSession(token)
 	checkErr(err)
 
-	fmt.Println("https://" + listener.GetDomain())
+	tunnelConfig := clientSession.GetTunnelConfig()
+
+	listener, err := clientSession.Listen("tcp", tunnelConfig.Domain)
+	checkErr(err)
+
+	fmt.Println("https://" + tunnelConfig.Domain)
 
 	err = http.Serve(listener, nil)
 	checkErr(err)

@@ -1,7 +1,9 @@
 package waygate
 
 import (
-	"bufio"
+	"errors"
+	"sync"
+	//"bufio"
 	"context"
 	"crypto/tls"
 	"encoding/json"
@@ -11,10 +13,14 @@ import (
 	"strings"
 
 	"github.com/caddyserver/certmagic"
-	proxyproto "github.com/pires/go-proxyproto"
+	"github.com/mailgun/proxyproto"
 	"golang.ngrok.com/muxado/v2"
 	"nhooyr.io/websocket"
 )
+
+const PROXY_PROTO_PP2_TYPE_MIN_CUSTOM = 0xe0
+const PROXY_PROTO_SERVER_NAME_OFFSET = PROXY_PROTO_PP2_TYPE_MIN_CUSTOM + 0
+const LISTENER_KEY_DEFAULT = "default-listener"
 
 type Listener struct {
 	listener     *PassthroughListener
@@ -37,18 +43,37 @@ func (l *Listener) GetDomain() string {
 func (l *Listener) GetTunnelConfig() TunnelConfig {
 	return l.tunnelConfig
 }
-func Listen(token string) (*Listener, error) {
+func Listen(network, address, token string) (*Listener, error) {
+
+	s, err := NewClientSession(token)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.Listen(network, address)
+}
+
+type ClientSession struct {
+	muxSess        muxado.Session
+	tlsConfig      *tls.Config
+	tunConfig      TunnelConfig
+	tlsTermination string
+	listenMap      map[string]*PassthroughListener
+	mut            *sync.Mutex
+}
+
+func NewClientSession(token string) (*ClientSession, error) {
 	var tunConfig TunnelConfig
 
 	tlsTermination := "client"
 	//tlsTermination := "server"
-	//useProxyProtoStr := "true"
-	useProxyProtoStr := "false"
+	useProxyProtoStr := "true"
+	//useProxyProtoStr := "false"
 
 	// Use random unprivileged port for ACME challenges. This is necessary
 	// because of the way certmagic works, in that if it fails to bind
 	// HTTPSPort (443 by default) and doesn't detect anything else binding
-	// it, it fails. Obviously the boringproxy client is likely to be
+	// it, it fails. Obviously the waygate client is likely to be
 	// running on a machine where 443 isn't bound, so we need a different
 	// port to hack around this. See here for more details:
 	// https://github.com/caddyserver/certmagic/issues/111
@@ -110,11 +135,25 @@ func Listen(token string) (*Listener, error) {
 
 	muxSess := muxado.Client(sessConn, nil)
 
-	listener := NewPassthroughListener()
+	s := &ClientSession{
+		muxSess:        muxSess,
+		tlsConfig:      tlsConfig,
+		tunConfig:      tunConfig,
+		tlsTermination: tlsTermination,
+		listenMap:      make(map[string]*PassthroughListener),
+		mut:            &sync.Mutex{},
+	}
+
+	s.start()
+
+	return s, nil
+}
+
+func (s *ClientSession) start() {
 
 	go func() {
 		for {
-			downstreamConn, err := muxSess.AcceptStream()
+			downstreamConn, err := s.muxSess.AcceptStream()
 			if err != nil {
 				// TODO: close on error
 				log.Println(err)
@@ -123,46 +162,53 @@ func Listen(token string) (*Listener, error) {
 
 			go func() {
 
-				log.Println("Got stream")
-
 				var conn connCloseWriter = downstreamConn
 
-				if tunConfig.UseProxyProtocol {
-					reader := bufio.NewReader(conn)
-					ppHeader, err := proxyproto.Read(reader)
-					if err != nil {
-						// TODO: close on error
-						log.Println(err)
-						return
-					}
-
-					tlvs, err := ppHeader.TLVs()
+				serverName := ""
+				if s.tunConfig.UseProxyProtocol {
+					ppHeader, err := proxyproto.ReadHeader(conn)
 					if err != nil {
 						log.Println(err)
 						return
 					}
 
-					proto := string(tlvs[0].Value)
+					tlvs, err := ppHeader.ParseTLVs()
+					if err != nil {
+						log.Println(err)
+						return
+					}
 
-					printJson(ppHeader)
-					printJson(tlvs)
-					fmt.Println(proto)
-
+					serverName = string(tlvs[PROXY_PROTO_SERVER_NAME_OFFSET])
 				}
 
-				if tlsTermination == "client" {
-					conn = tls.Server(conn, tlsConfig)
+				if s.tlsTermination == "client" {
+					conn = tls.Server(conn, s.tlsConfig)
 				}
 
 				// TODO: use addrs from PROXY protocol
 				conn = wrapperConn{
 					conn: conn,
 					localAddr: addr{
-						network: "dummy-network:0",
+						network: "dummy-network",
+						address: "dummy-address:0",
 					},
 					remoteAddr: addr{
-						network: "dummy-network:0",
+						network: "dummy-network",
+						address: "dummy-address:0",
 					},
+				}
+
+				s.mut.Lock()
+				defer s.mut.Unlock()
+
+				listener, exists := s.listenMap[serverName]
+				if !exists {
+					listener, exists = s.listenMap[LISTENER_KEY_DEFAULT]
+					if !exists {
+						fmt.Println("No such listener")
+						conn.Close()
+						return
+					}
 				}
 
 				listener.PassConn(conn)
@@ -200,11 +246,36 @@ func Listen(token string) (*Listener, error) {
 			}()
 		}
 	}()
+}
+
+func (s *ClientSession) GetTunnelConfig() TunnelConfig {
+	return s.tunConfig
+}
+
+func (s *ClientSession) Listen(network, address string) (*Listener, error) {
+
+	if network != "tcp" && network != "tcp4" {
+		return nil, errors.New(fmt.Sprintf("Invalid network type: %s", network))
+	}
+
+	if address == "" {
+		address = LISTENER_KEY_DEFAULT
+	}
+
+	ip := net.ParseIP(address)
+	fmt.Println("ip", ip)
+
+	s.mut.Lock()
+	defer s.mut.Unlock()
+
+	listener := NewPassthroughListener()
+
+	s.listenMap[address] = listener
 
 	l := &Listener{
 		listener:     listener,
-		domain:       tunConfig.Domain,
-		tunnelConfig: tunConfig,
+		domain:       s.tunConfig.Domain,
+		tunnelConfig: s.tunConfig,
 	}
 
 	return l, nil

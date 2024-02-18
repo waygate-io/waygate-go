@@ -305,7 +305,7 @@ func (s *Server) handleConn(
 
 		var conn connCloseWriter = passConn
 
-		negotiatedProto := ""
+		//negotiatedProto := ""
 		if tunnel.config.TerminationType == "server" {
 			tlsConn := tls.Server(passConn, tlsConfig)
 			tlsConn.Handshake()
@@ -314,9 +314,9 @@ func (s *Server) handleConn(
 				panic(err)
 			}
 
-			connState := tlsConn.ConnectionState()
-			printJson(connState)
-			negotiatedProto = connState.NegotiatedProtocol
+			//connState := tlsConn.ConnectionState()
+			//printJson(connState)
+			//negotiatedProto = connState.NegotiatedProtocol
 
 			conn = tlsConn
 		}
@@ -348,23 +348,27 @@ func (s *Server) handleConn(
 				},
 			}
 
-			if negotiatedProto != "" {
-				proxyHeader.SetTLVs([]proxyproto.TLV{
-					proxyproto.TLV{
-						Type:  proxyproto.PP2_TYPE_MIN_CUSTOM,
-						Value: []byte(negotiatedProto),
-					},
-				})
-			}
+			proxyHeader.SetTLVs([]proxyproto.TLV{
+				proxyproto.TLV{
+					Type:  proxyproto.PP2_TYPE_MIN_CUSTOM,
+					Value: []byte(clientHello.ServerName),
+				},
+			})
 
-			printJson(proxyHeader)
+			//if negotiatedProto != "" {
+			//	proxyHeader.SetTLVs([]proxyproto.TLV{
+			//		proxyproto.TLV{
+			//			Type:  proxyproto.PP2_TYPE_MIN_CUSTOM,
+			//			Value: []byte(negotiatedProto),
+			//		},
+			//	})
+			//}
 
 			// TODO: I think this can possibly block and deadlock
-			//n, err := proxyHeader.WriteTo(upstreamConn)
-			//if err != nil {
-			//	fmt.Println("ruh roh", n, err)
-			//}
-			//fmt.Println("done writing")
+			n, err := proxyHeader.WriteTo(upstreamConn)
+			if err != nil {
+				fmt.Println("Failed to write PROXY protocol header", n, err)
+			}
 		}
 
 		ConnectConns(conn, upstreamConn)

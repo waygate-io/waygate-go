@@ -9,8 +9,8 @@ require (
 	github.com/caddyserver/certmagic v0.20.0
 	github.com/lastlogin-io/obligator v0.0.0-20240209015740-b72ea8f4b27f
 	github.com/lestrrat-go/jwx/v2 v2.0.11
+	github.com/mailgun/proxyproto v1.0.0
 	github.com/pires/go-proxyproto v0.7.0
-	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
 	golang.ngrok.com/muxado/v2 v2.0.0
 	nhooyr.io/websocket v1.8.10
 )
@@ -44,8 +44,10 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.18 // indirect
 	github.com/mholt/acmez v1.2.0 // indirect
 	github.com/miekg/dns v1.1.55 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/segmentio/asm v1.2.0 // indirect
+	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e // indirect
 	github.com/srwiley/oksvg v0.0.0-20221011165216-be6e8873101c // indirect
 	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef // indirect
 	github.com/stretchr/testify v1.8.4 // indirect

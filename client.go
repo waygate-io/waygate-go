@@ -138,11 +138,11 @@ func (c *Client) Run() error {
 
 		token, err = tokenFlow.GetTokenWithRedirect(redirUriCh)
 		if err != nil {
-			return nil
+			return err
 		}
 	}
 
-	listener, err := Listen(token)
+	listener, err := Listen("tcp", "", token)
 	if err != nil {
 		return err
 	}
