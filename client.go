@@ -27,8 +27,8 @@ func NewClient(config *ClientConfig) *Client {
 
 	configCopy := *config
 
-	if configCopy.ServerDomain == "" {
-		configCopy.ServerDomain = "waygate.io"
+	if configCopy.ServerDomain != "" {
+		WaygateServerDomain = configCopy.ServerDomain
 	}
 
 	return &Client{

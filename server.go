@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -346,13 +347,13 @@ func (m *ServerMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		_, err := m.authServer.Validate(r)
 		if err != nil {
 
-			redirectUri := fmt.Sprintf("https://%s", m.adminDomain)
+			redirectUri := fmt.Sprintf("https://%s/%s?%s", host, r.URL.Path, r.URL.RawQuery)
 
 			authUri := m.authServer.AuthUri(&obligator.OAuth2AuthRequest{
 				// https://openid.net/specs/oauth-v2-multiple-response-types-1_0.html#none
 				ResponseType: "none",
-				ClientId:     "https://" + m.adminDomain,
-				RedirectUri:  redirectUri,
+				ClientId:     url.QueryEscape("https://" + m.adminDomain),
+				RedirectUri:  url.QueryEscape(redirectUri),
 				State:        "",
 				Scope:        "",
 			})
