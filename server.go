@@ -90,6 +90,7 @@ func (s *ServerMux) HandleFunc(p string, f func(w http.ResponseWriter, r *http.R
 
 type ServerConfig struct {
 	AdminDomain string
+	Port        int
 }
 
 type Server struct {
@@ -147,6 +148,16 @@ func (s *Server) Run() {
 		Prefix:  "waygate_auth_",
 	}
 	authServer := obligator.NewServer(authConfig)
+	err = authServer.SetOAuth2Provider(obligator.OAuth2Provider{
+		ID:            "lastlogin",
+		Name:          "LastLogin",
+		URI:           "https://lastlogin.io",
+		ClientID:      "https://" + authDomain,
+		OpenIDConnect: true,
+	})
+	if err != nil {
+		panic(err)
+	}
 
 	jose, err := josencillo.NewJOSE()
 	if err != nil {
@@ -162,7 +173,7 @@ func (s *Server) Run() {
 
 	mux.Handle(oauth2Prefix+"/", http.StripPrefix(oauth2Prefix, oauth2Handler))
 
-	tcpListener, err := net.Listen("tcp", ":9443")
+	tcpListener, err := net.Listen("tcp", fmt.Sprintf(":%d", s.config.Port))
 	if err != nil {
 		panic(err)
 	}

@@ -166,12 +166,17 @@ func (s *ClientSession) start() {
 				var conn connCloseWriter = downstreamConn
 
 				serverName := ""
+				remoteAddress := "dummy-address:0"
+				localAddress := "dummy-address:0"
 				if s.tunConfig.UseProxyProtocol {
 					ppHeader, err := proxyproto.ReadHeader(conn)
 					if err != nil {
 						log.Println(err)
 						return
 					}
+
+					remoteAddress = ppHeader.Source.String()
+					localAddress = ppHeader.Destination.String()
 
 					tlvs, err := ppHeader.ParseTLVs()
 					if err != nil {
@@ -190,12 +195,12 @@ func (s *ClientSession) start() {
 				conn = wrapperConn{
 					conn: conn,
 					localAddr: addr{
-						network: "dummy-network",
-						address: "dummy-address:0",
+						network: "waygate-network",
+						address: localAddress,
 					},
 					remoteAddr: addr{
-						network: "dummy-network",
-						address: "dummy-address:0",
+						network: "waygate-network",
+						address: remoteAddress,
 					},
 				}
 
