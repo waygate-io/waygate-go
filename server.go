@@ -21,73 +21,6 @@ import (
 	"nhooyr.io/websocket"
 )
 
-type ServerMux struct {
-	mux         *http.ServeMux
-	authServer  *obligator.Server
-	adminDomain string
-}
-
-func NewServerMux(authServer *obligator.Server, adminDomain string) *ServerMux {
-	m := &ServerMux{
-		mux:         http.NewServeMux(),
-		authServer:  authServer,
-		adminDomain: adminDomain,
-	}
-	return m
-}
-
-func (m *ServerMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Security-Policy", "frame-ancestors 'none'; script-src 'none'")
-	w.Header().Set("Referrer-Policy", "no-referrer")
-
-	host := r.Host
-
-	authDomain := m.authServer.AuthDomains()[0]
-
-	if r.URL.Path != "/waygate" && host != authDomain && r.URL.Path != "/oauth2/token" {
-		_, err := m.authServer.Validate(r)
-		if err != nil {
-
-			redirectUri := fmt.Sprintf("https://%s", m.adminDomain)
-
-			authUri := m.authServer.AuthUri(&obligator.OAuth2AuthRequest{
-				// https://openid.net/specs/oauth-v2-multiple-response-types-1_0.html#none
-				ResponseType: "none",
-				ClientId:     "https://" + m.adminDomain,
-				RedirectUri:  redirectUri,
-				State:        "",
-				Scope:        "",
-			})
-
-			http.Redirect(w, r, authUri, 303)
-			return
-		}
-	} else if host == authDomain {
-		m.authServer.ServeHTTP(w, r)
-		return
-	}
-
-	//timestamp := time.Now().Format(time.RFC3339)
-
-	//remoteIp, err := getRemoteIp(r, s.behindProxy)
-	//if err != nil {
-	//	w.WriteHeader(500)
-	//	io.WriteString(w, err.Error())
-	//	return
-	//}
-
-	//fmt.Println(fmt.Sprintf("%s\t%s\t%s\t%s\t%s", timestamp, remoteIp, r.Method, r.Host, r.URL.Path))
-	m.mux.ServeHTTP(w, r)
-}
-
-func (s *ServerMux) Handle(p string, h http.Handler) {
-	s.mux.Handle(p, h)
-}
-
-func (s *ServerMux) HandleFunc(p string, f func(w http.ResponseWriter, r *http.Request)) {
-	s.mux.HandleFunc(p, f)
-}
-
 type ServerConfig struct {
 	AdminDomain string
 	Port        int
@@ -384,4 +317,71 @@ func (s *Server) handleConn(
 
 		ConnectConns(conn, upstreamConn)
 	}
+}
+
+type ServerMux struct {
+	mux         *http.ServeMux
+	authServer  *obligator.Server
+	adminDomain string
+}
+
+func NewServerMux(authServer *obligator.Server, adminDomain string) *ServerMux {
+	m := &ServerMux{
+		mux:         http.NewServeMux(),
+		authServer:  authServer,
+		adminDomain: adminDomain,
+	}
+	return m
+}
+
+func (m *ServerMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Security-Policy", "frame-ancestors 'none'; script-src 'none'")
+	w.Header().Set("Referrer-Policy", "no-referrer")
+
+	host := r.Host
+
+	authDomain := m.authServer.AuthDomains()[0]
+
+	if r.URL.Path != "/waygate" && host != authDomain && r.URL.Path != "/oauth2/token" {
+		_, err := m.authServer.Validate(r)
+		if err != nil {
+
+			redirectUri := fmt.Sprintf("https://%s", m.adminDomain)
+
+			authUri := m.authServer.AuthUri(&obligator.OAuth2AuthRequest{
+				// https://openid.net/specs/oauth-v2-multiple-response-types-1_0.html#none
+				ResponseType: "none",
+				ClientId:     "https://" + m.adminDomain,
+				RedirectUri:  redirectUri,
+				State:        "",
+				Scope:        "",
+			})
+
+			http.Redirect(w, r, authUri, 303)
+			return
+		}
+	} else if host == authDomain {
+		m.authServer.ServeHTTP(w, r)
+		return
+	}
+
+	//timestamp := time.Now().Format(time.RFC3339)
+
+	//remoteIp, err := getRemoteIp(r, s.behindProxy)
+	//if err != nil {
+	//	w.WriteHeader(500)
+	//	io.WriteString(w, err.Error())
+	//	return
+	//}
+
+	//fmt.Println(fmt.Sprintf("%s\t%s\t%s\t%s\t%s", timestamp, remoteIp, r.Method, r.Host, r.URL.Path))
+	m.mux.ServeHTTP(w, r)
+}
+
+func (s *ServerMux) Handle(p string, h http.Handler) {
+	s.mux.Handle(p, h)
+}
+
+func (s *ServerMux) HandleFunc(p string, f func(w http.ResponseWriter, r *http.Request)) {
+	s.mux.HandleFunc(p, f)
 }
