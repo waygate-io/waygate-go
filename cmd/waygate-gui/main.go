@@ -20,7 +20,7 @@ func main() {
 	eventCh := make(chan interface{})
 
 	waygateConfig := &waygate.ClientConfig{
-		ServerDomain: "waygate.anderspitman.net",
+		//ServerDomain: "waygate.anderspitman.net",
 	}
 	waygateClient := waygate.NewClient(waygateConfig)
 	waygateClient.ListenEvents(eventCh)

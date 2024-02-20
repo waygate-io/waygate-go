@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"sync"
 
 	"github.com/lastlogin-io/obligator"
 )
@@ -20,10 +21,9 @@ type ClientConfig struct {
 }
 
 type Client struct {
-	config  *ClientConfig
-	eventCh chan interface{}
-	// TODO: protect proxyMap with a mutex
-	proxyMap   map[string]string
+	config     *ClientConfig
+	eventCh    chan interface{}
+	forwardMan *ForwardManager
 	authServer *obligator.Server
 	tmpl       *template.Template
 }
@@ -43,10 +43,10 @@ func NewClient(config *ClientConfig) *Client {
 	}
 
 	return &Client{
-		config:   &configCopy,
-		eventCh:  nil,
-		proxyMap: make(map[string]string),
-		tmpl:     tmpl,
+		config:     &configCopy,
+		eventCh:    nil,
+		forwardMan: NewForwardManager(),
+		tmpl:       tmpl,
 	}
 }
 
@@ -59,8 +59,8 @@ func (c *Client) Proxy(domain, addr string) {
 		return
 	}
 
-	c.proxyMap[domain] = addr
-	printJson(c.proxyMap)
+	//c.forwardMap[domain] = addr
+	//printJson(c.forwardMap)
 }
 
 func (c *Client) Run() error {
@@ -117,24 +117,24 @@ func (c *Client) Run() error {
 		panic(err)
 	}
 
-	mux := NewClientMux(authServer)
+	mux := NewClientMux(authServer, c.forwardMan)
 
 	httpClient := &http.Client{}
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 
-		upstreamAddr, exists := c.proxyMap[r.Host]
+		forward, exists := c.forwardMan.Get(r.Host)
 		if exists {
-			proxyHttp(w, r, httpClient, upstreamAddr, false)
+			proxyHttp(w, r, httpClient, forward.TargetAddress, false)
 			return
 		}
 
 		tmplData := struct {
 			Domains  []string
-			Forwards map[string]string
+			Forwards map[string]*Forward
 		}{
 			Domains:  []string{tunConfig.Domain},
-			Forwards: c.proxyMap,
+			Forwards: c.forwardMan.GetAll(),
 		}
 
 		err = c.tmpl.ExecuteTemplate(w, "client.html", tmplData)
@@ -171,10 +171,15 @@ func (c *Client) Run() error {
 			return
 		}
 
+		protected := r.Form.Get("protected") == "on"
+		fmt.Println(r.Form.Get("protected"))
+
 		subdomain := fmt.Sprintf("%s.%s", hostname, domain)
 
-		c.proxyMap[subdomain] = targetAddr
-		printJson(c.proxyMap)
+		c.forwardMan.Set(subdomain, &Forward{
+			TargetAddress: targetAddr,
+			Protected:     protected,
+		})
 
 		http.Redirect(w, r, "/", 303)
 	})
@@ -246,12 +251,14 @@ type OAuth2AuthUriEvent struct {
 type ClientMux struct {
 	mux        *http.ServeMux
 	authServer *obligator.Server
+	forwardMan *ForwardManager
 }
 
-func NewClientMux(authServer *obligator.Server) *ClientMux {
+func NewClientMux(authServer *obligator.Server, forwardMan *ForwardManager) *ClientMux {
 	m := &ClientMux{
 		mux:        http.NewServeMux(),
 		authServer: authServer,
+		forwardMan: forwardMan,
 	}
 	return m
 }
@@ -273,6 +280,13 @@ func (m *ClientMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	authDomain := m.authServer.AuthDomains()[0]
 
 	if host != authDomain {
+
+		forward, exists := m.forwardMan.Get(host)
+		if exists && !forward.Protected {
+			m.mux.ServeHTTP(w, r)
+			return
+		}
+
 		_, err := m.authServer.Validate(r)
 		if err != nil {
 
@@ -296,4 +310,50 @@ func (m *ClientMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	m.mux.ServeHTTP(w, r)
+}
+
+type Forward struct {
+	Protected     bool
+	TargetAddress string
+}
+
+type ForwardManager struct {
+	forwardMap map[string]*Forward
+	mut        *sync.Mutex
+}
+
+func NewForwardManager() *ForwardManager {
+	m := &ForwardManager{
+		forwardMap: make(map[string]*Forward),
+		mut:        &sync.Mutex{},
+	}
+
+	return m
+}
+
+func (m *ForwardManager) GetAll() map[string]*Forward {
+	m.mut.Lock()
+	defer m.mut.Unlock()
+
+	mapCopy := make(map[string]*Forward)
+	for k, v := range m.forwardMap {
+		mapCopy[k] = &(*v)
+	}
+
+	return mapCopy
+}
+
+func (m *ForwardManager) Get(domain string) (*Forward, bool) {
+	m.mut.Lock()
+	defer m.mut.Unlock()
+
+	forward, exists := m.forwardMap[domain]
+	return forward, exists
+}
+
+func (m *ForwardManager) Set(domain string, forward *Forward) {
+	m.mut.Lock()
+	defer m.mut.Unlock()
+
+	m.forwardMap[domain] = forward
 }
