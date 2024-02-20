@@ -3,6 +3,7 @@ package waygate
 import (
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -163,4 +164,18 @@ func addrToHostPort(addr net.Addr) (string, int, error) {
 	}
 
 	return host, port, nil
+}
+
+func parseIP(ip string) (net.IP, bool, error) {
+	parsed := net.ParseIP(ip)
+
+	if parsed == nil {
+		return nil, false, errors.New("Invalid IP")
+	}
+
+	if parsed.To4() != nil {
+		return parsed, true, nil
+	} else {
+		return parsed, false, nil
+	}
 }

@@ -276,17 +276,34 @@ func (s *Server) handleConn(
 			panic(err)
 		}
 
+		remoteIp, isIPv4, err := parseIP(host)
+		if err != nil {
+			log.Println(err)
+			panic(err)
+		}
+
+		localIp, _, err := parseIP(localHost)
+		if err != nil {
+			log.Println(err)
+			panic(err)
+		}
+
+		transportProto := proxyproto.TCPv4
+		if !isIPv4 {
+			transportProto = proxyproto.TCPv6
+		}
+
 		if tunnel.config.UseProxyProtocol {
 			proxyHeader := &proxyproto.Header{
 				Version:           2,
 				Command:           proxyproto.PROXY,
-				TransportProtocol: proxyproto.TCPv4,
+				TransportProtocol: transportProto,
 				SourceAddr: &net.TCPAddr{
-					IP:   net.ParseIP(host),
+					IP:   remoteIp,
 					Port: port,
 				},
 				DestinationAddr: &net.TCPAddr{
-					IP:   net.ParseIP(localHost),
+					IP:   localIp,
 					Port: localPort,
 				},
 			}
