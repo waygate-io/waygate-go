@@ -193,7 +193,9 @@ func (s *Server) Run() {
 
 		sessConn := websocket.NetConn(ctx, c, websocket.MessageBinary)
 
-		muxSess := muxado.Server(sessConn, nil)
+		muxSess := muxado.Server(sessConn, &muxado.Config{
+                        MaxWindowSize: 1*1024*1024,
+                })
 
 		mut.Lock()
 		defer mut.Unlock()

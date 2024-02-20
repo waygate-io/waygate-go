@@ -134,7 +134,9 @@ func NewClientSession(token string) (*ClientSession, error) {
 
 	sessConn := websocket.NetConn(ctx, wsConn, websocket.MessageBinary)
 
-	muxSess := muxado.Client(sessConn, nil)
+	muxSess := muxado.Client(sessConn, &muxado.Config{
+                MaxWindowSize: 1*1024*1024,
+        })
 
 	s := &ClientSession{
 		muxSess:        muxSess,
@@ -191,7 +193,6 @@ func (s *ClientSession) start() {
 					conn = tls.Server(conn, s.tlsConfig)
 				}
 
-				// TODO: use addrs from PROXY protocol
 				conn = wrapperConn{
 					conn: conn,
 					localAddr: addr{
