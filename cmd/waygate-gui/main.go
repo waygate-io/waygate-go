@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/url"
 
 	"fyne.io/fyne/v2/app"
@@ -18,7 +19,9 @@ func main() {
 
 	eventCh := make(chan interface{})
 
-	waygateConfig := &waygate.ClientConfig{}
+	waygateConfig := &waygate.ClientConfig{
+		ServerDomain: "waygate.anderspitman.net",
+	}
 	waygateClient := waygate.NewClient(waygateConfig)
 	waygateClient.ListenEvents(eventCh)
 
@@ -29,7 +32,12 @@ func main() {
 	mainPage := container.NewVBox(
 		widget.NewLabel("Main"),
 		widget.NewButton("Connect", func() {
-			go waygateClient.Run()
+			go func() {
+				err := waygateClient.Run()
+				if err != nil {
+					fmt.Println(err)
+				}
+			}()
 		}),
 	)
 

@@ -230,8 +230,11 @@ func (f *TokenFlow) GetTokenWithRedirect(redirUriCh chan string) (string, error)
 	debugToken := os.Getenv("WAYGATE_DEBUG_TOKEN")
 	if debugToken != "" {
 		if redirUriCh != nil {
-			fmt.Println("would redirect to", <-redirUriCh)
+			go func() {
+				fmt.Println("would redirect to", <-redirUriCh)
+			}()
 		}
+		fmt.Println("WAYGATE_DEBUG_TOKEN:", debugToken)
 		return debugToken, nil
 	}
 
@@ -319,6 +322,8 @@ func (f *TokenFlow) GetTokenWithRedirect(redirUriCh chan string) (string, error)
 	go server.ListenAndServe()
 
 	token := <-tokenCh
+
+	//fmt.Println(token)
 
 	return token, nil
 }

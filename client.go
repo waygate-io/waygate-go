@@ -3,7 +3,10 @@ package waygate
 import (
 	"errors"
 	"fmt"
+	"html/template"
+	"io"
 	"net/http"
+	"os"
 
 	"github.com/lastlogin-io/obligator"
 )
@@ -17,13 +20,21 @@ type ClientConfig struct {
 }
 
 type Client struct {
-	config     *ClientConfig
-	eventCh    chan interface{}
+	config  *ClientConfig
+	eventCh chan interface{}
+	// TODO: protect proxyMap with a mutex
 	proxyMap   map[string]string
 	authServer *obligator.Server
+	tmpl       *template.Template
 }
 
 func NewClient(config *ClientConfig) *Client {
+
+	tmpl, err := template.ParseFS(fs, "templates/*")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+		os.Exit(1)
+	}
 
 	configCopy := *config
 
@@ -35,6 +46,7 @@ func NewClient(config *ClientConfig) *Client {
 		config:   &configCopy,
 		eventCh:  nil,
 		proxyMap: make(map[string]string),
+		tmpl:     tmpl,
 	}
 }
 
@@ -75,6 +87,8 @@ func (c *Client) Run() error {
 		}
 	}
 
+	fmt.Println("here", token)
+
 	listener, err := Listen("tcp", "", token)
 	if err != nil {
 		return err
@@ -105,8 +119,64 @@ func (c *Client) Run() error {
 
 	mux := NewClientMux(authServer)
 
+	httpClient := &http.Client{}
+
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("<h1>Welcome to Waygate Client</h1>"))
+
+		upstreamAddr, exists := c.proxyMap[r.Host]
+		if exists {
+			proxyHttp(w, r, httpClient, upstreamAddr, false)
+			return
+		}
+
+		tmplData := struct {
+			Domains  []string
+			Forwards map[string]string
+		}{
+			Domains:  []string{tunConfig.Domain},
+			Forwards: c.proxyMap,
+		}
+
+		err = c.tmpl.ExecuteTemplate(w, "client.html", tmplData)
+		if err != nil {
+			w.WriteHeader(500)
+			io.WriteString(w, err.Error())
+			return
+		}
+
+	})
+
+	mux.HandleFunc("/add-forward", func(w http.ResponseWriter, r *http.Request) {
+		r.ParseForm()
+		printJson(r.Form)
+
+		hostname := r.Form.Get("hostname")
+		if hostname == "" {
+			w.WriteHeader(400)
+			io.WriteString(w, "Missing hostname")
+			return
+		}
+
+		domain := r.Form.Get("domain")
+		if hostname == "" {
+			w.WriteHeader(400)
+			io.WriteString(w, "Missing domain")
+			return
+		}
+
+		targetAddr := r.Form.Get("target-address")
+		if hostname == "" {
+			w.WriteHeader(400)
+			io.WriteString(w, "Missing target-address")
+			return
+		}
+
+		subdomain := fmt.Sprintf("%s.%s", hostname, domain)
+
+		c.proxyMap[subdomain] = targetAddr
+		printJson(c.proxyMap)
+
+		http.Redirect(w, r, "/", 303)
 	})
 
 	go http.Serve(listener, mux)

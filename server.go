@@ -213,8 +213,6 @@ func (s *Server) handleConn(
 	tunnels map[string]Tunnel,
 	tlsConfig *tls.Config) {
 
-	log.Println("got tcpConn")
-
 	clientHello, clientReader, err := peekClientHello(tcpConn)
 	if err != nil {
 		log.Println("peekClientHello error", err)
