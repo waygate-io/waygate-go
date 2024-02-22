@@ -19,8 +19,7 @@ func main() {
 
 	eventCh := make(chan interface{})
 
-	waygateConfig := &waygate.ClientConfig{
-	}
+	waygateConfig := &waygate.ClientConfig{}
 	waygateClient := waygate.NewClient(waygateConfig)
 	waygateClient.ListenEvents(eventCh)
 

@@ -135,8 +135,8 @@ func NewClientSession(token string) (*ClientSession, error) {
 	sessConn := websocket.NetConn(ctx, wsConn, websocket.MessageBinary)
 
 	muxSess := muxado.Client(sessConn, &muxado.Config{
-                MaxWindowSize: 1*1024*1024,
-        })
+		MaxWindowSize: 1 * 1024 * 1024,
+	})
 
 	s := &ClientSession{
 		muxSess:        muxSess,

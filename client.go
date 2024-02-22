@@ -119,7 +119,12 @@ func (c *Client) Run() error {
 
 	mux := NewClientMux(authServer, c.forwardMan)
 
-	httpClient := &http.Client{}
+	httpClient := &http.Client{
+		// Don't follow redirects
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 
@@ -272,8 +277,8 @@ func (s *ClientMux) HandleFunc(p string, f func(w http.ResponseWriter, r *http.R
 }
 
 func (m *ClientMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Security-Policy", "frame-ancestors 'none'; script-src 'none'")
-	w.Header().Set("Referrer-Policy", "no-referrer")
+	//w.Header().Set("Content-Security-Policy", "frame-ancestors 'none'; script-src 'none'")
+	//w.Header().Set("Referrer-Policy", "no-referrer")
 
 	host := r.Host
 

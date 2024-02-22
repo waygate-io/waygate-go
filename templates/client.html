@@ -1,0 +1,32 @@
+<h1>Waygate Client Dashboard</h1>
+
+<h2>Forwards</h2>
+
+{{range $subdomain, $forward := .Forwards}}
+<div class='forward'>
+  <a href='https://{{$subdomain}}' target='_blank'>{{$subdomain}}</a> -> {{$forward.TargetAddress}} (protected: {{$forward.Protected}})
+</div>
+{{end}}
+<h2>Add Forward</h2>
+
+<form action='/add-forward', method='POST'>
+  <input type='text' name='hostname' />
+  .
+  <select name='domain'>
+    {{range .Domains}}
+    <option>{{.}}</option>
+    {{end}}
+  </select>
+  ->
+  <input type='text' name='target-address' />
+
+  <div>
+    <label for='protected-checkbox'>Protected:</label>
+    <input id='protected-checkbox' type='checkbox' name='protected' />
+  </div>
+
+  <div>
+    <button>Submit</button>
+  </div>
+</form>
+
