@@ -9,6 +9,8 @@ import (
 	"os"
 	"sync"
 
+	"github.com/anderspitman/treemess-go"
+	"github.com/gemdrive/gemdrive-go"
 	"github.com/lastlogin-io/obligator"
 )
 
@@ -117,7 +119,34 @@ func (c *Client) Run() error {
 		panic(err)
 	}
 
-	mux := NewClientMux(authServer, c.forwardMan)
+	filesDomain := "files." + tunConfig.Domain
+
+	gdConfig := &gemdrive.Config{
+		DashboardDomain: "dash." + filesDomain,
+		FsDomain:        filesDomain,
+		Dirs:            []string{"files"},
+	}
+
+	tmess := treemess.NewTreeMess()
+	gdTmess := tmess.Branch()
+
+	gdServer, err := gemdrive.NewServer(gdConfig, gdTmess)
+	if err != nil {
+		panic(err)
+	}
+
+	gdCh := make(chan treemess.Message)
+	tmess.Listen(gdCh)
+
+	//tmess.Send("start", nil)
+
+	go func() {
+		for msg := range gdCh {
+			fmt.Println(msg)
+		}
+	}()
+
+	mux := NewClientMux(authServer, gdServer, c.forwardMan)
 
 	httpClient := &http.Client{
 		// Don't follow redirects
@@ -256,13 +285,15 @@ type OAuth2AuthUriEvent struct {
 type ClientMux struct {
 	mux        *http.ServeMux
 	authServer *obligator.Server
+	fileServer *gemdrive.Server
 	forwardMan *ForwardManager
 }
 
-func NewClientMux(authServer *obligator.Server, forwardMan *ForwardManager) *ClientMux {
+func NewClientMux(authServer *obligator.Server, fileServer *gemdrive.Server, forwardMan *ForwardManager) *ClientMux {
 	m := &ClientMux{
 		mux:        http.NewServeMux(),
 		authServer: authServer,
+		fileServer: fileServer,
 		forwardMan: forwardMan,
 	}
 	return m
@@ -284,7 +315,10 @@ func (m *ClientMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	authDomain := m.authServer.AuthDomains()[0]
 
-	if host != authDomain {
+	if host == m.fileServer.FsDomain() {
+		m.fileServer.ServeHTTP(w, r)
+		return
+	} else if host != authDomain {
 
 		forward, exists := m.forwardMan.Get(host)
 		if exists && !forward.Protected {
@@ -307,6 +341,11 @@ func (m *ClientMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			})
 
 			http.Redirect(w, r, authUri, 303)
+			return
+		}
+
+		if host == m.fileServer.DashboardDomain() {
+			m.fileServer.ServeHTTP(w, r)
 			return
 		}
 	} else {

@@ -3,10 +3,12 @@ module github.com/waygate-io/waygate-go
 go 1.21.4
 
 //replace github.com/lastlogin-io/obligator => ../obligator
+replace github.com/gemdrive/gemdrive-go => ../gemdrive-go
 
 require (
 	fyne.io/fyne/v2 v2.4.4
 	github.com/caddyserver/certmagic v0.20.0
+	github.com/gemdrive/gemdrive-go v0.0.0-20240229162317-81a94ff66963
 	github.com/lastlogin-io/obligator v0.0.0-20240221224237-6f1153ab8f31
 	github.com/lestrrat-go/jwx/v2 v2.0.11
 	github.com/mailgun/proxyproto v1.0.0
@@ -17,6 +19,7 @@ require (
 
 require (
 	fyne.io/systray v1.10.1-0.20231115130155-104f5ef7839e // indirect
+	github.com/anderspitman/treemess-go v0.0.0-20210313015619-ba255d9f1e0f // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.2.0 // indirect
 	github.com/fredbi/uri v1.0.0 // indirect
@@ -44,6 +47,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.18 // indirect
 	github.com/mholt/acmez v1.2.0 // indirect
 	github.com/miekg/dns v1.1.55 // indirect
+	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/segmentio/asm v1.2.0 // indirect
