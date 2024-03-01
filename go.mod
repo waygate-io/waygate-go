@@ -3,12 +3,12 @@ module github.com/waygate-io/waygate-go
 go 1.21.4
 
 //replace github.com/lastlogin-io/obligator => ../obligator
-replace github.com/gemdrive/gemdrive-go => ../gemdrive-go
+//replace github.com/gemdrive/gemdrive-go => ../gemdrive-go
 
 require (
 	fyne.io/fyne/v2 v2.4.4
 	github.com/caddyserver/certmagic v0.20.0
-	github.com/gemdrive/gemdrive-go v0.0.0-20240229162317-81a94ff66963
+	github.com/gemdrive/gemdrive-go v0.0.0-20240229172336-f3f7f72ae546
 	github.com/lastlogin-io/obligator v0.0.0-20240221224237-6f1153ab8f31
 	github.com/lestrrat-go/jwx/v2 v2.0.11
 	github.com/mailgun/proxyproto v1.0.0
