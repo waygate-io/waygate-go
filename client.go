@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/anderspitman/treemess-go"
@@ -20,6 +21,7 @@ type ClientConfig struct {
 	Users        []string
 	ServerDomain string
 	Token        string
+	Dir          string
 }
 
 type Client struct {
@@ -89,9 +91,9 @@ func (c *Client) Run() error {
 		}
 	}
 
-	fmt.Println("here", token)
+	certDir := filepath.Join(c.config.Dir, "certs")
 
-	listener, err := Listen("tcp", "", token)
+	listener, err := Listen("tcp", "", token, certDir)
 	if err != nil {
 		return err
 	}
@@ -103,8 +105,11 @@ func (c *Client) Run() error {
 
 	authDomain := "auth." + tunConfig.Domain
 	authConfig := obligator.ServerConfig{
-		RootUri: "https://" + authDomain,
-		Prefix:  "waygate_client_auth_",
+		RootUri:      "https://" + authDomain,
+		Prefix:       "waygate_client_auth_",
+		StorageDir:   c.config.Dir,
+		DatabaseDir:  c.config.Dir,
+		ApiSocketDir: c.config.Dir,
 	}
 	authServer := obligator.NewServer(authConfig)
 	c.authServer = authServer
@@ -121,10 +126,12 @@ func (c *Client) Run() error {
 
 	filesDomain := "files." + tunConfig.Domain
 
+	gdDataDir := filepath.Join(c.config.Dir, "gemdrive")
 	gdConfig := &gemdrive.Config{
 		DashboardDomain: "dash." + filesDomain,
 		FsDomain:        filesDomain,
-		Dirs:            []string{"files"},
+		Dirs:            []string{filepath.Join(gdDataDir, "files")},
+		DataDir:         gdDataDir,
 	}
 
 	tmess := treemess.NewTreeMess()

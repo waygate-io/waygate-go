@@ -31,6 +31,19 @@ const (
 )
 
 func main() {
+	go func() {
+		w := app.NewWindow()
+		err := run(w)
+		if err != nil {
+			log.Fatal(err)
+		}
+		os.Exit(0)
+	}()
+	app.Main()
+}
+
+func run(w *app.Window) error {
+
 	cacheDir, err := os.UserCacheDir()
 	if err != nil {
 		panic(err)
@@ -58,22 +71,11 @@ func main() {
 	os.Stdout = stdoutFile
 	os.Stderr = stderrFile
 
-	go func() {
-		w := app.NewWindow()
-		err := run(w)
-		if err != nil {
-			log.Fatal(err)
-		}
-		os.Exit(0)
-	}()
-	app.Main()
-}
-
-func run(w *app.Window) error {
-
 	eventCh := make(chan interface{}, 1)
 
-	waygateConfig := &waygate.ClientConfig{}
+	waygateConfig := &waygate.ClientConfig{
+		Dir: waygateDir,
+	}
 	waygateClient := waygate.NewClient(waygateConfig)
 	waygateClient.ListenEvents(eventCh)
 

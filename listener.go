@@ -43,9 +43,9 @@ func (l *Listener) GetDomain() string {
 func (l *Listener) GetTunnelConfig() TunnelConfig {
 	return l.tunnelConfig
 }
-func Listen(network, address, token string) (*Listener, error) {
+func Listen(network, address, token, certDir string) (*Listener, error) {
 
-	s, err := NewClientSession(token)
+	s, err := NewClientSession(token, certDir)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +62,7 @@ type ClientSession struct {
 	mut            *sync.Mutex
 }
 
-func NewClientSession(token string) (*ClientSession, error) {
+func NewClientSession(token, certDir string) (*ClientSession, error) {
 
 	var tunConfig TunnelConfig
 
@@ -82,7 +82,7 @@ func NewClientSession(token string) (*ClientSession, error) {
 	certmagic.HTTPSPort, err = randomOpenPort()
 	if err != nil {
 		log.Println("Failed get random port for TLS challenges")
-		panic(err)
+		return nil, err
 	}
 
 	certmagic.DefaultACME.DisableHTTPChallenge = true
@@ -98,6 +98,8 @@ func NewClientSession(token string) (*ClientSession, error) {
 			return nil
 		},
 	}
+
+	certmagic.Default.Storage = &certmagic.FileStorage{certDir}
 
 	certConfig := certmagic.NewDefault()
 
@@ -269,8 +271,7 @@ func (s *ClientSession) Listen(network, address string) (*Listener, error) {
 		address = LISTENER_KEY_DEFAULT
 	}
 
-	ip := net.ParseIP(address)
-	fmt.Println("ip", ip)
+	//ip := net.ParseIP(address)
 
 	s.mut.Lock()
 	defer s.mut.Unlock()
