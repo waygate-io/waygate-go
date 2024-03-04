@@ -2,7 +2,7 @@ module github.com/waygate-io/waygate-go
 
 go 1.21.4
 
-replace github.com/lastlogin-io/obligator => ../obligator
+//replace github.com/lastlogin-io/obligator => ../obligator
 //replace github.com/gemdrive/gemdrive-go => ../gemdrive-go
 
 require (
@@ -10,7 +10,7 @@ require (
 	github.com/anderspitman/treemess-go v0.0.0-20210313015619-ba255d9f1e0f
 	github.com/caddyserver/certmagic v0.20.0
 	github.com/gemdrive/gemdrive-go v0.0.0-20240229172336-f3f7f72ae546
-	github.com/lastlogin-io/obligator v0.0.0-20240221224237-6f1153ab8f31
+	github.com/lastlogin-io/obligator v0.0.0-20240304163727-37f75cc861f1
 	github.com/lestrrat-go/jwx/v2 v2.0.11
 	github.com/mailgun/proxyproto v1.0.0
 	github.com/pires/go-proxyproto v0.7.0
