@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"path/filepath"
 	//"image/color"
 	"image/color"
 	"log"
@@ -13,7 +14,6 @@ import (
 	"gioui.org/op"
 	"gioui.org/unit"
 	"gioui.org/widget"
-	//"gioui.org/text"
 	"gioui.org/widget/material"
 	"github.com/lastlogin-io/obligator"
 	"github.com/pkg/browser"
@@ -31,6 +31,33 @@ const (
 )
 
 func main() {
+	cacheDir, err := os.UserCacheDir()
+	if err != nil {
+		panic(err)
+	}
+
+	waygateDir := filepath.Join(cacheDir, "WaygateClientGUI")
+
+	err = os.MkdirAll(waygateDir, os.ModePerm)
+	if err != nil {
+		panic(err)
+	}
+
+	stdoutFilePath := filepath.Join(waygateDir, "stdout.txt")
+	stdoutFile, err := openLogFile(stdoutFilePath)
+	if err != nil {
+		panic(err)
+	}
+
+	stderrFilePath := filepath.Join(waygateDir, "stderr.txt")
+	stderrFile, err := openLogFile(stderrFilePath)
+	if err != nil {
+		panic(err)
+	}
+
+	os.Stdout = stdoutFile
+	os.Stderr = stderrFile
+
 	go func() {
 		w := app.NewWindow()
 		err := run(w)
@@ -217,4 +244,8 @@ func (p *connectedPage) Layout(gtx C, users []string) D {
 			return material.Button(p.theme, p.addUserBtn, "Add User").Layout(gtx)
 		}),
 	)
+}
+
+func openLogFile(path string) (*os.File, error) {
+	return os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
 }
