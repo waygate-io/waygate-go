@@ -169,6 +169,7 @@ type connectedPage struct {
 	user       string
 	userText   *widget.Editor
 	addUserBtn *widget.Clickable
+	userList   *widget.List
 }
 
 func NewConnectedPage(events chan interface{}, th *material.Theme) *connectedPage {
@@ -180,6 +181,11 @@ func NewConnectedPage(events chan interface{}, th *material.Theme) *connectedPag
 			//Alignment:  text.End,
 		},
 		addUserBtn: new(widget.Clickable),
+		userList: &widget.List{
+			List: layout.List{
+				Axis: layout.Vertical,
+			},
+		},
 	}
 }
 
@@ -191,6 +197,12 @@ func (p *connectedPage) Layout(gtx C, users []string) D {
 	border := widget.Border{Color: color.NRGBA{A: 0xff}, CornerRadius: unit.Dp(8), Width: unit.Dp(2)}
 	inset := layout.UniformInset(unit.Dp(4))
 	return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+		layout.Rigid(func(gtx C) D {
+			return material.List(p.theme, p.userList).Layout(gtx, len(users), func(gtx C, i int) D {
+				return material.Label(p.theme, unit.Sp(16), users[i]).Layout(gtx)
+				//return layout.UniformInset(unit.Dp(16)).Layout(gtx, widgets[i])
+			})
+		}),
 		layout.Rigid(func(gtx C) D {
 			return border.Layout(gtx, func(gtx C) D {
 				return inset.Layout(gtx, material.Editor(p.theme, p.userText, "User").Layout)
@@ -206,109 +218,3 @@ func (p *connectedPage) Layout(gtx C, users []string) D {
 		}),
 	)
 }
-
-//func main() {
-//	a := app.New()
-//	w := a.NewWindow("Waygate Client")
-//
-//	eventCh := make(chan interface{})
-//
-//	waygateConfig := &waygate.ClientConfig{}
-//	waygateClient := waygate.NewClient(waygateConfig)
-//	waygateClient.ListenEvents(eventCh)
-//
-//	oauth2Uri := ""
-//	var tunnelConfig waygate.TunnelConfig
-//	label := widget.NewLabel("Waygate Client")
-//
-//	mainPage := container.NewVBox(
-//		widget.NewLabel("Main"),
-//		widget.NewButton("Connect", func() {
-//			go func() {
-//				err := waygateClient.Run()
-//				if err != nil {
-//					fmt.Println(err)
-//				}
-//			}()
-//		}),
-//	)
-//
-//	getTokenPage := container.NewVBox(
-//		widget.NewLabel("How do you want to get token?"),
-//		widget.NewButton("Open browser", func() {
-//			u, err := url.Parse(oauth2Uri)
-//			if err != nil {
-//				label.SetText(err.Error())
-//			}
-//
-//			a.OpenURL(u)
-//			if err != nil {
-//				label.SetText(err.Error())
-//			}
-//		}),
-//		//widget.NewButton("Show QR", func() {
-//		//	qr, err := qrcode.New(oauth2Uri, qrcode.Medium)
-//		//	if err != nil {
-//		//		label.SetText(err.Error())
-//		//	}
-//
-//		//	img := canvas.NewImageFromImage(qr.Image(256))
-//		//	img.FillMode = canvas.ImageFillOriginal
-//
-//		//	w.SetContent(img)
-//		//}),
-//	)
-//
-//	domainLabel := widget.NewLabel("Domain")
-//	//addrEntry := widget.NewEntry()
-//	userEntry := widget.NewEntry()
-//	userList := container.NewVBox()
-//	connectedPage := container.NewVBox(
-//		widget.NewLabel("Connected"),
-//		domainLabel,
-//		//widget.NewLabel("Update Proxy Address:"),
-//		//addrEntry,
-//		//widget.NewButton("Update", func() {
-//		//	waygateClient.Proxy(tunnelConfig.Domain, addrEntry.Text)
-//		//}),
-//		widget.NewLabel("Users:"),
-//		userList,
-//		userEntry,
-//		widget.NewButton("Add User", func() {
-//			waygateClient.AddUser(obligator.User{
-//				Email: userEntry.Text,
-//			})
-//		}),
-//		widget.NewButton("Disconnect", func() {
-//		}),
-//	)
-//
-//	w.SetContent(mainPage)
-//	//w.SetContent(connectedPage)
-//
-//	go func() {
-//		for {
-//			event := <-eventCh
-//
-//			switch evt := event.(type) {
-//			case waygate.OAuth2AuthUriEvent:
-//				oauth2Uri = evt.Uri
-//				w.SetContent(getTokenPage)
-//			case waygate.TunnelConnectedEvent:
-//				tunnelConfig = evt.TunnelConfig
-//				domainLabel.SetText(tunnelConfig.Domain)
-//				w.SetContent(connectedPage)
-//
-//			case waygate.UsersUpdatedEvent:
-//
-//				userList.RemoveAll()
-//
-//				for _, user := range evt.Users {
-//					userList.Add(widget.NewLabel(user.Email))
-//				}
-//			}
-//		}
-//	}()
-//
-//	w.ShowAndRun()
-//}

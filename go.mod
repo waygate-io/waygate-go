@@ -2,7 +2,7 @@ module github.com/waygate-io/waygate-go
 
 go 1.21.4
 
-//replace github.com/lastlogin-io/obligator => ../obligator
+replace github.com/lastlogin-io/obligator => ../obligator
 //replace github.com/gemdrive/gemdrive-go => ../gemdrive-go
 
 require (
