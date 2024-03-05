@@ -2,6 +2,7 @@ package waygate
 
 import (
 	"errors"
+	"os"
 	"sync"
 	//"bufio"
 	"context"
@@ -14,6 +15,8 @@ import (
 
 	"github.com/caddyserver/certmagic"
 	"github.com/mailgun/proxyproto"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"golang.ngrok.com/muxado/v2"
 	"nhooyr.io/websocket"
 )
@@ -60,6 +63,7 @@ type ClientSession struct {
 	tlsTermination string
 	listenMap      map[string]*PassthroughListener
 	mut            *sync.Mutex
+	logger         *zap.Logger
 }
 
 func NewClientSession(token, certDir string) (*ClientSession, error) {
@@ -100,6 +104,20 @@ func NewClientSession(token, certDir string) (*ClientSession, error) {
 	}
 
 	certmagic.Default.Storage = &certmagic.FileStorage{certDir}
+
+	var output zapcore.WriteSyncer = os.Stdout
+	logOutput := zapcore.Lock(output)
+	logEncoder := zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig())
+	logPriority := zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
+		return lvl >= zapcore.InfoLevel
+	})
+
+	logCore := zapcore.NewCore(logEncoder, logOutput, logPriority)
+
+	logger := zap.New(logCore)
+
+	certmagic.Default.Logger = logger
+	certmagic.DefaultACME.Logger = logger
 
 	certConfig := certmagic.NewDefault()
 
@@ -147,6 +165,7 @@ func NewClientSession(token, certDir string) (*ClientSession, error) {
 		tlsTermination: tlsTermination,
 		listenMap:      make(map[string]*PassthroughListener),
 		mut:            &sync.Mutex{},
+		logger:         logger,
 	}
 
 	s.start()
@@ -157,6 +176,9 @@ func NewClientSession(token, certDir string) (*ClientSession, error) {
 func (s *ClientSession) start() {
 
 	go func() {
+
+		defer s.logger.Sync()
+
 		for {
 			downstreamConn, err := s.muxSess.AcceptStream()
 			if err != nil {
