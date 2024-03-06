@@ -1,24 +1,20 @@
 package waygate
 
 import (
-	"errors"
-	"os"
-	"sync"
-	//"bufio"
 	"context"
 	"crypto/tls"
-	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net"
+	"os"
 	"strings"
+	"sync"
 
 	"github.com/caddyserver/certmagic"
 	"github.com/mailgun/proxyproto"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"golang.ngrok.com/muxado/v2"
-	"nhooyr.io/websocket"
 )
 
 const PROXY_PROTO_PP2_TYPE_MIN_CUSTOM = 0xe0
@@ -27,6 +23,7 @@ const LISTENER_KEY_DEFAULT = "default-listener"
 
 type Listener struct {
 	listener     *PassthroughListener
+	tunnel       Tunnel
 	domain       string
 	tunnelConfig TunnelConfig
 }
@@ -44,7 +41,7 @@ func (l *Listener) GetDomain() string {
 	return l.domain
 }
 func (l *Listener) GetTunnelConfig() TunnelConfig {
-	return l.tunnelConfig
+	return l.tunnel.GetConfig()
 }
 func Listen(network, address, token, certDir string) (*Listener, error) {
 
@@ -57,9 +54,8 @@ func Listen(network, address, token, certDir string) (*Listener, error) {
 }
 
 type ClientSession struct {
-	muxSess        muxado.Session
+	tunnel         Tunnel
 	tlsConfig      *tls.Config
-	tunConfig      TunnelConfig
 	tlsTermination string
 	listenMap      map[string]*PassthroughListener
 	mut            *sync.Mutex
@@ -67,13 +63,6 @@ type ClientSession struct {
 }
 
 func NewClientSession(token, certDir string) (*ClientSession, error) {
-
-	var tunConfig TunnelConfig
-
-	tlsTermination := "client"
-	//tlsTermination := "server"
-	useProxyProtoStr := "true"
-	//useProxyProtoStr := "false"
 
 	// Use random unprivileged port for ACME challenges. This is necessary
 	// because of the way certmagic works, in that if it fails to bind
@@ -94,10 +83,14 @@ func NewClientSession(token, certDir string) (*ClientSession, error) {
 	certmagic.DefaultACME.Agreed = true
 	//certmagic.DefaultACME.CA = certmagic.LetsEncryptStagingCA
 
+	var s *ClientSession
+
 	certmagic.Default.OnDemand = &certmagic.OnDemandConfig{
 		DecisionFunc: func(ctx context.Context, name string) error {
-			if !strings.HasSuffix(name, tunConfig.Domain) {
-				return fmt.Errorf("not allowed")
+			if s != nil {
+				if !strings.HasSuffix(name, s.tunnel.GetConfig().Domain) {
+					return fmt.Errorf("not allowed")
+				}
 			}
 			return nil
 		},
@@ -121,7 +114,7 @@ func NewClientSession(token, certDir string) (*ClientSession, error) {
 
 	certConfig := certmagic.NewDefault()
 
-	ctx := context.Background()
+	//ctx := context.Background()
 
 	tlsConfig := &tls.Config{
 		GetCertificate: certConfig.GetCertificate,
@@ -130,39 +123,22 @@ func NewClientSession(token, certDir string) (*ClientSession, error) {
 		NextProtos: []string{"http/1.1", "acme-tls/1"},
 	}
 
-	uri := fmt.Sprintf("wss://%s/waygate?token=%s&termination-type=%s&use-proxy-protocol=%s",
-		WaygateServerDomain,
-		token,
-		tlsTermination,
-		useProxyProtoStr,
-	)
+	tunReq := TunnelRequest{
+		Token:            token,
+		TerminationType:  "client",
+		UseProxyProtocol: true,
+	}
 
-	wsConn, _, err := websocket.Dial(ctx, uri, nil)
+	tunnel, err := NewTlsMuxadoClientTunnel(tunReq)
+	//tunnel, err := NewWebSocketMuxadoClientTunnel(tunReq)
 	if err != nil {
 		return nil, err
 	}
 
-	_, tunConfigBytes, err := wsConn.Read(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	err = json.Unmarshal(tunConfigBytes, &tunConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	sessConn := websocket.NetConn(ctx, wsConn, websocket.MessageBinary)
-
-	muxSess := muxado.Client(sessConn, &muxado.Config{
-		MaxWindowSize: 1 * 1024 * 1024,
-	})
-
-	s := &ClientSession{
-		muxSess:        muxSess,
+	s = &ClientSession{
+		tunnel:         tunnel,
 		tlsConfig:      tlsConfig,
-		tunConfig:      tunConfig,
-		tlsTermination: tlsTermination,
+		tlsTermination: tunnel.GetConfig().TerminationType,
 		listenMap:      make(map[string]*PassthroughListener),
 		mut:            &sync.Mutex{},
 		logger:         logger,
@@ -180,7 +156,7 @@ func (s *ClientSession) start() {
 		defer s.logger.Sync()
 
 		for {
-			downstreamConn, err := s.muxSess.AcceptStream()
+			downstreamConn, err := s.tunnel.AcceptStream()
 			if err != nil {
 				// TODO: close on error
 				log.Println(err)
@@ -194,7 +170,7 @@ func (s *ClientSession) start() {
 				serverName := ""
 				remoteAddress := "dummy-address:0"
 				localAddress := "dummy-address:0"
-				if s.tunConfig.UseProxyProtocol {
+				if s.tunnel.GetConfig().UseProxyProtocol {
 					ppHeader, err := proxyproto.ReadHeader(conn)
 					if err != nil {
 						log.Println(err)
@@ -280,7 +256,7 @@ func (s *ClientSession) start() {
 }
 
 func (s *ClientSession) GetTunnelConfig() TunnelConfig {
-	return s.tunConfig
+	return s.tunnel.GetConfig()
 }
 
 func (s *ClientSession) Listen(network, address string) (*Listener, error) {
@@ -303,9 +279,8 @@ func (s *ClientSession) Listen(network, address string) (*Listener, error) {
 	s.listenMap[address] = listener
 
 	l := &Listener{
-		listener:     listener,
-		domain:       s.tunConfig.Domain,
-		tunnelConfig: s.tunConfig,
+		listener: listener,
+		tunnel:   s.tunnel,
 	}
 
 	return l, nil

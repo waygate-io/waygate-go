@@ -3,8 +3,6 @@ package waygate
 import (
 	"context"
 	"crypto/tls"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -18,8 +16,6 @@ import (
 	"github.com/lastlogin-io/obligator"
 	proxyproto "github.com/pires/go-proxyproto"
 	"github.com/waygate-io/waygate-go/josencillo"
-	"golang.ngrok.com/muxado/v2"
-	"nhooyr.io/websocket"
 )
 
 type ServerConfig struct {
@@ -28,13 +24,16 @@ type ServerConfig struct {
 }
 
 type Server struct {
+	jose   *josencillo.JOSE
 	config *ServerConfig
+	mut    *sync.Mutex
 }
 
 func NewServer(config *ServerConfig) *Server {
 
 	s := &Server{
 		config: config,
+		mut:    &sync.Mutex{},
 	}
 
 	return s
@@ -73,7 +72,7 @@ func (s *Server) Run() {
 	tlsConfig := &tls.Config{
 		GetCertificate: certConfig.GetCertificate,
 		// TODO: can we drop h2 here as long as we're not doing server TLS termination?
-		NextProtos: []string{"http/1.1", "acme-tls/1"},
+		NextProtos: []string{"http/1.1", "acme-tls/1", "waygate-tls-muxado"},
 	}
 
 	authDomain := "auth." + s.config.AdminDomain
@@ -93,14 +92,14 @@ func (s *Server) Run() {
 		panic(err)
 	}
 
-	jose, err := josencillo.NewJOSE()
+	s.jose, err = josencillo.NewJOSE()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
 	}
 
 	oauth2Prefix := "/oauth2"
-	oauth2Handler := NewOAuth2Handler(oauth2Prefix, jose)
+	oauth2Handler := NewOAuth2Handler(oauth2Prefix, s.jose)
 
 	//mux := http.NewServeMux()
 	mux := NewServerMux(authServer, s.config.AdminDomain)
@@ -115,8 +114,6 @@ func (s *Server) Run() {
 	waygateListener := NewPassthroughListener()
 
 	tunnels := make(map[string]Tunnel)
-	mut := &sync.Mutex{}
-	ctx := context.Background()
 
 	go func() {
 		for {
@@ -126,9 +123,10 @@ func (s *Server) Run() {
 				continue
 			}
 
-			mut.Lock()
+			s.mut.Lock()
+			// TODO: I don't think this is actually a copy...
 			tunnelsCopy := tunnels
-			mut.Unlock()
+			s.mut.Unlock()
 			go s.handleConn(tcpConn, authDomain, waygateListener, tunnelsCopy, tlsConfig)
 		}
 	}()
@@ -141,68 +139,17 @@ func (s *Server) Run() {
 
 	mux.HandleFunc("/waygate", func(w http.ResponseWriter, r *http.Request) {
 
-		tokenJwt := r.URL.Query().Get("token")
-		if tokenJwt == "" {
-			w.WriteHeader(401)
-			log.Println(errors.New("Missing token"))
-			return
-		}
-
-		claims, err := jose.ParseJWT(tokenJwt)
-		if err != nil {
-			w.WriteHeader(401)
-			log.Println(err)
-			return
-		}
-
-		//domain := fmt.Sprintf("test.%s", s.config.AdminDomain)
-		domain := claims["domain"].(string)
-
-		terminationType := r.URL.Query().Get("termination-type")
-
-		c, err := websocket.Accept(w, r, &websocket.AcceptOptions{
-			OriginPatterns: []string{"*"},
-		})
+		tunnel, err := NewWebSocketMuxadoServerTunnel(w, r, s.jose)
 		if err != nil {
 			w.WriteHeader(500)
 			log.Println(err)
 			return
 		}
 
-		useProxyProto := r.URL.Query().Get("use-proxy-protocol") == "true"
-
-		tunConfig := TunnelConfig{
-			Domain:           domain,
-			TerminationType:  terminationType,
-			UseProxyProtocol: useProxyProto,
-		}
-
-		bytes, err := json.Marshal(tunConfig)
-		if err != nil {
-			w.WriteHeader(500)
-			log.Println(err)
-			return
-		}
-
-		err = c.Write(ctx, websocket.MessageBinary, bytes)
-		if err != nil {
-			w.WriteHeader(500)
-			log.Println(err)
-			return
-		}
-
-		sessConn := websocket.NetConn(ctx, c, websocket.MessageBinary)
-
-		muxSess := muxado.Server(sessConn, &muxado.Config{
-			MaxWindowSize: 1 * 1024 * 1024,
-		})
-
-		mut.Lock()
-		defer mut.Unlock()
-		tunnels[domain] = Tunnel{
-			muxSess: muxSess,
-			config:  tunConfig,
-		}
+		s.mut.Lock()
+		defer s.mut.Unlock()
+		domain := tunnel.GetConfig().Domain
+		tunnels[domain] = tunnel
 	})
 
 	http.Serve(tlsListener, mux)
@@ -223,14 +170,29 @@ func (s *Server) handleConn(
 
 	passConn := NewProxyConn(tcpConn, clientReader)
 
-	if clientHello.ServerName == s.config.AdminDomain || clientHello.ServerName == authDomain {
+	if clientHello.ServerName == s.config.AdminDomain && isTlsMuxado(clientHello) {
+
+		tlsConn := tls.Server(passConn, tlsConfig)
+
+		tunnel, err := NewTlsMuxadoServerTunnel(tlsConn, s.jose)
+		if err != nil {
+			log.Println("Error reading setup size", err)
+			return
+		}
+
+		s.mut.Lock()
+		defer s.mut.Unlock()
+		domain := tunnel.GetConfig().Domain
+		tunnels[domain] = tunnel
+
+	} else if clientHello.ServerName == s.config.AdminDomain || clientHello.ServerName == authDomain {
 		waygateListener.PassConn(passConn)
 	} else {
 
 		var tunnel Tunnel
 		matched := false
 		for _, tun := range tunnels {
-			if strings.HasSuffix(clientHello.ServerName, tun.config.Domain) {
+			if strings.HasSuffix(clientHello.ServerName, tun.GetConfig().Domain) {
 				tunnel = tun
 				matched = true
 				break
@@ -242,7 +204,7 @@ func (s *Server) handleConn(
 			return
 		}
 
-		upstreamConn, err := tunnel.muxSess.OpenStream()
+		upstreamConn, err := tunnel.OpenStream()
 		if err != nil {
 			log.Println(err)
 			panic(err)
@@ -251,7 +213,7 @@ func (s *Server) handleConn(
 		var conn connCloseWriter = passConn
 
 		//negotiatedProto := ""
-		if tunnel.config.TerminationType == "server" {
+		if tunnel.GetConfig().TerminationType == "server" {
 			tlsConn := tls.Server(passConn, tlsConfig)
 			tlsConn.Handshake()
 			if err != nil {
@@ -295,7 +257,7 @@ func (s *Server) handleConn(
 			transportProto = proxyproto.TCPv6
 		}
 
-		if tunnel.config.UseProxyProtocol {
+		if tunnel.GetConfig().UseProxyProtocol {
 			proxyHeader := &proxyproto.Header{
 				Version:           2,
 				Command:           proxyproto.PROXY,
@@ -402,4 +364,13 @@ func (s *ServerMux) Handle(p string, h http.Handler) {
 
 func (s *ServerMux) HandleFunc(p string, f func(w http.ResponseWriter, r *http.Request)) {
 	s.mux.HandleFunc(p, f)
+}
+
+func isTlsMuxado(clientHello *tls.ClientHelloInfo) bool {
+	for _, proto := range clientHello.SupportedProtos {
+		if proto == "waygate-tls-muxado" {
+			return true
+		}
+	}
+	return false
 }

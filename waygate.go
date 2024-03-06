@@ -1,12 +1,11 @@
 package waygate
 
-import (
-	"golang.ngrok.com/muxado/v2"
-)
+import ()
 
-type Tunnel struct {
-	muxSess muxado.Session
-	config  TunnelConfig
+type TunnelRequest struct {
+	Token            string `json:"token"`
+	TerminationType  string `json:"termination_type"`
+	UseProxyProtocol bool   `json:"use_proxy_protocol"`
 }
 
 type TunnelConfig struct {
