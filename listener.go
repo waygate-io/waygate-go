@@ -129,8 +129,9 @@ func NewClientSession(token, certDir string) (*ClientSession, error) {
 		UseProxyProtocol: true,
 	}
 
-	tunnel, err := NewTlsMuxadoClientTunnel(tunReq)
-	//tunnel, err := NewWebSocketMuxadoClientTunnel(tunReq)
+	//tunnel, err := NewWebTransportClientTunnel(tunReq)
+	//tunnel, err := NewTlsMuxadoClientTunnel(tunReq)
+	tunnel, err := NewWebSocketMuxadoClientTunnel(tunReq)
 	if err != nil {
 		return nil, err
 	}

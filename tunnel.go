@@ -8,8 +8,11 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
+	"time"
 
+	"github.com/quic-go/webtransport-go"
 	"github.com/waygate-io/waygate-go/josencillo"
 	"golang.ngrok.com/muxado/v2"
 	"nhooyr.io/websocket"
@@ -275,6 +278,122 @@ func NewWebSocketMuxadoClientTunnel(tunReq TunnelRequest) (*MuxadoTunnel, error)
 	t := &MuxadoTunnel{
 		muxSess:   muxSess,
 		tunConfig: tunConfig,
+	}
+
+	return t, nil
+}
+
+type WebTransportTunnel struct {
+	tunConfig TunnelConfig
+	wtSession *webtransport.Session
+	ctx       context.Context
+}
+
+func (t *WebTransportTunnel) OpenStream() (connCloseWriter, error) {
+	stream, err := t.wtSession.OpenStreamSync(t.ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return wtStreamWrapper{
+		wtStream: stream,
+	}, nil
+}
+
+func (t *WebTransportTunnel) AcceptStream() (connCloseWriter, error) {
+	stream, err := t.wtSession.AcceptStream(t.ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return wtStreamWrapper{
+		wtStream: stream,
+	}, nil
+}
+
+func (t *WebTransportTunnel) GetConfig() TunnelConfig {
+	return t.tunConfig
+}
+
+type wtStreamWrapper struct {
+	wtStream webtransport.Stream
+}
+
+func (w wtStreamWrapper) Read(buf []byte) (int, error) {
+	return w.wtStream.Read(buf)
+}
+func (w wtStreamWrapper) Write(buf []byte) (int, error) {
+	return w.wtStream.Write(buf)
+}
+func (w wtStreamWrapper) Close() error {
+	return w.wtStream.Close()
+}
+func (w wtStreamWrapper) CloseWrite() error {
+	w.wtStream.CancelWrite(42)
+	return nil
+}
+func (w wtStreamWrapper) LocalAddr() net.Addr {
+	return addr{
+		network: fmt.Sprintf("webtransport-network-%d", w.wtStream.StreamID()),
+		address: fmt.Sprintf("webtransport-address-%d", w.wtStream.StreamID()),
+	}
+}
+func (w wtStreamWrapper) RemoteAddr() net.Addr {
+	return addr{
+		network: fmt.Sprintf("webtransport-network-%d", w.wtStream.StreamID()),
+		address: fmt.Sprintf("webtransport-address-%d", w.wtStream.StreamID()),
+	}
+}
+func (w wtStreamWrapper) SetDeadline(t time.Time) error {
+	return w.wtStream.SetDeadline(t)
+}
+func (w wtStreamWrapper) SetReadDeadline(t time.Time) error {
+	return w.wtStream.SetReadDeadline(t)
+}
+func (w wtStreamWrapper) SetWriteDeadline(t time.Time) error {
+	return w.wtStream.SetWriteDeadline(t)
+}
+
+func NewWebTransportServerTunnel(w http.ResponseWriter, r *http.Request, wtServer webtransport.Server, jose *josencillo.JOSE) (*WebTransportTunnel, error) {
+
+	wtSession, err := wtServer.Upgrade(w, r)
+	if err != nil {
+		return nil, err
+	}
+
+	t := &WebTransportTunnel{
+		ctx:       context.Background(),
+		wtSession: wtSession,
+		tunConfig: TunnelConfig{
+			Domain:           "example.com",
+			TerminationType:  "client",
+			UseProxyProtocol: true,
+		},
+	}
+
+	return t, nil
+}
+
+func NewWebTransportClientTunnel(tunReq TunnelRequest) (Tunnel, error) {
+
+	uri := fmt.Sprintf("https://%s/waygate", WaygateServerDomain)
+
+	ctx := context.Background()
+
+	var d webtransport.Dialer
+	_, wtSession, err := d.Dial(ctx, uri, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	t := &WebTransportTunnel{
+		ctx:       ctx,
+		wtSession: wtSession,
+		tunConfig: TunnelConfig{
+			Domain:           "example.com",
+			TerminationType:  "client",
+			UseProxyProtocol: true,
+		},
 	}
 
 	return t, nil

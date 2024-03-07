@@ -15,6 +15,9 @@ import (
 	"github.com/caddyserver/certmagic"
 	"github.com/lastlogin-io/obligator"
 	proxyproto "github.com/pires/go-proxyproto"
+	"github.com/quic-go/quic-go"
+	"github.com/quic-go/quic-go/http3"
+	"github.com/quic-go/webtransport-go"
 	"github.com/waygate-io/waygate-go/josencillo"
 )
 
@@ -111,6 +114,20 @@ func (s *Server) Run() {
 		panic(err)
 	}
 
+	wtServer := webtransport.Server{
+		H3: http3.Server{
+			Addr:      ":9443",
+			Handler:   mux,
+			TLSConfig: tlsConfig,
+			QuicConfig: &quic.Config{
+				//MaxIncomingStreams: 512,
+				KeepAlivePeriod: 8,
+			},
+		},
+	}
+
+	go wtServer.ListenAndServe()
+
 	waygateListener := NewPassthroughListener()
 
 	tunnels := make(map[string]Tunnel)
@@ -139,11 +156,21 @@ func (s *Server) Run() {
 
 	mux.HandleFunc("/waygate", func(w http.ResponseWriter, r *http.Request) {
 
-		tunnel, err := NewWebSocketMuxadoServerTunnel(w, r, s.jose)
-		if err != nil {
-			w.WriteHeader(500)
-			log.Println(err)
-			return
+		var tunnel Tunnel
+		if r.ProtoMajor == 3 {
+			tunnel, err = NewWebTransportServerTunnel(w, r, wtServer, s.jose)
+			if err != nil {
+				w.WriteHeader(500)
+				log.Println(err)
+				return
+			}
+		} else {
+			tunnel, err = NewWebSocketMuxadoServerTunnel(w, r, s.jose)
+			if err != nil {
+				w.WriteHeader(500)
+				log.Println(err)
+				return
+			}
 		}
 
 		s.mut.Lock()
