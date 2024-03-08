@@ -19,6 +19,8 @@ import (
 	"nhooyr.io/websocket"
 )
 
+const WebTransportCodeCancel = 0
+
 type Tunnel interface {
 	OpenStream() (connCloseWriter, error)
 	AcceptStream() (connCloseWriter, error)
@@ -327,7 +329,11 @@ func (w wtStreamWrapper) Write(buf []byte) (int, error) {
 	return w.wtStream.Write(buf)
 }
 func (w wtStreamWrapper) Close() error {
-	return w.wtStream.Close()
+	// quic.Stream.Close only closes the write side, see here:
+	// https://pkg.go.dev/github.com/quic-go/quic-go#readme-using-streams
+	w.wtStream.CancelRead(WebTransportCodeCancel)
+	w.wtStream.CancelWrite(WebTransportCodeCancel)
+	return nil
 }
 func (w wtStreamWrapper) CloseWrite() error {
 	// quic.Stream.Close only closes the write side, see here:
