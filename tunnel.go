@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -329,8 +330,9 @@ func (w wtStreamWrapper) Close() error {
 	return w.wtStream.Close()
 }
 func (w wtStreamWrapper) CloseWrite() error {
-	w.wtStream.CancelWrite(42)
-	return nil
+	// quic.Stream.Close only closes the write side, see here:
+	// https://pkg.go.dev/github.com/quic-go/quic-go#readme-using-streams
+	return w.wtStream.Close()
 }
 func (w wtStreamWrapper) LocalAddr() net.Addr {
 	return addr{
@@ -356,25 +358,73 @@ func (w wtStreamWrapper) SetWriteDeadline(t time.Time) error {
 
 func NewWebTransportServerTunnel(w http.ResponseWriter, r *http.Request, wtServer webtransport.Server, jose *josencillo.JOSE) (*WebTransportTunnel, error) {
 
+	ctx := context.Background()
+
 	wtSession, err := wtServer.Upgrade(w, r)
 	if err != nil {
 		return nil, err
 	}
 
+	setupStream, err := wtSession.AcceptStream(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	setupBytes, err := io.ReadAll(setupStream)
+	if err != nil {
+		return nil, err
+	}
+
+	var tunnelReq TunnelRequest
+
+	err = json.Unmarshal(setupBytes, &tunnelReq)
+	if err != nil {
+		return nil, err
+	}
+
+	tokenJwt := tunnelReq.Token
+	if tokenJwt == "" {
+		return nil, err
+	}
+
+	claims, err := jose.ParseJWT(tokenJwt)
+	if err != nil {
+		return nil, err
+	}
+
+	domain := claims["domain"].(string)
+
+	tunConfig := TunnelConfig{
+		Domain:           domain,
+		TerminationType:  tunnelReq.TerminationType,
+		UseProxyProtocol: tunnelReq.UseProxyProtocol,
+	}
+
+	setupResBytes, err := json.Marshal(tunConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = setupStream.Write(setupResBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	err = setupStream.Close()
+	if err != nil {
+		return nil, err
+	}
+
 	t := &WebTransportTunnel{
-		ctx:       context.Background(),
+		ctx:       ctx,
 		wtSession: wtSession,
-		tunConfig: TunnelConfig{
-			Domain:           "example.com",
-			TerminationType:  "client",
-			UseProxyProtocol: true,
-		},
+		tunConfig: tunConfig,
 	}
 
 	return t, nil
 }
 
-func NewWebTransportClientTunnel(tunReq TunnelRequest) (Tunnel, error) {
+func NewWebTransportClientTunnel(tunnelReq TunnelRequest) (Tunnel, error) {
 
 	uri := fmt.Sprintf("https://%s/waygate", WaygateServerDomain)
 
@@ -386,14 +436,42 @@ func NewWebTransportClientTunnel(tunReq TunnelRequest) (Tunnel, error) {
 		return nil, err
 	}
 
+	setupStream, err := wtSession.OpenStreamSync(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	setupReqBytes, err := json.Marshal(tunnelReq)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = setupStream.Write(setupReqBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	err = setupStream.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	setupResBytes, err := io.ReadAll(setupStream)
+	if err != nil {
+		return nil, err
+	}
+
+	var tunConfig TunnelConfig
+
+	err = json.Unmarshal(setupResBytes, &tunConfig)
+	if err != nil {
+		return nil, err
+	}
+
 	t := &WebTransportTunnel{
 		ctx:       ctx,
 		wtSession: wtSession,
-		tunConfig: TunnelConfig{
-			Domain:           "example.com",
-			TerminationType:  "client",
-			UseProxyProtocol: true,
-		},
+		tunConfig: tunConfig,
 	}
 
 	return t, nil

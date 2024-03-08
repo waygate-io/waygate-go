@@ -109,14 +109,15 @@ func (s *Server) Run() {
 
 	mux.Handle(oauth2Prefix+"/", http.StripPrefix(oauth2Prefix, oauth2Handler))
 
-	tcpListener, err := net.Listen("tcp", fmt.Sprintf(":%d", s.config.Port))
+	listenAddr := fmt.Sprintf(":%d", s.config.Port)
+	tcpListener, err := net.Listen("tcp", listenAddr)
 	if err != nil {
 		panic(err)
 	}
 
 	wtServer := webtransport.Server{
 		H3: http3.Server{
-			Addr:      ":9443",
+			Addr:      listenAddr,
 			Handler:   mux,
 			TLSConfig: tlsConfig,
 			QuicConfig: &quic.Config{
