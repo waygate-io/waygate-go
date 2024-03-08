@@ -125,6 +125,9 @@ func (s *Server) Run() {
 				KeepAlivePeriod: 8,
 			},
 		},
+		CheckOrigin: func(r *http.Request) bool {
+			return true
+		},
 	}
 
 	go wtServer.ListenAndServe()
