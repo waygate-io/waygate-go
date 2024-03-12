@@ -16,6 +16,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/caddyserver/certmagic"
+	"github.com/libdns/namedotcom"
 )
 
 type connCloseWriter interface {
@@ -178,5 +181,18 @@ func parseIP(ip string) (net.IP, bool, error) {
 		return parsed, true, nil
 	} else {
 		return parsed, false, nil
+	}
+}
+
+func getDnsProvider(provider, token, user string) (certmagic.ACMEDNSProvider, error) {
+	switch provider {
+	case "name.com":
+		return &namedotcom.Provider{
+			Server: "https://api.name.com",
+			Token:  token,
+			User:   user,
+		}, nil
+	default:
+		return nil, errors.New("Unsupported DNS provider")
 	}
 }

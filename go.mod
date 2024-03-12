@@ -13,6 +13,8 @@ require (
 	github.com/gemdrive/gemdrive-go v0.0.0-20240229172336-f3f7f72ae546
 	github.com/lastlogin-io/obligator v0.0.0-20240304163727-37f75cc861f1
 	github.com/lestrrat-go/jwx/v2 v2.0.11
+	github.com/libdns/libdns v0.2.1
+	github.com/libdns/namedotcom v0.3.3
 	github.com/mailgun/proxyproto v1.0.0
 	github.com/pires/go-proxyproto v0.7.0
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
@@ -39,7 +41,6 @@ require (
 	github.com/lestrrat-go/httprc v1.0.4 // indirect
 	github.com/lestrrat-go/iter v1.0.2 // indirect
 	github.com/lestrrat-go/option v1.0.1 // indirect
-	github.com/libdns/libdns v0.2.1 // indirect
 	github.com/mattn/go-sqlite3 v1.14.18 // indirect
 	github.com/mholt/acmez v1.2.0 // indirect
 	github.com/miekg/dns v1.1.55 // indirect

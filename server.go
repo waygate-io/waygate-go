@@ -25,6 +25,9 @@ type ServerConfig struct {
 	AdminDomain   string
 	Port          int
 	Public        bool
+	DnsProvider   string
+	DnsToken      string
+	DnsUser       string
 	TunnelDomains []string
 }
 
@@ -45,6 +48,7 @@ func NewServer(config *ServerConfig) *Server {
 }
 
 func (s *Server) Run() {
+
 	// Use random unprivileged port for ACME challenges. This is necessary
 	// because of the way certmagic works, in that if it fails to bind
 	// HTTPSPort (443 by default) and doesn't detect anything else binding
@@ -63,16 +67,39 @@ func (s *Server) Run() {
 	certmagic.DefaultACME.Agreed = true
 	//certmagic.DefaultACME.CA = certmagic.LetsEncryptStagingCA
 
-	certmagic.Default.OnDemand = &certmagic.OnDemandConfig{
-		DecisionFunc: func(ctx context.Context, name string) error {
-			// TODO: verify domain is in tunnels
-			//if name != tunnelDomain {
-			//	return fmt.Errorf("not allowed")
-			//}
-			return nil
-		},
+	if s.config.DnsProvider != "" {
+		dnsProvider, err := getDnsProvider(s.config.DnsProvider, s.config.DnsToken, s.config.DnsUser)
+		if err != nil {
+			panic(err)
+		}
+
+		certmagic.DefaultACME.DNS01Solver = &certmagic.DNS01Solver{
+			DNSProvider: dnsProvider,
+		}
 	}
+
+	//certmagic.Default.OnDemand = &certmagic.OnDemandConfig{
+	//        DecisionFunc: func(ctx context.Context, name string) error {
+	//                // TODO: verify domain is in tunnels
+	//                //if name != tunnelDomain {
+	//                //	return fmt.Errorf("not allowed")
+	//                //}
+	//                return nil
+	//        },
+	//}
+
 	certConfig := certmagic.NewDefault()
+
+	challengeDomains := []string{}
+	for _, domain := range s.config.TunnelDomains {
+		challengeDomains = append(challengeDomains, "*."+domain)
+	}
+
+	ctx := context.Background()
+	err = certConfig.ManageSync(ctx, append([]string{s.config.AdminDomain}, challengeDomains...))
+	if err != nil {
+		panic(err)
+	}
 
 	tlsConfig := &tls.Config{
 		GetCertificate: certConfig.GetCertificate,

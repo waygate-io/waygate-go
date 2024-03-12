@@ -10,6 +10,9 @@ func main() {
 	adminDomainArg := flag.String("admin-domain", "", "Admin domain")
 	portArg := flag.Int("port", 443, "Port")
 	public := flag.Bool("public", false, "Create tunnels for unauthenticated clients")
+	dnsProvider := flag.String("dns-provider", "", "DNS Provider")
+	dnsToken := flag.String("dns-token", "", "DNS Token")
+	dnsUser := flag.String("dns-user", "", "DNS User")
 	var tunnelDomains arrayFlags
 	flag.Var(&tunnelDomains, "tunnel-domain", "Tunnel domains")
 	flag.Parse()
@@ -18,6 +21,9 @@ func main() {
 		AdminDomain:   *adminDomainArg,
 		Port:          *portArg,
 		Public:        *public,
+		DnsProvider:   *dnsProvider,
+		DnsToken:      *dnsToken,
+		DnsUser:       *dnsUser,
 		TunnelDomains: tunnelDomains,
 	}
 
