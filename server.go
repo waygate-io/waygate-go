@@ -22,8 +22,10 @@ import (
 )
 
 type ServerConfig struct {
-	AdminDomain string
-	Port        int
+	AdminDomain   string
+	Port          int
+	Public        bool
+	TunnelDomains []string
 }
 
 type Server struct {
@@ -162,14 +164,14 @@ func (s *Server) Run() {
 
 		var tunnel Tunnel
 		if r.ProtoMajor == 3 {
-			tunnel, err = NewWebTransportServerTunnel(w, r, wtServer, s.jose)
+			tunnel, err = NewWebTransportServerTunnel(w, r, wtServer, s.jose, s.config.Public, s.config.TunnelDomains)
 			if err != nil {
 				w.WriteHeader(500)
 				log.Println(err)
 				return
 			}
 		} else {
-			tunnel, err = NewWebSocketMuxadoServerTunnel(w, r, s.jose)
+			tunnel, err = NewWebSocketMuxadoServerTunnel(w, r, s.jose, s.config.Public)
 			if err != nil {
 				w.WriteHeader(500)
 				log.Println(err)
@@ -205,7 +207,7 @@ func (s *Server) handleConn(
 
 		tlsConn := tls.Server(passConn, tlsConfig)
 
-		tunnel, err := NewTlsMuxadoServerTunnel(tlsConn, s.jose)
+		tunnel, err := NewTlsMuxadoServerTunnel(tlsConn, s.jose, s.config.Public)
 		if err != nil {
 			log.Println("Error reading setup size", err)
 			return

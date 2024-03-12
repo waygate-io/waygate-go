@@ -11,6 +11,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/quic-go/webtransport-go"
@@ -45,7 +46,7 @@ func (t *MuxadoTunnel) GetConfig() TunnelConfig {
 	return t.tunConfig
 }
 
-func NewTlsMuxadoServerTunnel(tlsConn *tls.Conn, jose *josencillo.JOSE) (*MuxadoTunnel, error) {
+func NewTlsMuxadoServerTunnel(tlsConn *tls.Conn, jose *josencillo.JOSE, public bool) (*MuxadoTunnel, error) {
 	msgSizeBuf := make([]byte, 4)
 
 	_, err := tlsConn.Read(msgSizeBuf)
@@ -75,12 +76,19 @@ func NewTlsMuxadoServerTunnel(tlsConn *tls.Conn, jose *josencillo.JOSE) (*Muxado
 		return nil, err
 	}
 
-	claims, err := jose.ParseJWT(tokenJwt)
+	domain, err := genRandomText(8)
 	if err != nil {
 		return nil, err
 	}
 
-	domain := claims["domain"].(string)
+	if !public {
+		claims, err := jose.ParseJWT(tokenJwt)
+		if err != nil {
+			return nil, err
+		}
+
+		domain = claims["domain"].(string)
+	}
 
 	tunConfig := TunnelConfig{
 		Domain:           domain,
@@ -185,20 +193,28 @@ func NewWebSocketMuxadoServerTunnel(
 	w http.ResponseWriter,
 	r *http.Request,
 	jose *josencillo.JOSE,
+	public bool,
 ) (*MuxadoTunnel, error) {
 
-	tokenJwt := r.URL.Query().Get("token")
-	if tokenJwt == "" {
-		return nil, errors.New("Missing token")
-	}
-
-	claims, err := jose.ParseJWT(tokenJwt)
+	domain, err := genRandomText(8)
 	if err != nil {
 		return nil, err
 	}
 
-	//domain := fmt.Sprintf("test.%s", s.config.AdminDomain)
-	domain := claims["domain"].(string)
+	if !public {
+		tokenJwt := r.URL.Query().Get("token")
+		if tokenJwt == "" {
+			return nil, errors.New("Missing token")
+		}
+
+		claims, err := jose.ParseJWT(tokenJwt)
+		if err != nil {
+			return nil, err
+		}
+
+		//domain := fmt.Sprintf("test.%s", s.config.AdminDomain)
+		domain = claims["domain"].(string)
+	}
 
 	terminationType := r.URL.Query().Get("termination-type")
 
@@ -362,7 +378,14 @@ func (w wtStreamWrapper) SetWriteDeadline(t time.Time) error {
 	return w.wtStream.SetWriteDeadline(t)
 }
 
-func NewWebTransportServerTunnel(w http.ResponseWriter, r *http.Request, wtServer webtransport.Server, jose *josencillo.JOSE) (*WebTransportTunnel, error) {
+func NewWebTransportServerTunnel(
+	w http.ResponseWriter,
+	r *http.Request,
+	wtServer webtransport.Server,
+	jose *josencillo.JOSE,
+	public bool,
+	tunnelDomains []string,
+) (*WebTransportTunnel, error) {
 
 	ctx := context.Background()
 
@@ -388,17 +411,30 @@ func NewWebTransportServerTunnel(w http.ResponseWriter, r *http.Request, wtServe
 		return nil, err
 	}
 
-	tokenJwt := tunnelReq.Token
-	if tokenJwt == "" {
-		return nil, err
-	}
-
-	claims, err := jose.ParseJWT(tokenJwt)
+	host, err := genRandomText(8)
 	if err != nil {
 		return nil, err
 	}
 
-	domain := claims["domain"].(string)
+	if len(tunnelDomains) == 0 {
+		return nil, errors.New("No tunnel domains")
+	}
+
+	var domain string
+	if tunnelReq.Token == "" {
+		if !public {
+			return nil, errors.New("No token provided")
+		}
+
+		domain = strings.ToLower(host) + "." + tunnelDomains[0]
+	} else {
+		claims, err := jose.ParseJWT(tunnelReq.Token)
+		if err != nil {
+			return nil, err
+		}
+
+		domain = claims["domain"].(string)
+	}
 
 	tunConfig := TunnelConfig{
 		Domain:           domain,

@@ -75,6 +75,7 @@ func run(w *app.Window) error {
 
 	waygateConfig := &waygate.ClientConfig{
 		Dir: waygateDir,
+		//Public: true,
 	}
 	waygateClient := waygate.NewClient(waygateConfig)
 	waygateClient.ListenEvents(eventCh)
@@ -129,6 +130,7 @@ func run(w *app.Window) error {
 					browser.OpenURL(evt.Uri)
 				}()
 			case waygate.TunnelConnectedEvent:
+				fmt.Println("https://" + evt.TunnelConfig.Domain)
 				state = stateConnected
 				w.Invalidate()
 				//tunnelConfig = evt.TunnelConfig

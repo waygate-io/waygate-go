@@ -22,6 +22,7 @@ type ClientConfig struct {
 	ServerDomain string
 	Token        string
 	Dir          string
+	Public       bool
 }
 
 type Client struct {
@@ -72,7 +73,7 @@ func (c *Client) Run() error {
 	token := c.config.Token
 	redirUriCh := make(chan string)
 
-	if token == "" {
+	if token == "" && !c.config.Public {
 
 		tokenFlow, err := NewTokenFlow()
 		if err != nil {
@@ -89,6 +90,10 @@ func (c *Client) Run() error {
 		if err != nil {
 			return err
 		}
+	} else {
+		go func() {
+			<-redirUriCh
+		}()
 	}
 
 	certDir := filepath.Join(c.config.Dir, "certs")

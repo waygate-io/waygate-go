@@ -100,8 +100,9 @@ func pipeConns(readConn net.Conn, writeConn connCloseWriter) {
 	log.Println("CloseWrite:", reflect.TypeOf(writeConn))
 }
 
+const chars string = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
 func genRandomText(length int) (string, error) {
-	const chars string = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	id := ""
 	for i := 0; i < length; i++ {
 		randIndex, err := rand.Int(rand.Reader, big.NewInt(int64(len(chars))))
