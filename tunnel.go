@@ -394,14 +394,18 @@ func NewWebTransportServerTunnel(
 		return nil, err
 	}
 
-	setupStream, err := wtSession.AcceptStream(ctx)
+	wtStream, err := wtSession.AcceptStream(ctx)
 	if err != nil {
 		return nil, err
 	}
 
+	setupStream := wtStreamWrapper{
+		wtStream: wtStream,
+	}
+
 	setupBytes, err := io.ReadAll(setupStream)
 	if err != nil {
-		return nil, err
+		return nil, closeWithError(setupStream, err)
 	}
 
 	var tunnelReq TunnelRequest
@@ -423,14 +427,14 @@ func NewWebTransportServerTunnel(
 	var domain string
 	if tunnelReq.Token == "" {
 		if !public {
-			return nil, errors.New("No token provided")
+			return nil, closeWithError(setupStream, errors.New("No token provided"))
 		}
 
 		domain = strings.ToLower(host) + "." + tunnelDomains[0]
 	} else {
 		claims, err := jose.ParseJWT(tunnelReq.Token)
 		if err != nil {
-			return nil, err
+			return nil, closeWithError(setupStream, err)
 		}
 
 		domain = claims["domain"].(string)
@@ -452,7 +456,7 @@ func NewWebTransportServerTunnel(
 		return nil, err
 	}
 
-	err = setupStream.Close()
+	err = setupStream.CloseWrite()
 	if err != nil {
 		return nil, err
 	}
@@ -517,4 +521,33 @@ func NewWebTransportClientTunnel(tunnelReq TunnelRequest) (Tunnel, error) {
 	}
 
 	return t, nil
+}
+
+const MessageTypeError = 0
+
+type ErrorMessage struct {
+	Type    int    `json:"type"`
+	Message string `json:"message"`
+}
+
+func closeWithError(stream connCloseWriter, inErr error) error {
+	// TODO: maybe need to close
+	//defer stream.Close()
+
+	e := ErrorMessage{
+		Type:    MessageTypeError,
+		Message: inErr.Error(),
+	}
+
+	errBytes, err := json.Marshal(e)
+	if err != nil {
+		return err
+	}
+
+	_, err = stream.Write(errBytes)
+	if err != nil {
+		return err
+	}
+
+	return inErr
 }
