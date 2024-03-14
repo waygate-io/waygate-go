@@ -14,7 +14,7 @@ func main() {
 	flag.Parse()
 
 	if *userArg == "" {
-		panic("Must provide a user")
+		exitOnError(errors.New("Must provide user"))
 	}
 
 	config := &waygate.ClientConfig{

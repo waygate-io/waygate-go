@@ -126,7 +126,7 @@ func (c *Client) Run() error {
 		OpenIDConnect: true,
 	})
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	filesDomain := "files." + tunConfig.Domain
@@ -144,7 +144,7 @@ func (c *Client) Run() error {
 
 	gdServer, err := gemdrive.NewServer(gdConfig, gdTmess)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	gdCh := make(chan treemess.Message)
@@ -234,7 +234,7 @@ func (c *Client) Run() error {
 
 	users, err := c.authServer.GetUsers()
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	if c.eventCh != nil {

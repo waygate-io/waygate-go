@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -194,5 +195,12 @@ func getDnsProvider(provider, token, user string) (certmagic.ACMEDNSProvider, er
 		}, nil
 	default:
 		return nil, errors.New("Unsupported DNS provider")
+	}
+}
+
+func exitOnError(err error) {
+	if err != nil {
+		fmt.Fprintf(os.Stderr, err.Error())
+		os.Exit(1)
 	}
 }

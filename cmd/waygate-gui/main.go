@@ -45,28 +45,20 @@ func main() {
 func run(w *app.Window) error {
 
 	cacheDir, err := os.UserCacheDir()
-	if err != nil {
-		panic(err)
-	}
+	exitOnError(err)
 
 	waygateDir := filepath.Join(cacheDir, "WaygateClientGUI")
 
 	err = os.MkdirAll(waygateDir, os.ModePerm)
-	if err != nil {
-		panic(err)
-	}
+	exitOnError(err)
 
 	stdoutFilePath := filepath.Join(waygateDir, "stdout.txt")
 	stdoutFile, err := openLogFile(stdoutFilePath)
-	if err != nil {
-		panic(err)
-	}
+	exitOnError(err)
 
 	stderrFilePath := filepath.Join(waygateDir, "stderr.txt")
 	stderrFile, err := openLogFile(stderrFilePath)
-	if err != nil {
-		panic(err)
-	}
+	exitOnError(err)
 
 	os.Stdout = stdoutFile
 	os.Stderr = stderrFile
@@ -252,4 +244,11 @@ func (p *connectedPage) Layout(gtx C, users []string) D {
 
 func openLogFile(path string) (*os.File, error) {
 	return os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
+}
+
+func exitOnError(err error) {
+	if err != nil {
+		fmt.Fprintf(os.Stderr, err.Error())
+		os.Exit(1)
+	}
 }

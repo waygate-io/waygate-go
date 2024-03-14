@@ -3,6 +3,7 @@ package waygate
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -58,10 +59,7 @@ func (s *Server) Run() {
 	// https://github.com/caddyserver/certmagic/issues/111
 	var err error
 	certmagic.HTTPSPort, err = randomOpenPort()
-	if err != nil {
-		log.Println("Failed get random port for TLS challenges")
-		panic(err)
-	}
+	exitOnError(err)
 
 	certmagic.DefaultACME.DisableHTTPChallenge = true
 	certmagic.DefaultACME.Agreed = true
@@ -69,9 +67,7 @@ func (s *Server) Run() {
 
 	if s.config.DnsProvider != "" {
 		dnsProvider, err := getDnsProvider(s.config.DnsProvider, s.config.DnsToken, s.config.DnsUser)
-		if err != nil {
-			panic(err)
-		}
+		exitOnError(err)
 
 		certmagic.DefaultACME.DNS01Solver = &certmagic.DNS01Solver{
 			DNSProvider: dnsProvider,
@@ -97,9 +93,7 @@ func (s *Server) Run() {
 
 	ctx := context.Background()
 	err = certConfig.ManageSync(ctx, append([]string{s.config.AdminDomain}, challengeDomains...))
-	if err != nil {
-		panic(err)
-	}
+	exitOnError(err)
 
 	tlsConfig := &tls.Config{
 		GetCertificate: certConfig.GetCertificate,
@@ -120,9 +114,7 @@ func (s *Server) Run() {
 		ClientID:      "https://" + authDomain,
 		OpenIDConnect: true,
 	})
-	if err != nil {
-		panic(err)
-	}
+	exitOnError(err)
 
 	s.jose, err = josencillo.NewJOSE()
 	if err != nil {
@@ -140,9 +132,7 @@ func (s *Server) Run() {
 
 	listenAddr := fmt.Sprintf(":%d", s.config.Port)
 	tcpListener, err := net.Listen("tcp", listenAddr)
-	if err != nil {
-		panic(err)
-	}
+	exitOnError(err)
 
 	wtServer := webtransport.Server{
 		H3: http3.Server{
@@ -177,7 +167,12 @@ func (s *Server) Run() {
 			// TODO: I don't think this is actually a copy...
 			tunnelsCopy := tunnels
 			s.mut.Unlock()
-			go s.handleConn(tcpConn, authDomain, waygateListener, tunnelsCopy, tlsConfig)
+			go func() {
+				err := s.handleConn(tcpConn, authDomain, waygateListener, tunnelsCopy, tlsConfig)
+				if err != nil {
+					log.Println(err)
+				}
+			}()
 		}
 	}()
 
@@ -220,12 +215,11 @@ func (s *Server) handleConn(
 	authDomain string,
 	waygateListener *PassthroughListener,
 	tunnels map[string]Tunnel,
-	tlsConfig *tls.Config) {
+	tlsConfig *tls.Config) error {
 
 	clientHello, clientReader, err := peekClientHello(tcpConn)
 	if err != nil {
-		log.Println("peekClientHello error", err)
-		return
+		return err
 	}
 
 	passConn := NewProxyConn(tcpConn, clientReader)
@@ -236,8 +230,7 @@ func (s *Server) handleConn(
 
 		tunnel, err := NewTlsMuxadoServerTunnel(tlsConn, s.jose, s.config.Public)
 		if err != nil {
-			log.Println("Error reading setup size", err)
-			return
+			return err
 		}
 
 		s.mut.Lock()
@@ -260,14 +253,12 @@ func (s *Server) handleConn(
 		}
 
 		if !matched {
-			log.Println("No such tunnel")
-			return
+			return errors.New("No such tunnel")
 		}
 
 		upstreamConn, err := tunnel.OpenStream()
 		if err != nil {
-			log.Println(err)
-			panic(err)
+			return err
 		}
 
 		var conn connCloseWriter = passConn
@@ -275,10 +266,9 @@ func (s *Server) handleConn(
 		//negotiatedProto := ""
 		if tunnel.GetConfig().TerminationType == "server" {
 			tlsConn := tls.Server(passConn, tlsConfig)
-			tlsConn.Handshake()
+			err := tlsConn.Handshake()
 			if err != nil {
-				log.Println(err)
-				panic(err)
+				return err
 			}
 
 			//connState := tlsConn.ConnectionState()
@@ -290,26 +280,22 @@ func (s *Server) handleConn(
 
 		host, port, err := addrToHostPort(conn.RemoteAddr())
 		if err != nil {
-			log.Println(err)
-			panic(err)
+			return err
 		}
 
 		localHost, localPort, err := addrToHostPort(conn.LocalAddr())
 		if err != nil {
-			log.Println(err)
-			panic(err)
+			return err
 		}
 
 		remoteIp, isIPv4, err := parseIP(host)
 		if err != nil {
-			log.Println(err)
-			panic(err)
+			return err
 		}
 
 		localIp, _, err := parseIP(localHost)
 		if err != nil {
-			log.Println(err)
-			panic(err)
+			return err
 		}
 
 		transportProto := proxyproto.TCPv4
@@ -357,6 +343,8 @@ func (s *Server) handleConn(
 
 		ConnectConns(conn, upstreamConn)
 	}
+
+	return nil
 }
 
 type ServerMux struct {
