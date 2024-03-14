@@ -196,8 +196,11 @@ func getDnsProvider(provider, token, user string) (certmagic.ACMEDNSProvider, er
 		}, nil
 	case "route53":
 		return &route53.Provider{
-			AccessKeyId:     user,
-			SecretAccessKey: token,
+			WaitForPropagation: true,
+			MaxWaitDur:         5 * time.Minute,
+			// AccessKeyId and SecretAccessKey are grabbed from the environment
+			//AccessKeyId:     user,
+			//SecretAccessKey: token,
 		}, nil
 	default:
 		return nil, errors.New("Unsupported DNS provider")
