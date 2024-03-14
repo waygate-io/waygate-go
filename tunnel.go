@@ -403,6 +403,27 @@ func NewWebTransportServerTunnel(
 		wtStream: wtStream,
 	}
 
+	tunConfig, err := handshake(setupStream, jose, public, tunnelDomains)
+	if err != nil {
+		return nil, err
+	}
+
+	t := &WebTransportTunnel{
+		ctx:       ctx,
+		wtSession: wtSession,
+		tunConfig: *tunConfig,
+	}
+
+	return t, nil
+}
+
+func handshake(
+	setupStream connCloseWriter,
+	jose *josencillo.JOSE,
+	public bool,
+	tunnelDomains []string,
+) (*TunnelConfig, error) {
+
 	setupBytes, err := io.ReadAll(setupStream)
 	if err != nil {
 		return nil, closeWithError(setupStream, err)
@@ -440,7 +461,7 @@ func NewWebTransportServerTunnel(
 		domain = claims["domain"].(string)
 	}
 
-	tunConfig := TunnelConfig{
+	tunConfig := &TunnelConfig{
 		Domain:           domain,
 		TerminationType:  tunnelReq.TerminationType,
 		UseProxyProtocol: tunnelReq.UseProxyProtocol,
@@ -461,13 +482,7 @@ func NewWebTransportServerTunnel(
 		return nil, err
 	}
 
-	t := &WebTransportTunnel{
-		ctx:       ctx,
-		wtSession: wtSession,
-		tunConfig: tunConfig,
-	}
-
-	return t, nil
+	return tunConfig, nil
 }
 
 func NewWebTransportClientTunnel(tunnelReq TunnelRequest) (Tunnel, error) {
