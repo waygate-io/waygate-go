@@ -29,7 +29,6 @@ type Tunnel interface {
 }
 
 type MuxadoTunnel struct {
-	domain    string
 	muxSess   muxado.Session
 	tunConfig TunnelConfig
 }
@@ -146,7 +145,6 @@ func NewTlsMuxadoServerTunnel(tlsConn *tls.Conn, jose *josencillo.JOSE, public b
 	})
 
 	t := &MuxadoTunnel{
-		domain:    domain,
 		muxSess:   muxSess,
 		tunConfig: tunConfig,
 	}
@@ -159,43 +157,25 @@ func NewWebSocketMuxadoServerTunnel(
 	r *http.Request,
 	jose *josencillo.JOSE,
 	public bool,
+	tunnelDomains []string,
 ) (*MuxadoTunnel, error) {
 
-	domain, err := genRandomText(8)
+	tunnelReq := TunnelRequest{
+		Token:            r.URL.Query().Get("token"),
+		TerminationType:  r.URL.Query().Get("termination-type"),
+		UseProxyProtocol: r.URL.Query().Get("use-proxy-protocol") == "true",
+	}
+
+	tunConfig, err := processRequest(tunnelReq, tunnelDomains, jose, public)
 	if err != nil {
 		return nil, err
 	}
-
-	if !public {
-		tokenJwt := r.URL.Query().Get("token")
-		if tokenJwt == "" {
-			return nil, errors.New("Missing token")
-		}
-
-		claims, err := jose.ParseJWT(tokenJwt)
-		if err != nil {
-			return nil, err
-		}
-
-		//domain := fmt.Sprintf("test.%s", s.config.AdminDomain)
-		domain = claims["domain"].(string)
-	}
-
-	terminationType := r.URL.Query().Get("termination-type")
 
 	c, err := websocket.Accept(w, r, &websocket.AcceptOptions{
 		OriginPatterns: []string{"*"},
 	})
 	if err != nil {
 		return nil, err
-	}
-
-	useProxyProto := r.URL.Query().Get("use-proxy-protocol") == "true"
-
-	tunConfig := TunnelConfig{
-		Domain:           domain,
-		TerminationType:  terminationType,
-		UseProxyProtocol: useProxyProto,
 	}
 
 	bytes, err := json.Marshal(tunConfig)
@@ -217,9 +197,8 @@ func NewWebSocketMuxadoServerTunnel(
 	})
 
 	t := &MuxadoTunnel{
-		domain:    domain,
 		muxSess:   muxSess,
-		tunConfig: tunConfig,
+		tunConfig: *tunConfig,
 	}
 
 	return t, nil
@@ -283,35 +262,9 @@ func serverHandshake(
 		return nil, err
 	}
 
-	host, err := genRandomText(8)
+	tunConfig, err := processRequest(tunnelReq, tunnelDomains, jose, public)
 	if err != nil {
-		return nil, err
-	}
-
-	if len(tunnelDomains) == 0 {
-		return nil, errors.New("No tunnel domains")
-	}
-
-	var domain string
-	if tunnelReq.Token == "" {
-		if !public {
-			return nil, closeWithError(setupStream, errors.New("No token provided"))
-		}
-
-		domain = strings.ToLower(host) + "." + tunnelDomains[0]
-	} else {
-		claims, err := jose.ParseJWT(tunnelReq.Token)
-		if err != nil {
-			return nil, closeWithError(setupStream, err)
-		}
-
-		domain = claims["domain"].(string)
-	}
-
-	tunConfig := &TunnelConfig{
-		Domain:           domain,
-		TerminationType:  tunnelReq.TerminationType,
-		UseProxyProtocol: tunnelReq.UseProxyProtocol,
+		return nil, closeWithError(setupStream, err)
 	}
 
 	setupResBytes, err := json.Marshal(tunConfig)
@@ -327,6 +280,42 @@ func serverHandshake(
 	err = setupStream.CloseWrite()
 	if err != nil {
 		return nil, err
+	}
+
+	return tunConfig, nil
+}
+
+func processRequest(tunnelReq TunnelRequest, tunnelDomains []string, jose *josencillo.JOSE, public bool) (*TunnelConfig, error) {
+
+	host, err := genRandomText(8)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(tunnelDomains) == 0 {
+		return nil, errors.New("No tunnel domains")
+	}
+
+	var domain string
+	if tunnelReq.Token == "" {
+		if !public {
+			return nil, errors.New("No token provided")
+		}
+
+		domain = strings.ToLower(host) + "." + tunnelDomains[0]
+	} else {
+		claims, err := jose.ParseJWT(tunnelReq.Token)
+		if err != nil {
+			return nil, err
+		}
+
+		domain = claims["domain"].(string)
+	}
+
+	tunConfig := &TunnelConfig{
+		Domain:           domain,
+		TerminationType:  tunnelReq.TerminationType,
+		UseProxyProtocol: tunnelReq.UseProxyProtocol,
 	}
 
 	return tunConfig, nil
