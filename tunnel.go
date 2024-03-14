@@ -46,6 +46,34 @@ func (t *MuxadoTunnel) GetConfig() TunnelConfig {
 	return t.tunConfig
 }
 
+type WebTransportTunnel struct {
+	tunConfig TunnelConfig
+	wtSession *webtransport.Session
+	ctx       context.Context
+}
+
+func (t *WebTransportTunnel) OpenStream() (connCloseWriter, error) {
+	stream, err := t.wtSession.OpenStreamSync(t.ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return wtStreamWrapper{
+		wtStream: stream,
+	}, nil
+}
+
+func (t *WebTransportTunnel) AcceptStream() (connCloseWriter, error) {
+	stream, err := t.wtSession.AcceptStream(t.ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return wtStreamWrapper{
+		wtStream: stream,
+	}, nil
+}
+
 func NewTlsMuxadoServerTunnel(tlsConn *tls.Conn, jose *josencillo.JOSE, public bool) (*MuxadoTunnel, error) {
 	msgSizeBuf := make([]byte, 4)
 
@@ -126,69 +154,6 @@ func NewTlsMuxadoServerTunnel(tlsConn *tls.Conn, jose *josencillo.JOSE, public b
 	return t, nil
 }
 
-func NewTlsMuxadoClientTunnel(tunnelReq TunnelRequest) (*MuxadoTunnel, error) {
-
-	tlsDialConfig := &tls.Config{
-		//NextProtos: []string{"waygate-tls-muxado", "http/1.1"},
-		NextProtos: []string{"waygate-tls-muxado"},
-	}
-
-	tlsConn, err := tls.Dial("tcp", fmt.Sprintf("%s:443", WaygateServerDomain), tlsDialConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	setupReqBytes, err := json.Marshal(tunnelReq)
-	if err != nil {
-		return nil, err
-	}
-
-	msgSizeBuf := make([]byte, 4)
-	binary.BigEndian.PutUint32(msgSizeBuf, uint32(len(setupReqBytes)))
-
-	_, err = tlsConn.Write(msgSizeBuf)
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = tlsConn.Write(setupReqBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = tlsConn.Read(msgSizeBuf)
-	if err != nil {
-		return nil, err
-	}
-
-	setupResSize := binary.BigEndian.Uint32(msgSizeBuf)
-
-	setupResBuf := make([]byte, setupResSize)
-
-	_, err = tlsConn.Read(setupResBuf)
-	if err != nil {
-		return nil, err
-	}
-
-	var tunConfig TunnelConfig
-
-	err = json.Unmarshal(setupResBuf, &tunConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	muxSess := muxado.Client(tlsConn, &muxado.Config{
-		MaxWindowSize: 1 * 1024 * 1024,
-	})
-
-	t := &MuxadoTunnel{
-		muxSess:   muxSess,
-		tunConfig: tunConfig,
-	}
-
-	return t, err
-}
-
 func NewWebSocketMuxadoServerTunnel(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -260,124 +225,6 @@ func NewWebSocketMuxadoServerTunnel(
 	return t, nil
 }
 
-func NewWebSocketMuxadoClientTunnel(tunReq TunnelRequest) (*MuxadoTunnel, error) {
-
-	ctx := context.Background()
-
-	uri := fmt.Sprintf("wss://%s/waygate?token=%s&termination-type=%s&use-proxy-protocol=%s",
-		WaygateServerDomain,
-		tunReq.Token,
-		tunReq.TerminationType,
-		tunReq.UseProxyProtocol,
-	)
-
-	wsConn, _, err := websocket.Dial(ctx, uri, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	_, tunConfigBytes, err := wsConn.Read(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	var tunConfig TunnelConfig
-
-	err = json.Unmarshal(tunConfigBytes, &tunConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	sessConn := websocket.NetConn(ctx, wsConn, websocket.MessageBinary)
-
-	muxSess := muxado.Client(sessConn, &muxado.Config{
-		MaxWindowSize: 1 * 1024 * 1024,
-	})
-
-	t := &MuxadoTunnel{
-		muxSess:   muxSess,
-		tunConfig: tunConfig,
-	}
-
-	return t, nil
-}
-
-type WebTransportTunnel struct {
-	tunConfig TunnelConfig
-	wtSession *webtransport.Session
-	ctx       context.Context
-}
-
-func (t *WebTransportTunnel) OpenStream() (connCloseWriter, error) {
-	stream, err := t.wtSession.OpenStreamSync(t.ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return wtStreamWrapper{
-		wtStream: stream,
-	}, nil
-}
-
-func (t *WebTransportTunnel) AcceptStream() (connCloseWriter, error) {
-	stream, err := t.wtSession.AcceptStream(t.ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return wtStreamWrapper{
-		wtStream: stream,
-	}, nil
-}
-
-func (t *WebTransportTunnel) GetConfig() TunnelConfig {
-	return t.tunConfig
-}
-
-type wtStreamWrapper struct {
-	wtStream webtransport.Stream
-}
-
-func (w wtStreamWrapper) Read(buf []byte) (int, error) {
-	return w.wtStream.Read(buf)
-}
-func (w wtStreamWrapper) Write(buf []byte) (int, error) {
-	return w.wtStream.Write(buf)
-}
-func (w wtStreamWrapper) Close() error {
-	// quic.Stream.Close only closes the write side, see here:
-	// https://pkg.go.dev/github.com/quic-go/quic-go#readme-using-streams
-	w.wtStream.CancelRead(WebTransportCodeCancel)
-	w.wtStream.CancelWrite(WebTransportCodeCancel)
-	return nil
-}
-func (w wtStreamWrapper) CloseWrite() error {
-	// quic.Stream.Close only closes the write side, see here:
-	// https://pkg.go.dev/github.com/quic-go/quic-go#readme-using-streams
-	return w.wtStream.Close()
-}
-func (w wtStreamWrapper) LocalAddr() net.Addr {
-	return addr{
-		network: fmt.Sprintf("webtransport-network-%d", w.wtStream.StreamID()),
-		address: fmt.Sprintf("webtransport-address-%d", w.wtStream.StreamID()),
-	}
-}
-func (w wtStreamWrapper) RemoteAddr() net.Addr {
-	return addr{
-		network: fmt.Sprintf("webtransport-network-%d", w.wtStream.StreamID()),
-		address: fmt.Sprintf("webtransport-address-%d", w.wtStream.StreamID()),
-	}
-}
-func (w wtStreamWrapper) SetDeadline(t time.Time) error {
-	return w.wtStream.SetDeadline(t)
-}
-func (w wtStreamWrapper) SetReadDeadline(t time.Time) error {
-	return w.wtStream.SetReadDeadline(t)
-}
-func (w wtStreamWrapper) SetWriteDeadline(t time.Time) error {
-	return w.wtStream.SetWriteDeadline(t)
-}
-
 func NewWebTransportServerTunnel(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -403,7 +250,7 @@ func NewWebTransportServerTunnel(
 		wtStream: wtStream,
 	}
 
-	tunConfig, err := handshake(setupStream, jose, public, tunnelDomains)
+	tunConfig, err := serverHandshake(setupStream, jose, public, tunnelDomains)
 	if err != nil {
 		return nil, err
 	}
@@ -417,7 +264,7 @@ func NewWebTransportServerTunnel(
 	return t, nil
 }
 
-func handshake(
+func serverHandshake(
 	setupStream connCloseWriter,
 	jose *josencillo.JOSE,
 	public bool,
@@ -485,6 +332,111 @@ func handshake(
 	return tunConfig, nil
 }
 
+func NewTlsMuxadoClientTunnel(tunnelReq TunnelRequest) (*MuxadoTunnel, error) {
+
+	tlsDialConfig := &tls.Config{
+		//NextProtos: []string{"waygate-tls-muxado", "http/1.1"},
+		NextProtos: []string{"waygate-tls-muxado"},
+	}
+
+	tlsConn, err := tls.Dial("tcp", fmt.Sprintf("%s:443", WaygateServerDomain), tlsDialConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	setupReqBytes, err := json.Marshal(tunnelReq)
+	if err != nil {
+		return nil, err
+	}
+
+	msgSizeBuf := make([]byte, 4)
+	binary.BigEndian.PutUint32(msgSizeBuf, uint32(len(setupReqBytes)))
+
+	_, err = tlsConn.Write(msgSizeBuf)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = tlsConn.Write(setupReqBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = tlsConn.Read(msgSizeBuf)
+	if err != nil {
+		return nil, err
+	}
+
+	setupResSize := binary.BigEndian.Uint32(msgSizeBuf)
+
+	setupResBuf := make([]byte, setupResSize)
+
+	_, err = tlsConn.Read(setupResBuf)
+	if err != nil {
+		return nil, err
+	}
+
+	var tunConfig TunnelConfig
+
+	err = json.Unmarshal(setupResBuf, &tunConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	muxSess := muxado.Client(tlsConn, &muxado.Config{
+		MaxWindowSize: 1 * 1024 * 1024,
+	})
+
+	t := &MuxadoTunnel{
+		muxSess:   muxSess,
+		tunConfig: tunConfig,
+	}
+
+	return t, err
+}
+
+func NewWebSocketMuxadoClientTunnel(tunReq TunnelRequest) (*MuxadoTunnel, error) {
+
+	ctx := context.Background()
+
+	uri := fmt.Sprintf("wss://%s/waygate?token=%s&termination-type=%s&use-proxy-protocol=%s",
+		WaygateServerDomain,
+		tunReq.Token,
+		tunReq.TerminationType,
+		tunReq.UseProxyProtocol,
+	)
+
+	wsConn, _, err := websocket.Dial(ctx, uri, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	_, tunConfigBytes, err := wsConn.Read(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var tunConfig TunnelConfig
+
+	err = json.Unmarshal(tunConfigBytes, &tunConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	sessConn := websocket.NetConn(ctx, wsConn, websocket.MessageBinary)
+
+	muxSess := muxado.Client(sessConn, &muxado.Config{
+		MaxWindowSize: 1 * 1024 * 1024,
+	})
+
+	t := &MuxadoTunnel{
+		muxSess:   muxSess,
+		tunConfig: tunConfig,
+	}
+
+	return t, nil
+}
+
 func NewWebTransportClientTunnel(tunnelReq TunnelRequest) (Tunnel, error) {
 
 	uri := fmt.Sprintf("https://%s/waygate", WaygateServerDomain)
@@ -536,6 +488,54 @@ func NewWebTransportClientTunnel(tunnelReq TunnelRequest) (Tunnel, error) {
 	}
 
 	return t, nil
+}
+
+func (t *WebTransportTunnel) GetConfig() TunnelConfig {
+	return t.tunConfig
+}
+
+type wtStreamWrapper struct {
+	wtStream webtransport.Stream
+}
+
+func (w wtStreamWrapper) Read(buf []byte) (int, error) {
+	return w.wtStream.Read(buf)
+}
+func (w wtStreamWrapper) Write(buf []byte) (int, error) {
+	return w.wtStream.Write(buf)
+}
+func (w wtStreamWrapper) Close() error {
+	// quic.Stream.Close only closes the write side, see here:
+	// https://pkg.go.dev/github.com/quic-go/quic-go#readme-using-streams
+	w.wtStream.CancelRead(WebTransportCodeCancel)
+	w.wtStream.CancelWrite(WebTransportCodeCancel)
+	return nil
+}
+func (w wtStreamWrapper) CloseWrite() error {
+	// quic.Stream.Close only closes the write side, see here:
+	// https://pkg.go.dev/github.com/quic-go/quic-go#readme-using-streams
+	return w.wtStream.Close()
+}
+func (w wtStreamWrapper) LocalAddr() net.Addr {
+	return addr{
+		network: fmt.Sprintf("webtransport-network-%d", w.wtStream.StreamID()),
+		address: fmt.Sprintf("webtransport-address-%d", w.wtStream.StreamID()),
+	}
+}
+func (w wtStreamWrapper) RemoteAddr() net.Addr {
+	return addr{
+		network: fmt.Sprintf("webtransport-network-%d", w.wtStream.StreamID()),
+		address: fmt.Sprintf("webtransport-address-%d", w.wtStream.StreamID()),
+	}
+}
+func (w wtStreamWrapper) SetDeadline(t time.Time) error {
+	return w.wtStream.SetDeadline(t)
+}
+func (w wtStreamWrapper) SetReadDeadline(t time.Time) error {
+	return w.wtStream.SetReadDeadline(t)
+}
+func (w wtStreamWrapper) SetWriteDeadline(t time.Time) error {
+	return w.wtStream.SetWriteDeadline(t)
 }
 
 const MessageTypeError = 0
