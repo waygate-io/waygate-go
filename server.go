@@ -74,15 +74,15 @@ func (s *Server) Run() {
 		}
 	}
 
-	certmagic.Default.OnDemand = &certmagic.OnDemandConfig{
-		DecisionFunc: func(ctx context.Context, name string) error {
-			// TODO: verify domain is in tunnels
-			//if name != tunnelDomain {
-			//	return fmt.Errorf("not allowed")
-			//}
-			return nil
-		},
-	}
+	//certmagic.Default.OnDemand = &certmagic.OnDemandConfig{
+	//	DecisionFunc: func(ctx context.Context, name string) error {
+	//		// TODO: verify domain is in tunnels
+	//		//if name != tunnelDomain {
+	//		//	return fmt.Errorf("not allowed")
+	//		//}
+	//		return nil
+	//	},
+	//}
 
 	certConfig := certmagic.NewDefault()
 

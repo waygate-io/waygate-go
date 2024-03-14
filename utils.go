@@ -20,6 +20,7 @@ import (
 
 	"github.com/caddyserver/certmagic"
 	"github.com/libdns/namedotcom"
+	"github.com/libdns/route53"
 )
 
 type connCloseWriter interface {
@@ -192,6 +193,11 @@ func getDnsProvider(provider, token, user string) (certmagic.ACMEDNSProvider, er
 			Server: "https://api.name.com",
 			Token:  token,
 			User:   user,
+		}, nil
+	case "route53":
+		return &route53.Provider{
+			AccessKeyId:     user,
+			SecretAccessKey: token,
 		}, nil
 	default:
 		return nil, errors.New("Unsupported DNS provider")
