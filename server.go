@@ -253,7 +253,7 @@ func (s *Server) handleConn(
 		}
 
 		if !matched {
-			return errors.New("No such tunnel")
+			return errors.New(fmt.Sprintf("No such tunnel: %s", clientHello.ServerName))
 		}
 
 		upstreamConn, err := tunnel.OpenStream()
