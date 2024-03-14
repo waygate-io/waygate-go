@@ -84,6 +84,8 @@ func (s *Server) Run() {
 	//	},
 	//}
 
+	certmagic.Default.Storage = &certmagic.FileStorage{"./certs"}
+
 	certConfig := certmagic.NewDefault()
 
 	challengeDomains := []string{}
