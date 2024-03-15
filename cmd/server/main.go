@@ -2,9 +2,12 @@ package main
 
 import (
 	"flag"
+	"fmt"
 
 	"github.com/waygate-io/waygate-go"
 )
+
+var Version string
 
 func main() {
 	adminDomainArg := flag.String("admin-domain", "", "Admin domain")
@@ -28,6 +31,8 @@ func main() {
 	}
 
 	server := waygate.NewServer(config)
+
+	fmt.Printf("Running Waygate Server Version: %s\n", Version)
 	server.Run()
 }
 

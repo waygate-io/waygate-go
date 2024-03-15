@@ -405,6 +405,7 @@ func (m *ServerMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	//}
 
 	//fmt.Println(fmt.Sprintf("%s\t%s\t%s\t%s\t%s", timestamp, remoteIp, r.Method, r.Host, r.URL.Path))
+
 	m.mux.ServeHTTP(w, r)
 }
 
