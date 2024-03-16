@@ -188,12 +188,26 @@ func (s *Server) Run() {
 
 		var tunnel Tunnel
 		if r.ProtoMajor == 3 {
-			tunnel, err = NewWebTransportServerTunnel(w, r, wtServer, s.jose, s.config.Public, s.config.TunnelDomains)
+			wtTun, err := NewWebTransportServerTunnel(w, r, wtServer, s.jose, s.config.Public, s.config.TunnelDomains)
 			if err != nil {
 				w.WriteHeader(500)
 				log.Println(err)
 				return
 			}
+
+			tunnel = wtTun
+
+			go func() {
+				for {
+					msg, err := wtTun.ReceiveMessage()
+					if err != nil {
+						fmt.Println(err)
+						break
+					}
+
+					fmt.Println(string(msg))
+				}
+			}()
 		} else {
 			tunnel, err = NewWebSocketMuxadoServerTunnel(w, r, s.jose, s.config.Public, s.config.TunnelDomains)
 			if err != nil {

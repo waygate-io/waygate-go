@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"net/http"
@@ -46,9 +45,18 @@ func (t *MuxadoTunnel) GetConfig() TunnelConfig {
 }
 
 type WebTransportTunnel struct {
-	tunConfig TunnelConfig
-	wtSession *webtransport.Session
-	ctx       context.Context
+	tunConfig     TunnelConfig
+	controlStream connCloseWriter
+	wtSession     *webtransport.Session
+	ctx           context.Context
+}
+
+func (t *WebTransportTunnel) SendMessage(msg []byte) error {
+	return sendMessage(t.controlStream, msg)
+}
+
+func (t *WebTransportTunnel) ReceiveMessage() ([]byte, error) {
+	return receiveMessage(t.controlStream)
 }
 
 func (t *WebTransportTunnel) OpenStream() (connCloseWriter, error) {
@@ -225,34 +233,35 @@ func NewWebTransportServerTunnel(
 		return nil, err
 	}
 
-	setupStream := wtStreamWrapper{
+	controlStream := wtStreamWrapper{
 		wtStream: wtStream,
 	}
 
-	tunConfig, err := serverHandshake(setupStream, jose, public, tunnelDomains)
+	tunConfig, err := serverHandshake(controlStream, jose, public, tunnelDomains)
 	if err != nil {
 		return nil, err
 	}
 
 	t := &WebTransportTunnel{
-		ctx:       ctx,
-		wtSession: wtSession,
-		tunConfig: *tunConfig,
+		ctx:           ctx,
+		wtSession:     wtSession,
+		controlStream: controlStream,
+		tunConfig:     *tunConfig,
 	}
 
 	return t, nil
 }
 
 func serverHandshake(
-	setupStream connCloseWriter,
+	controlStream connCloseWriter,
 	jose *josencillo.JOSE,
 	public bool,
 	tunnelDomains []string,
 ) (*TunnelConfig, error) {
 
-	setupBytes, err := io.ReadAll(setupStream)
+	setupBytes, err := receiveMessage(controlStream)
 	if err != nil {
-		return nil, closeWithError(setupStream, err)
+		return nil, closeWithError(controlStream, err)
 	}
 
 	var tunnelReq TunnelRequest
@@ -264,7 +273,7 @@ func serverHandshake(
 
 	tunConfig, err := processRequest(tunnelReq, tunnelDomains, jose, public)
 	if err != nil {
-		return nil, closeWithError(setupStream, err)
+		return nil, closeWithError(controlStream, err)
 	}
 
 	setupResBytes, err := json.Marshal(tunConfig)
@@ -272,12 +281,7 @@ func serverHandshake(
 		return nil, err
 	}
 
-	_, err = setupStream.Write(setupResBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	err = setupStream.CloseWrite()
+	err = sendMessage(controlStream, setupResBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -426,7 +430,7 @@ func NewWebSocketMuxadoClientTunnel(tunReq TunnelRequest) (*MuxadoTunnel, error)
 	return t, nil
 }
 
-func NewWebTransportClientTunnel(tunnelReq TunnelRequest) (Tunnel, error) {
+func NewWebTransportClientTunnel(tunnelReq TunnelRequest) (*WebTransportTunnel, error) {
 
 	uri := fmt.Sprintf("https://%s/waygate", WaygateServerDomain)
 
@@ -438,9 +442,13 @@ func NewWebTransportClientTunnel(tunnelReq TunnelRequest) (Tunnel, error) {
 		return nil, err
 	}
 
-	setupStream, err := wtSession.OpenStreamSync(ctx)
+	wtStream, err := wtSession.OpenStreamSync(ctx)
 	if err != nil {
 		return nil, err
+	}
+
+	controlStream := wtStreamWrapper{
+		wtStream: wtStream,
 	}
 
 	setupReqBytes, err := json.Marshal(tunnelReq)
@@ -448,17 +456,12 @@ func NewWebTransportClientTunnel(tunnelReq TunnelRequest) (Tunnel, error) {
 		return nil, err
 	}
 
-	_, err = setupStream.Write(setupReqBytes)
+	err = sendMessage(controlStream, setupReqBytes)
 	if err != nil {
 		return nil, err
 	}
 
-	err = setupStream.Close()
-	if err != nil {
-		return nil, err
-	}
-
-	setupResBytes, err := io.ReadAll(setupStream)
+	setupResBytes, err := receiveMessage(controlStream)
 	if err != nil {
 		return nil, err
 	}
@@ -471,9 +474,10 @@ func NewWebTransportClientTunnel(tunnelReq TunnelRequest) (Tunnel, error) {
 	}
 
 	t := &WebTransportTunnel{
-		ctx:       ctx,
-		wtSession: wtSession,
-		tunConfig: tunConfig,
+		ctx:           ctx,
+		wtSession:     wtSession,
+		controlStream: controlStream,
+		tunConfig:     tunConfig,
 	}
 
 	return t, nil
@@ -554,4 +558,44 @@ func closeWithError(stream connCloseWriter, inErr error) error {
 	}
 
 	return inErr
+}
+
+func sendMessage(stream connCloseWriter, msg []byte) error {
+
+	msgSizeBuf := make([]byte, 4)
+
+	binary.BigEndian.PutUint32(msgSizeBuf, uint32(len(msg)))
+
+	_, err := stream.Write(msgSizeBuf)
+	if err != nil {
+		return err
+	}
+
+	_, err = stream.Write(msg)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func receiveMessage(stream connCloseWriter) ([]byte, error) {
+
+	msgSizeBuf := make([]byte, 4)
+
+	_, err := stream.Read(msgSizeBuf)
+	if err != nil {
+		return nil, err
+	}
+
+	msgSize := binary.BigEndian.Uint32(msgSizeBuf)
+
+	msgBuf := make([]byte, msgSize)
+
+	_, err = stream.Read(msgBuf)
+	if err != nil {
+		return nil, err
+	}
+
+	return msgBuf, nil
 }

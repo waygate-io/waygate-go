@@ -136,6 +136,8 @@ func NewClientSession(token, certDir string) (*ClientSession, error) {
 		return nil, err
 	}
 
+	tunnel.SendMessage([]byte("Hi there"))
+
 	s = &ClientSession{
 		tunnel:         tunnel,
 		tlsConfig:      tlsConfig,
