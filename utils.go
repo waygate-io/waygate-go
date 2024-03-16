@@ -12,7 +12,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -102,7 +101,7 @@ func pipeConns(readConn net.Conn, writeConn connCloseWriter) {
 	}
 
 	writeConn.CloseWrite()
-	log.Println("CloseWrite:", reflect.TypeOf(writeConn))
+	//log.Println("CloseWrite:", reflect.TypeOf(writeConn))
 }
 
 const chars string = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
