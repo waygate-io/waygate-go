@@ -15,7 +15,6 @@ import (
 
 	"github.com/caddyserver/certmagic"
 	"github.com/lastlogin-io/obligator"
-	proxyproto "github.com/pires/go-proxyproto"
 	"github.com/quic-go/quic-go"
 	"github.com/quic-go/quic-go/http3"
 	"github.com/quic-go/webtransport-go"
@@ -324,62 +323,12 @@ func (s *Server) handleConn(
 
 		if tunnel.GetConfig().TerminationType == "server" {
 			tlsConn := tls.Server(passConn, tlsConfig)
-			err := tlsConn.Handshake()
-			if err != nil {
-				return err
-			}
-
 			conn = tlsConn
 		}
 
-		host, port, err := addrToHostPort(conn.RemoteAddr())
-		if err != nil {
-			return err
-		}
-
-		localHost, localPort, err := addrToHostPort(conn.LocalAddr())
-		if err != nil {
-			return err
-		}
-
-		remoteIp, isIPv4, err := parseIP(host)
-		if err != nil {
-			return err
-		}
-
-		localIp, _, err := parseIP(localHost)
-		if err != nil {
-			return err
-		}
-
-		transportProto := proxyproto.TCPv4
-		if !isIPv4 {
-			transportProto = proxyproto.TCPv6
-		}
-
 		if tunnel.GetConfig().UseProxyProtocol {
-			proxyHeader := &proxyproto.Header{
-				Version:           2,
-				Command:           proxyproto.PROXY,
-				TransportProtocol: transportProto,
-				SourceAddr: &net.TCPAddr{
-					IP:   remoteIp,
-					Port: port,
-				},
-				DestinationAddr: &net.TCPAddr{
-					IP:   localIp,
-					Port: localPort,
-				},
-			}
+			proxyHeader, err := buildProxyProtoHeader(conn, clientHello.ServerName)
 
-			proxyHeader.SetTLVs([]proxyproto.TLV{
-				proxyproto.TLV{
-					Type:  proxyproto.PP2_TYPE_MIN_CUSTOM,
-					Value: []byte(clientHello.ServerName),
-				},
-			})
-
-			// TODO: I think this can possibly block and deadlock
 			n, err := proxyHeader.WriteTo(upstreamConn)
 			if err != nil {
 				fmt.Println("Failed to write PROXY protocol header", n, err)
