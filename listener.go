@@ -256,37 +256,6 @@ func (s *ClientSession) start() {
 				}
 
 				listener.PassConn(conn)
-
-				//ip := "127.0.0.1"
-				//port := 8000
-
-				//proxyAddr, exists := c.proxyMap[tunConfig.Domain]
-				//if exists {
-				//	var portStr string
-				//	ip, portStr, err = net.SplitHostPort(proxyAddr)
-				//	if err != nil {
-				//		log.Println("Error splitting address")
-				//		return
-				//	}
-
-				//	port, err = strconv.Atoi(portStr)
-				//	if err != nil {
-				//		log.Println("Error parsing port")
-				//		return
-				//	}
-				//}
-
-				//upstreamConn, err := net.DialTCP("tcp", nil, &net.TCPAddr{
-				//	IP:   net.ParseIP(ip),
-				//	Port: port,
-				//})
-				//if err != nil {
-				//	log.Println("Error dialing")
-				//	return
-				//}
-
-				//ConnectConns(conn, upstreamConn)
-
 			}()
 		}
 	}()
