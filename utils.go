@@ -20,6 +20,7 @@ import (
 	"github.com/caddyserver/certmagic"
 	"github.com/libdns/namedotcom"
 	"github.com/libdns/route53"
+	proxyproto "github.com/pires/go-proxyproto"
 )
 
 type connCloseWriter interface {
@@ -211,4 +212,57 @@ func exitOnError(err error) {
 		fmt.Fprintf(os.Stderr, err.Error())
 		os.Exit(1)
 	}
+}
+
+func buildProxyProtoHeader(conn net.Conn, serverName string) (*proxyproto.Header, error) {
+
+	host, port, err := addrToHostPort(conn.RemoteAddr())
+	if err != nil {
+		return nil, err
+	}
+
+	localHost, localPort, err := addrToHostPort(conn.LocalAddr())
+	if err != nil {
+		return nil, err
+	}
+
+	remoteIp, isIPv4, err := parseIP(host)
+	if err != nil {
+		return nil, err
+	}
+
+	localIp, _, err := parseIP(localHost)
+	if err != nil {
+		return nil, err
+	}
+
+	transportProto := proxyproto.TCPv4
+	if !isIPv4 {
+		transportProto = proxyproto.TCPv6
+	}
+
+	proxyHeader := &proxyproto.Header{
+		Version:           2,
+		Command:           proxyproto.PROXY,
+		TransportProtocol: transportProto,
+		SourceAddr: &net.TCPAddr{
+			IP:   remoteIp,
+			Port: port,
+		},
+		DestinationAddr: &net.TCPAddr{
+			IP:   localIp,
+			Port: localPort,
+		},
+	}
+
+	if serverName != "" {
+		proxyHeader.SetTLVs([]proxyproto.TLV{
+			proxyproto.TLV{
+				Type:  proxyproto.PP2_TYPE_MIN_CUSTOM,
+				Value: []byte(serverName),
+			},
+		})
+	}
+
+	return proxyHeader, nil
 }

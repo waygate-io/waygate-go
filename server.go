@@ -197,17 +197,60 @@ func (s *Server) Run() {
 
 			tunnel = wtTun
 
-			go func() {
-				for {
-					msg, err := wtTun.ReceiveMessage()
+			wtTun.HandleRequests(func(req interface{}) interface{} {
+				switch r := req.(type) {
+				case *ListenRequest:
+					ln, err := net.Listen("tcp", r.Address)
 					if err != nil {
-						fmt.Println(err)
-						break
+						return &ListenResponse{
+							Success: false,
+							Message: err.Error(),
+						}
 					}
 
-					fmt.Println(string(msg))
+					go func() {
+						for {
+							conn, err := ln.Accept()
+							if err != nil {
+								fmt.Println("Failed to forward")
+								continue
+							}
+
+							stream, err := wtTun.OpenStream()
+							if err != nil {
+								fmt.Println("Failed to open stream")
+								continue
+							}
+
+							tcpConn := conn.(*net.TCPConn)
+
+							proxyHeader, err := buildProxyProtoHeader(tcpConn, "")
+							if err != nil {
+								fmt.Println("Failed to build proxy header")
+								continue
+							}
+
+							n, err := proxyHeader.WriteTo(stream)
+							if err != nil {
+								fmt.Println("Failed to write PROXY protocol header", n, err)
+								continue
+							}
+
+							ConnectConns(tcpConn, stream)
+						}
+					}()
+
+					return &ListenResponse{
+						Success: true,
+					}
+				default:
+					fmt.Println("Invalid request type")
+					return nil
 				}
-			}()
+
+				return nil
+			})
+
 		} else {
 			tunnel, err = NewWebSocketMuxadoServerTunnel(w, r, s.jose, s.config.Public, s.config.TunnelDomains)
 			if err != nil {

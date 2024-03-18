@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -54,7 +55,8 @@ func Listen(network, address, token, certDir string) (*Listener, error) {
 }
 
 type ClientSession struct {
-	tunnel         Tunnel
+	//tunnel         Tunnel
+	tunnel         *WebTransportTunnel
 	tlsConfig      *tls.Config
 	tlsTermination string
 	listenMap      map[string]*PassthroughListener
@@ -138,6 +140,18 @@ func NewClientSession(token, certDir string) (*ClientSession, error) {
 
 	tunnel.SendMessage([]byte("Hi there"))
 
+	go func() {
+		for {
+			msg, err := tunnel.ReceiveMessage()
+			if err != nil {
+				fmt.Println(err)
+				break
+			}
+
+			fmt.Println(string(msg))
+		}
+	}()
+
 	s = &ClientSession{
 		tunnel:         tunnel,
 		tlsConfig:      tlsConfig,
@@ -192,7 +206,10 @@ func (s *ClientSession) start() {
 					serverName = string(tlvs[PROXY_PROTO_SERVER_NAME_OFFSET])
 				}
 
-				if s.tlsTermination == "client" {
+				// TODO: figure out a cleaner way to disable TLS for raw TCP.
+				// TerminationType should probably be a per-listen setting, instead
+				// of per-tunnel
+				if s.tlsTermination == "client" && serverName != "" {
 					conn = tls.Server(conn, s.tlsConfig)
 				}
 
@@ -211,7 +228,24 @@ func (s *ClientSession) start() {
 				s.mut.Lock()
 				defer s.mut.Unlock()
 
-				listener, exists := s.listenMap[serverName]
+				_, portStr, err := net.SplitHostPort(localAddress)
+				if err != nil {
+					log.Println("Error splitting address")
+					return
+				}
+
+				port, err := strconv.Atoi(portStr)
+				if err != nil {
+					log.Println("Error parsing port")
+					return
+				}
+
+				key := serverName
+				if key == "" {
+					key = fmt.Sprintf(":%d", port)
+				}
+
+				listener, exists := s.listenMap[key]
 				if !exists {
 					listener, exists = s.listenMap[LISTENER_KEY_DEFAULT]
 					if !exists {
@@ -270,6 +304,18 @@ func (s *ClientSession) Listen(network, address string) (*Listener, error) {
 
 	if address == "" {
 		address = LISTENER_KEY_DEFAULT
+	} else {
+		listenReq := &ListenRequest{
+			Address: address,
+		}
+		listenRes, err := s.tunnel.Request(listenReq)
+		if err != nil {
+			return nil, err
+		}
+
+		lres := listenRes.(*ListenResponse)
+
+		printJson(lres)
 	}
 
 	//ip := net.ParseIP(address)
