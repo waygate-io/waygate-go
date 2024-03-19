@@ -199,45 +199,23 @@ func (s *Server) Run() {
 			wtTun.HandleRequests(func(req interface{}) interface{} {
 				switch r := req.(type) {
 				case *ListenRequest:
-					ln, err := net.Listen("tcp", r.Address)
-					if err != nil {
-						return &ListenResponse{
-							Success: false,
-							Message: err.Error(),
+					if strings.HasPrefix(r.Network, "tcp") {
+						_, err = handleListenTCP(tunnel, r.Address)
+						if err != nil {
+							return &ListenResponse{
+								Success: false,
+								Message: err.Error(),
+							}
+						}
+					} else {
+						_, err = handleListenUDP(wtTun, r.Address)
+						if err != nil {
+							return &ListenResponse{
+								Success: false,
+								Message: err.Error(),
+							}
 						}
 					}
-
-					go func() {
-						for {
-							conn, err := ln.Accept()
-							if err != nil {
-								fmt.Println("Failed to forward")
-								continue
-							}
-
-							stream, err := wtTun.OpenStream()
-							if err != nil {
-								fmt.Println("Failed to open stream")
-								continue
-							}
-
-							tcpConn := conn.(*net.TCPConn)
-
-							proxyHeader, err := buildProxyProtoHeader(tcpConn, "")
-							if err != nil {
-								fmt.Println("Failed to build proxy header")
-								continue
-							}
-
-							n, err := proxyHeader.WriteTo(stream)
-							if err != nil {
-								fmt.Println("Failed to write PROXY protocol header", n, err)
-								continue
-							}
-
-							ConnectConns(tcpConn, stream)
-						}
-					}()
 
 					return &ListenResponse{
 						Success: true,
@@ -339,6 +317,79 @@ func (s *Server) handleConn(
 	}
 
 	return nil
+}
+
+func handleListenTCP(wtTun Tunnel, addr string) (net.Listener, error) {
+
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		return nil, err
+	}
+
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				fmt.Println("Failed to forward")
+				continue
+			}
+
+			stream, err := wtTun.OpenStream()
+			if err != nil {
+				fmt.Println("Failed to open stream")
+				continue
+			}
+
+			tcpConn := conn.(*net.TCPConn)
+
+			proxyHeader, err := buildProxyProtoHeader(tcpConn, "")
+			if err != nil {
+				fmt.Println("Failed to build proxy header")
+				continue
+			}
+
+			n, err := proxyHeader.WriteTo(stream)
+			if err != nil {
+				fmt.Println("Failed to write PROXY protocol header", n, err)
+				continue
+			}
+
+			ConnectConns(tcpConn, stream)
+		}
+	}()
+
+	return ln, nil
+}
+
+func handleListenUDP(wtTun *WebTransportTunnel, listenAddr string) (net.Conn, error) {
+
+	udpAddr, err := net.ResolveUDPAddr("udp", listenAddr)
+	if err != nil {
+		return nil, err
+	}
+
+	conn, err := net.ListenUDP("udp", udpAddr)
+	if err != nil {
+		return nil, err
+	}
+
+	go func() {
+
+		buf := make([]byte, 4096)
+
+		for {
+			n, addr, err := conn.ReadFromUDP(buf)
+			if err != nil {
+				fmt.Println("Failed to forward")
+				continue
+			}
+
+			fmt.Println("Read:", n, string(buf))
+			printJson(addr)
+		}
+	}()
+
+	return conn, nil
 }
 
 type ServerMux struct {

@@ -22,6 +22,21 @@ import (
 
 const WebTransportCodeCancel = 0
 
+type ListenRequest struct {
+	Network string `json:"network"`
+	Address string `json:"address"`
+}
+type ListenResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+}
+
+type ReqType uint8
+
+const (
+	ReqTypeListen ReqType = iota
+)
+
 type Tunnel interface {
 	OpenStream() (connCloseWriter, error)
 	AcceptStream() (connCloseWriter, error)
@@ -51,20 +66,6 @@ type WebTransportTunnel struct {
 	wtSession     *webtransport.Session
 	ctx           context.Context
 }
-
-type ListenRequest struct {
-	Address string `json:"address"`
-}
-type ListenResponse struct {
-	Success bool   `json:"success"`
-	Message string `json:"message"`
-}
-
-type ReqType uint8
-
-const (
-	ReqTypeListen ReqType = iota
-)
 
 func (t *WebTransportTunnel) Request(req interface{}) (interface{}, error) {
 

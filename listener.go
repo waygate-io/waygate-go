@@ -141,20 +141,6 @@ func NewClientSession(token, certDir string) (*ClientSession, error) {
 		return nil, err
 	}
 
-	tunnel.SendMessage([]byte("Hi there"))
-
-	go func() {
-		for {
-			msg, err := tunnel.ReceiveMessage()
-			if err != nil {
-				fmt.Println(err)
-				break
-			}
-
-			fmt.Println(string(msg))
-		}
-	}()
-
 	s = &ClientSession{
 		tunnel:         tunnel,
 		tlsConfig:      tlsConfig,
@@ -268,9 +254,13 @@ func (s *ClientSession) GetTunnelConfig() TunnelConfig {
 	return s.tunnel.GetConfig()
 }
 
+func (s *ClientSession) ListenUDP(network string, address net.UDPAddr) (*Listener, error) {
+	return Listen(network, fmt.Sprintf("%s:%d", address.IP, address.Port))
+}
+
 func (s *ClientSession) Listen(network, address string) (*Listener, error) {
 
-	if network != "tcp" && network != "tcp4" {
+	if network != "tcp" && network != "tcp4" && network != "udp" {
 		return nil, errors.New(fmt.Sprintf("Invalid network type: %s", network))
 	}
 
@@ -278,6 +268,7 @@ func (s *ClientSession) Listen(network, address string) (*Listener, error) {
 		address = ListenerDefaultKey
 	} else {
 		listenReq := &ListenRequest{
+			Network: network,
 			Address: address,
 		}
 		listenRes, err := s.tunnel.Request(listenReq)
