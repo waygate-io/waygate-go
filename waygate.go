@@ -13,3 +13,8 @@ type TunnelConfig struct {
 	TerminationType  string `json:"termination_type"`
 	UseProxyProtocol bool   `json:"use_proxy_protocol"`
 }
+
+var (
+	DefaultToken   string = ""
+	DefaultCertDir string = "./"
+)

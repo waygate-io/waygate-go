@@ -44,7 +44,10 @@ func (l *Listener) GetDomain() string {
 func (l *Listener) GetTunnelConfig() TunnelConfig {
 	return l.tunnel.GetConfig()
 }
-func Listen(network, address, token, certDir string) (*Listener, error) {
+func Listen(network, address string) (*Listener, error) {
+	return ListenWithOpts(network, address, DefaultToken, DefaultCertDir)
+}
+func ListenWithOpts(network, address, token, certDir string) (*Listener, error) {
 
 	s, err := NewClientSession(token, certDir)
 	if err != nil {

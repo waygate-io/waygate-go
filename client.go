@@ -98,7 +98,7 @@ func (c *Client) Run() error {
 
 	certDir := filepath.Join(c.config.Dir, "certs")
 
-	listener, err := Listen("tcp", "", token, certDir)
+	listener, err := ListenWithOpts("tcp", "", token, certDir)
 	if err != nil {
 		return err
 	}
