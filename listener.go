@@ -20,7 +20,7 @@ import (
 
 const PROXY_PROTO_PP2_TYPE_MIN_CUSTOM = 0xe0
 const PROXY_PROTO_SERVER_NAME_OFFSET = PROXY_PROTO_PP2_TYPE_MIN_CUSTOM + 0
-const LISTENER_KEY_DEFAULT = "default-listener"
+const ListenerDefaultKey = "default-listener"
 
 type Listener struct {
 	listener     *PassthroughListener
@@ -250,7 +250,7 @@ func (s *ClientSession) start() {
 
 				listener, exists := s.listenMap[key]
 				if !exists {
-					listener, exists = s.listenMap[LISTENER_KEY_DEFAULT]
+					listener, exists = s.listenMap[ListenerDefaultKey]
 					if !exists {
 						fmt.Println("No such listener")
 						conn.Close()
@@ -275,7 +275,7 @@ func (s *ClientSession) Listen(network, address string) (*Listener, error) {
 	}
 
 	if address == "" {
-		address = LISTENER_KEY_DEFAULT
+		address = ListenerDefaultKey
 	} else {
 		listenReq := &ListenRequest{
 			Address: address,
