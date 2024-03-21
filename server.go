@@ -229,7 +229,8 @@ func (s *Server) Run() {
 			})
 
 		} else {
-			tunnel, err = NewWebSocketMuxadoServerTunnel(w, r, s.jose, s.config.Public, s.config.TunnelDomains)
+			//tunnel, err = NewWebSocketMuxadoServerTunnel(w, r, s.jose, s.config.Public, s.config.TunnelDomains)
+			tunnel, err = NewOmnistreamsServerTunnel(w, r, s.jose, s.config.Public, s.config.TunnelDomains)
 			if err != nil {
 				w.WriteHeader(500)
 				log.Println(err)

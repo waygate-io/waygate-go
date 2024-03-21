@@ -1,13 +1,16 @@
 module github.com/waygate-io/waygate-go
 
-go 1.21.4
+go 1.22.0
 
 replace github.com/lastlogin-io/obligator => ../obligator
+
+replace github.com/anderspitman/omnistreams-go => ../omnistreams-go
 
 //replace github.com/gemdrive/gemdrive-go => ../gemdrive-go
 
 require (
 	gioui.org v0.5.0
+	github.com/anderspitman/omnistreams-go v0.0.0-20240321185041-c8a7fda29c02
 	github.com/anderspitman/treemess-go v0.0.0-20210313015619-ba255d9f1e0f
 	github.com/caddyserver/certmagic v0.20.0
 	github.com/gemdrive/gemdrive-go v0.0.0-20240229172336-f3f7f72ae546
