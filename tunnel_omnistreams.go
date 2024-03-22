@@ -113,14 +113,14 @@ func (w omnistreamWrapper) CloseWrite() error {
 }
 func (w omnistreamWrapper) LocalAddr() net.Addr {
 	return addr{
-		network: fmt.Sprintf("webtransport-network-%d", w.ostream.StreamID()),
-		address: fmt.Sprintf("webtransport-address-%d", w.ostream.StreamID()),
+		network: fmt.Sprintf("omnistreams-network-%d", w.ostream.StreamID()),
+		address: fmt.Sprintf("omnistreams-address-%d", w.ostream.StreamID()),
 	}
 }
 func (w omnistreamWrapper) RemoteAddr() net.Addr {
 	return addr{
-		network: fmt.Sprintf("webtransport-network-%d", w.ostream.StreamID()),
-		address: fmt.Sprintf("webtransport-address-%d", w.ostream.StreamID()),
+		network: fmt.Sprintf("omnistreams-network-%d", w.ostream.StreamID()),
+		address: fmt.Sprintf("omnistreams-address-%d", w.ostream.StreamID()),
 	}
 }
 func (w omnistreamWrapper) SetDeadline(t time.Time) error {
