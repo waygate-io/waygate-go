@@ -76,8 +76,16 @@ func printJson(data interface{}) {
 
 func ConnectConns(downstreamConn connCloseWriter, upstreamConn connCloseWriter) {
 
-	defer downstreamConn.Close()
-	defer upstreamConn.Close()
+	defer func() {
+		err := downstreamConn.Close()
+		if err != nil {
+			fmt.Println("ConnectConns: downstreamConn.Close()", err)
+		}
+		err = upstreamConn.Close()
+		if err != nil {
+			fmt.Println("ConnectConns: upstreamConn.Close()", err)
+		}
+	}()
 
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -98,10 +106,13 @@ func ConnectConns(downstreamConn connCloseWriter, upstreamConn connCloseWriter) 
 func pipeConns(readConn net.Conn, writeConn connCloseWriter) {
 	_, err := io.Copy(writeConn, readConn)
 	if err != nil {
-		log.Println(err.Error())
+		log.Println("io.Copy(writeConn, readConn)", err.Error())
 	}
 
-	writeConn.CloseWrite()
+	err = writeConn.CloseWrite()
+	if err != nil {
+		log.Println("writeConn.CloseWrite", err.Error())
+	}
 	//log.Println("CloseWrite:", reflect.TypeOf(writeConn))
 }
 

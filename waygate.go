@@ -17,4 +17,5 @@ type TunnelConfig struct {
 var (
 	DefaultToken   string = ""
 	DefaultCertDir string = "./"
+	DebugMode      bool   = false
 )

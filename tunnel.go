@@ -435,9 +435,15 @@ func serverHandshake(
 
 func processRequest(tunnelReq TunnelRequest, tunnelDomains []string, jose *josencillo.JOSE, public bool) (*TunnelConfig, error) {
 
-	host, err := genRandomText(8)
-	if err != nil {
-		return nil, err
+	var host string
+	if DebugMode {
+		host = "debug"
+	} else {
+		var err error
+		host, err = genRandomText(8)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if len(tunnelDomains) == 0 {

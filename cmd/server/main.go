@@ -16,9 +16,12 @@ func main() {
 	dnsProvider := flag.String("dns-provider", "", "DNS Provider")
 	dnsToken := flag.String("dns-token", "", "DNS Token")
 	dnsUser := flag.String("dns-user", "", "DNS User")
+	debug := flag.Bool("debug", false, "Enable debug mode")
 	var tunnelDomains arrayFlags
 	flag.Var(&tunnelDomains, "tunnel-domain", "Tunnel domains")
 	flag.Parse()
+
+	waygate.DebugMode = *debug
 
 	config := &waygate.ServerConfig{
 		AdminDomain:   *adminDomainArg,
