@@ -41,6 +41,14 @@ func (t *OmnistreamsTunnel) AcceptStream() (connCloseWriter, error) {
 	}, nil
 }
 
+func (t *OmnistreamsTunnel) ReceiveDatagram() ([]byte, error) {
+	return t.conn.ReceiveMessage()
+}
+
+func (t *OmnistreamsTunnel) SendDatagram(msg []byte) error {
+	return t.conn.SendMessage(msg)
+}
+
 func (t *OmnistreamsTunnel) GetConfig() TunnelConfig {
 	return *t.tunConfig
 }
@@ -90,6 +98,44 @@ func NewOmnistreamsServerTunnel(
 	t := &OmnistreamsTunnel{
 		conn:      conn,
 		tunConfig: tunConfig,
+	}
+
+	return t, nil
+}
+
+func NewOmnistreamsClientTunnel(tunReq TunnelRequest) (*OmnistreamsTunnel, error) {
+
+	ctx := context.Background()
+
+	uri := fmt.Sprintf("wss://%s/waygate?token=%s&termination-type=%s&use-proxy-protocol=%t",
+		WaygateServerDomain,
+		tunReq.Token,
+		tunReq.TerminationType,
+		tunReq.UseProxyProtocol,
+	)
+
+	wsConn, _, err := websocket.Dial(ctx, uri, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	_, tunConfigBytes, err := wsConn.Read(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var tunConfig TunnelConfig
+
+	err = json.Unmarshal(tunConfigBytes, &tunConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	conn := omnistreams.NewConnection(wsConn, true)
+
+	t := &OmnistreamsTunnel{
+		conn:      conn,
+		tunConfig: &tunConfig,
 	}
 
 	return t, nil
