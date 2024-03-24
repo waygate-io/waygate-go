@@ -25,7 +25,6 @@ const ListenerDefaultKey = "default-listener"
 type Listener struct {
 	listener     *PassthroughListener
 	tunnel       Tunnel
-	domain       string
 	tunnelConfig TunnelConfig
 }
 
@@ -37,9 +36,6 @@ func (l *Listener) Addr() net.Addr {
 }
 func (l *Listener) Close() error {
 	return l.listener.Close()
-}
-func (l *Listener) GetDomain() string {
-	return l.domain
 }
 func (l *Listener) GetTunnelConfig() TunnelConfig {
 	return l.tunnel.GetConfig()
@@ -58,8 +54,8 @@ func ListenWithOpts(network, address, token, certDir string) (*Listener, error) 
 }
 
 type ClientSession struct {
-	//tunnel         Tunnel
-	tunnel         *WebTransportTunnel
+	tunnel Tunnel
+	//tunnel         *WebTransportTunnel
 	tlsConfig      *tls.Config
 	tlsTermination string
 	listenMap      map[string]*PassthroughListener
@@ -267,18 +263,18 @@ func (s *ClientSession) Listen(network, address string) (*Listener, error) {
 	if address == "" {
 		address = ListenerDefaultKey
 	} else {
-		listenReq := &ListenRequest{
-			Network: network,
-			Address: address,
-		}
-		listenRes, err := s.tunnel.Request(listenReq)
-		if err != nil {
-			return nil, err
-		}
+		//listenReq := &ListenRequest{
+		//	Network: network,
+		//	Address: address,
+		//}
+		//listenRes, err := s.tunnel.Request(listenReq)
+		//if err != nil {
+		//	return nil, err
+		//}
 
-		lres := listenRes.(*ListenResponse)
+		//lres := listenRes.(*ListenResponse)
 
-		printJson(lres)
+		//printJson(lres)
 	}
 
 	//ip := net.ParseIP(address)

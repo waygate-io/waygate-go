@@ -85,7 +85,7 @@ func NewOmnistreamsServerTunnel(
 		return nil, err
 	}
 
-	conn := omnistreams.NewConnection(wsConn)
+	conn := omnistreams.NewConnection(wsConn, false)
 
 	t := &OmnistreamsTunnel{
 		conn:      conn,

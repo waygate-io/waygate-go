@@ -542,7 +542,7 @@ func NewWebSocketMuxadoClientTunnel(tunReq TunnelRequest) (*MuxadoTunnel, error)
 
 	ctx := context.Background()
 
-	uri := fmt.Sprintf("wss://%s/waygate?token=%s&termination-type=%s&use-proxy-protocol=%s",
+	uri := fmt.Sprintf("wss://%s/waygate?token=%s&termination-type=%s&use-proxy-protocol=%t",
 		WaygateServerDomain,
 		tunReq.Token,
 		tunReq.TerminationType,
