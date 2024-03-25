@@ -31,12 +31,6 @@ type ListenResponse struct {
 	Message string `json:"message"`
 }
 
-type ReqType uint8
-
-const (
-	ReqTypeListen ReqType = iota
-)
-
 type Tunnel interface {
 	OpenStream() (connCloseWriter, error)
 	AcceptStream() (connCloseWriter, error)
@@ -67,13 +61,19 @@ type WebTransportTunnel struct {
 	ctx           context.Context
 }
 
-func (t *WebTransportTunnel) Request(req interface{}) (interface{}, error) {
+//func (t *WebTransportTunnel) Request(req interface{}) (interface{}, error) {
+//        return request(t, req)
+//}
 
-	var reqType ReqType
+func request(t *OmnistreamsTunnel, req interface{}) (interface{}, error) {
+
+	var msgType MessageType
 
 	switch req.(type) {
 	case *ListenRequest:
-		reqType = ReqTypeListen
+		msgType = MessageTypeListen
+	case *TunnelConfig:
+		msgType = MessageTypeTunnelConfig
 	default:
 		return nil, errors.New("Unknown request type")
 	}
@@ -83,15 +83,7 @@ func (t *WebTransportTunnel) Request(req interface{}) (interface{}, error) {
 		return nil, err
 	}
 
-	reqStream, err := t.OpenStream()
-	if err != nil {
-		return nil, err
-	}
-
-	reqTypeBuf := make([]byte, 1)
-	reqTypeBuf[0] = byte(reqType)
-
-	_, err = reqStream.Write(reqTypeBuf)
+	reqStream, err := t.OpenStreamType(msgType)
 	if err != nil {
 		return nil, err
 	}
@@ -106,28 +98,50 @@ func (t *WebTransportTunnel) Request(req interface{}) (interface{}, error) {
 		return nil, err
 	}
 
-	resBytes, err := io.ReadAll(reqStream)
+	fmt.Println("here1")
+	msgTypeBuf := make([]byte, 1)
+	n, err := reqStream.Read(msgTypeBuf)
 	if err != nil {
+		fmt.Println("here3", n)
 		return nil, err
 	}
 
-	switch req.(type) {
-	case *ListenRequest:
-		var listenRes ListenResponse
-		err = json.Unmarshal(resBytes, &listenRes)
-		if err != nil {
-			return nil, err
-		}
+	msgType = MessageType(msgTypeBuf[0])
 
-		return &listenRes, nil
-	default:
-		return nil, errors.New("Unknown request type")
+	switch msgType {
+	case MessageTypeSuccess:
+		fmt.Println("here2")
+
+		return nil, nil
+
+		switch req.(type) {
+		case *ListenRequest:
+
+			resBytes, err := io.ReadAll(reqStream)
+			if err != nil {
+				return nil, err
+			}
+
+			var listenRes ListenResponse
+			err = json.Unmarshal(resBytes, &listenRes)
+			if err != nil {
+				return nil, err
+			}
+
+			return &listenRes, nil
+		default:
+			return nil, errors.New("Unknown request type")
+		}
 	}
 
 	return nil, nil
 }
 
 func (t *WebTransportTunnel) HandleRequests(callback func(interface{}) interface{}) error {
+	return handleRequests(t, callback)
+}
+
+func handleRequests(t Tunnel, callback func(interface{}) interface{}) error {
 
 	// TODO: make thread safe
 
@@ -140,14 +154,14 @@ func (t *WebTransportTunnel) HandleRequests(callback func(interface{}) interface
 				continue
 			}
 
-			reqTypeBuf := make([]byte, 1)
-			_, err = msgStream.Read(reqTypeBuf)
+			msgTypeBuf := make([]byte, 1)
+			_, err = msgStream.Read(msgTypeBuf)
 			if err != nil {
 				fmt.Println(err)
 				continue
 			}
 
-			reqType := ReqType(reqTypeBuf[0])
+			msgType := MessageType(msgTypeBuf[0])
 
 			reqBytes, err := io.ReadAll(msgStream)
 			if err != nil {
@@ -157,8 +171,8 @@ func (t *WebTransportTunnel) HandleRequests(callback func(interface{}) interface
 
 			var response interface{}
 
-			switch reqType {
-			case ReqTypeListen:
+			switch msgType {
+			case MessageTypeListen:
 				var listenReq ListenRequest
 				err = json.Unmarshal(reqBytes, &listenReq)
 				if err != nil {

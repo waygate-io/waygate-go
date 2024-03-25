@@ -14,19 +14,34 @@ import (
 	"nhooyr.io/websocket"
 )
 
+type MessageType uint8
+
+const (
+	MessageTypeTunnelConfig = iota
+	MessageTypeSuccess
+	MessageTypeListen
+	MessageTypeStream
+)
+
 type OmnistreamsTunnel struct {
 	conn      *omnistreams.Connection
 	tunConfig *TunnelConfig
 }
 
 func (t *OmnistreamsTunnel) OpenStream() (connCloseWriter, error) {
+	return t.OpenStreamType(MessageTypeStream)
+}
+
+func (t *OmnistreamsTunnel) OpenStreamType(msgType MessageType) (connCloseWriter, error) {
 	stream, err := t.conn.OpenStream()
 	if err != nil {
 		return nil, err
 	}
 
 	return omnistreamWrapper{
-		ostream: stream,
+		msgType:         msgType,
+		sendMessageType: true,
+		ostream:         stream,
 	}, nil
 }
 
@@ -37,8 +52,13 @@ func (t *OmnistreamsTunnel) AcceptStream() (connCloseWriter, error) {
 	}
 
 	return omnistreamWrapper{
-		ostream: stream,
+		ostream:         stream,
+		sendMessageType: false,
 	}, nil
+}
+
+func (t *OmnistreamsTunnel) SendMessage(msg interface{}) (interface{}, error) {
+	return request(t, msg)
 }
 
 func (t *OmnistreamsTunnel) ReceiveDatagram() ([]byte, error) {
@@ -100,6 +120,13 @@ func NewOmnistreamsServerTunnel(
 		tunConfig: tunConfig,
 	}
 
+	_, err = request(t, tunConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Println("https://" + tunConfig.Domain)
+
 	return t, nil
 }
 
@@ -142,13 +169,23 @@ func NewOmnistreamsClientTunnel(tunReq TunnelRequest) (*OmnistreamsTunnel, error
 }
 
 type omnistreamWrapper struct {
-	ostream *omnistreams.Stream
+	msgType         MessageType
+	sendMessageType bool
+	ostream         *omnistreams.Stream
 }
 
 func (w omnistreamWrapper) Read(buf []byte) (int, error) {
 	return w.ostream.Read(buf)
 }
 func (w omnistreamWrapper) Write(buf []byte) (int, error) {
+	if w.sendMessageType {
+		w.sendMessageType = false
+		prependedBuf := make([]byte, len(buf)+1)
+		copy(prependedBuf[1:], buf)
+		prependedBuf[0] = byte(w.msgType)
+		return w.ostream.Write(prependedBuf)
+	}
+
 	return w.ostream.Write(buf)
 }
 func (w omnistreamWrapper) Close() error {
