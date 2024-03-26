@@ -93,7 +93,8 @@ func (s *Server) Run() {
 	}
 
 	ctx := context.Background()
-	err = certConfig.ManageSync(ctx, append([]string{s.config.AdminDomain}, challengeDomains...))
+	adminDomains := []string{s.config.AdminDomain, "*." + s.config.AdminDomain}
+	err = certConfig.ManageSync(ctx, append(adminDomains, challengeDomains...))
 	exitOnError(err)
 
 	tlsConfig := &tls.Config{
