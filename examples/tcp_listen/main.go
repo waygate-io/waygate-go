@@ -10,7 +10,7 @@ import (
 
 func main() {
 
-	listener, err := waygate.Listen("tcp", ":5757")
+	listener, err := waygate.Listen("tcp", "")
 	checkErr(err)
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

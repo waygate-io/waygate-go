@@ -23,9 +23,8 @@ const PROXY_PROTO_SERVER_NAME_OFFSET = PROXY_PROTO_PP2_TYPE_MIN_CUSTOM + 0
 const ListenerDefaultKey = "default-listener"
 
 type Listener struct {
-	listener     *PassthroughListener
-	tunnel       Tunnel
-	tunnelConfig TunnelConfig
+	listener *PassthroughListener
+	tunnel   Tunnel
 }
 
 func (l *Listener) Accept() (net.Conn, error) {
@@ -125,8 +124,9 @@ func NewClientSession(token, certDir string) (*ClientSession, error) {
 	}
 
 	tunReq := TunnelRequest{
-		Token:            token,
-		TerminationType:  "client",
+		Token:           token,
+		TerminationType: "client",
+		//TerminationType:  "server",
 		UseProxyProtocol: true,
 	}
 
@@ -196,7 +196,13 @@ func (s *ClientSession) start() {
 				// TerminationType should probably be a per-listen setting, instead
 				// of per-tunnel
 				if s.tlsTermination == "client" && serverName != "" {
-					conn = tls.Server(conn, s.tlsConfig)
+					tlsConn := tls.Server(conn, s.tlsConfig)
+					err := tlsConn.Handshake()
+					if err != nil {
+						fmt.Println("fatal fail", err)
+						return
+					}
+					conn = tlsConn
 				}
 
 				conn = wrapperConn{

@@ -1,6 +1,21 @@
 package waygate
 
-import ()
+import (
+	"fmt"
+)
+
+type MessageType uint8
+
+func (t MessageType) String() string {
+	return fmt.Sprintf("MessageType: %d", t)
+}
+
+const (
+	MessageTypeTunnelConfig = iota
+	MessageTypeSuccess
+	MessageTypeListen
+	MessageTypeStream
+)
 
 type TunnelRequest struct {
 	Token            string `json:"token"`

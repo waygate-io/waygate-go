@@ -98,11 +98,9 @@ func request(t *OmnistreamsTunnel, req interface{}) (interface{}, error) {
 		return nil, err
 	}
 
-	fmt.Println("here1")
 	msgTypeBuf := make([]byte, 1)
-	n, err := reqStream.Read(msgTypeBuf)
+	_, err = reqStream.Read(msgTypeBuf)
 	if err != nil {
-		fmt.Println("here3", n)
 		return nil, err
 	}
 
@@ -110,28 +108,25 @@ func request(t *OmnistreamsTunnel, req interface{}) (interface{}, error) {
 
 	switch msgType {
 	case MessageTypeSuccess:
-		fmt.Println("here2")
 
 		return nil, nil
 
-		switch req.(type) {
-		case *ListenRequest:
+	case MessageTypeListen:
 
-			resBytes, err := io.ReadAll(reqStream)
-			if err != nil {
-				return nil, err
-			}
-
-			var listenRes ListenResponse
-			err = json.Unmarshal(resBytes, &listenRes)
-			if err != nil {
-				return nil, err
-			}
-
-			return &listenRes, nil
-		default:
-			return nil, errors.New("Unknown request type")
+		resBytes, err := io.ReadAll(reqStream)
+		if err != nil {
+			return nil, err
 		}
+
+		var listenRes ListenResponse
+		err = json.Unmarshal(resBytes, &listenRes)
+		if err != nil {
+			return nil, err
+		}
+
+		return &listenRes, nil
+	default:
+		return nil, errors.New("Unknown request type")
 	}
 
 	return nil, nil

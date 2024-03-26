@@ -5,22 +5,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
+	"runtime"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/anderspitman/omnistreams-go"
 	"github.com/waygate-io/waygate-go/josencillo"
 	"nhooyr.io/websocket"
-)
-
-type MessageType uint8
-
-const (
-	MessageTypeTunnelConfig = iota
-	MessageTypeSuccess
-	MessageTypeListen
-	MessageTypeStream
 )
 
 type OmnistreamsTunnel struct {
@@ -38,7 +33,7 @@ func (t *OmnistreamsTunnel) OpenStreamType(msgType MessageType) (connCloseWriter
 		return nil, err
 	}
 
-	return omnistreamWrapper{
+	return &omnistreamWrapper{
 		msgType:         msgType,
 		sendMessageType: true,
 		ostream:         stream,
@@ -51,9 +46,18 @@ func (t *OmnistreamsTunnel) AcceptStream() (connCloseWriter, error) {
 		return nil, err
 	}
 
-	return omnistreamWrapper{
-		ostream:         stream,
+	msgTypeBuf := make([]byte, 1)
+	_, err = stream.Read(msgTypeBuf)
+	if err != nil {
+		return nil, err
+	}
+
+	msgType := MessageType(msgTypeBuf[0])
+
+	return &omnistreamWrapper{
+		msgType:         msgType,
 		sendMessageType: false,
+		ostream:         stream,
 	}, nil
 }
 
@@ -101,18 +105,6 @@ func NewOmnistreamsServerTunnel(
 
 	wsConn.SetReadLimit(128 * 1024)
 
-	bytes, err := json.Marshal(tunConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	ctx := context.Background()
-
-	err = wsConn.Write(ctx, websocket.MessageBinary, bytes)
-	if err != nil {
-		return nil, err
-	}
-
 	conn := omnistreams.NewConnection(wsConn, false)
 
 	t := &OmnistreamsTunnel{
@@ -124,8 +116,6 @@ func NewOmnistreamsServerTunnel(
 	if err != nil {
 		return nil, err
 	}
-
-	fmt.Println("https://" + tunConfig.Domain)
 
 	return t, nil
 }
@@ -146,19 +136,47 @@ func NewOmnistreamsClientTunnel(tunReq TunnelRequest) (*OmnistreamsTunnel, error
 		return nil, err
 	}
 
-	_, tunConfigBytes, err := wsConn.Read(ctx)
+	conn := omnistreams.NewConnection(wsConn, true)
+
+	tunConfigStream, err := conn.AcceptStream()
 	if err != nil {
 		return nil, err
 	}
 
+	msgTypeBuf := make([]byte, 1)
+	_, err = tunConfigStream.Read(msgTypeBuf)
+	if err != nil {
+		return nil, err
+	}
+
+	msgType := MessageType(msgTypeBuf[0])
+
+	if msgType != MessageTypeTunnelConfig {
+		return nil, errors.New("Expected MessageTypeTunnelConfig")
+	}
+
 	var tunConfig TunnelConfig
+
+	tunConfigBytes, _ := io.ReadAll(tunConfigStream)
+	if len(tunConfigBytes) == 0 {
+		return nil, errors.New("No tunnel config received")
+	}
 
 	err = json.Unmarshal(tunConfigBytes, &tunConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	conn := omnistreams.NewConnection(wsConn, true)
+	msgTypeBuf[0] = byte(MessageTypeSuccess)
+	_, err = tunConfigStream.Write(msgTypeBuf)
+	if err != nil {
+		return nil, err
+	}
+
+	err = tunConfigStream.CloseWrite()
+	if err != nil {
+		return nil, err
+	}
 
 	t := &OmnistreamsTunnel{
 		conn:      conn,
@@ -174,44 +192,63 @@ type omnistreamWrapper struct {
 	ostream         *omnistreams.Stream
 }
 
-func (w omnistreamWrapper) Read(buf []byte) (int, error) {
-	return w.ostream.Read(buf)
+func goid() int {
+	var buf [64]byte
+	n := runtime.Stack(buf[:], false)
+	idField := strings.Fields(strings.TrimPrefix(string(buf[:n]), "goroutine "))[0]
+	id, err := strconv.Atoi(idField)
+	if err != nil {
+		panic(fmt.Sprintf("cannot get goroutine id: %v", err))
+	}
+	return id
 }
-func (w omnistreamWrapper) Write(buf []byte) (int, error) {
+
+func (w *omnistreamWrapper) Read(buf []byte) (int, error) {
+
+	n, err := w.ostream.Read(buf)
+
+	return n, err
+}
+func (w *omnistreamWrapper) Write(buf []byte) (int, error) {
 	if w.sendMessageType {
 		w.sendMessageType = false
 		prependedBuf := make([]byte, len(buf)+1)
-		copy(prependedBuf[1:], buf)
+		n := copy(prependedBuf[1:], buf)
 		prependedBuf[0] = byte(w.msgType)
-		return w.ostream.Write(prependedBuf)
+		n, err := w.ostream.Write(prependedBuf)
+		if err != nil {
+			return n - 1, err
+		}
+
+		return n - 1, nil
 	}
 
 	return w.ostream.Write(buf)
 }
-func (w omnistreamWrapper) Close() error {
+func (w *omnistreamWrapper) Close() error {
 	return w.ostream.Close()
 }
-func (w omnistreamWrapper) CloseWrite() error {
+func (w *omnistreamWrapper) CloseWrite() error {
 	return w.ostream.CloseWrite()
 }
-func (w omnistreamWrapper) LocalAddr() net.Addr {
+func (w *omnistreamWrapper) LocalAddr() net.Addr {
 	return addr{
 		network: fmt.Sprintf("omnistreams-network-%d", w.ostream.StreamID()),
 		address: fmt.Sprintf("omnistreams-address-%d", w.ostream.StreamID()),
 	}
 }
-func (w omnistreamWrapper) RemoteAddr() net.Addr {
+func (w *omnistreamWrapper) RemoteAddr() net.Addr {
 	return addr{
 		network: fmt.Sprintf("omnistreams-network-%d", w.ostream.StreamID()),
 		address: fmt.Sprintf("omnistreams-address-%d", w.ostream.StreamID()),
 	}
 }
-func (w omnistreamWrapper) SetDeadline(t time.Time) error {
+func (w *omnistreamWrapper) SetDeadline(t time.Time) error {
 	return errors.New("SetDeadline not implemented")
 }
-func (w omnistreamWrapper) SetReadDeadline(t time.Time) error {
+func (w *omnistreamWrapper) SetReadDeadline(t time.Time) error {
 	return errors.New("SetReadDeadline not implemented")
 }
-func (w omnistreamWrapper) SetWriteDeadline(t time.Time) error {
+func (w *omnistreamWrapper) SetWriteDeadline(t time.Time) error {
 	return errors.New("SetWriteDeadline not implemented")
 }

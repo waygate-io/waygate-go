@@ -91,28 +91,36 @@ func ConnectConns(downstreamConn connCloseWriter, upstreamConn connCloseWriter) 
 	wg.Add(2)
 
 	go func() {
-		pipeConns(downstreamConn, upstreamConn)
+		err := pipeConns(downstreamConn, upstreamConn)
+		if err != nil {
+			log.Println("ConnectConns pipeConns(downstreamConn, upstreamConn)", err.Error())
+		}
 		wg.Done()
 	}()
 
 	go func() {
-		pipeConns(upstreamConn, downstreamConn)
+		err := pipeConns(upstreamConn, downstreamConn)
+		if err != nil {
+			log.Println("ConnectConns pipeConns(upstreamConn, downstreamConn)", err.Error())
+		}
 		wg.Done()
 	}()
 
 	wg.Wait()
 }
 
-func pipeConns(readConn net.Conn, writeConn connCloseWriter) {
+func pipeConns(readConn net.Conn, writeConn connCloseWriter) error {
 	_, err := io.Copy(writeConn, readConn)
 	if err != nil {
-		log.Println("io.Copy(writeConn, readConn)", err.Error())
+		return err
 	}
 
 	err = writeConn.CloseWrite()
 	if err != nil {
-		log.Println("writeConn.CloseWrite", err.Error())
+		return err
 	}
+
+	return nil
 	//log.Println("CloseWrite:", reflect.TypeOf(writeConn))
 }
 
