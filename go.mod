@@ -2,9 +2,9 @@ module github.com/waygate-io/waygate-go
 
 go 1.22.0
 
-replace github.com/lastlogin-io/obligator => ../obligator
+//replace github.com/lastlogin-io/obligator => ../obligator
 
-replace github.com/anderspitman/omnistreams-go => ../omnistreams-go
+//replace github.com/anderspitman/omnistreams-go => ../omnistreams-go
 
 //replace github.com/gemdrive/gemdrive-go => ../gemdrive-go
 
@@ -14,7 +14,7 @@ require (
 	github.com/anderspitman/treemess-go v0.0.0-20210313015619-ba255d9f1e0f
 	github.com/caddyserver/certmagic v0.20.0
 	github.com/gemdrive/gemdrive-go v0.0.0-20240229172336-f3f7f72ae546
-	github.com/lastlogin-io/obligator v0.0.0-20240304163727-37f75cc861f1
+	github.com/lastlogin-io/obligator v0.0.0-20240320141513-ad56a2786bf7
 	github.com/lestrrat-go/jwx/v2 v2.0.11
 	github.com/libdns/namedotcom v0.3.3
 	github.com/libdns/route53 v1.3.3
