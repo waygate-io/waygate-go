@@ -10,7 +10,7 @@ go 1.22.0
 
 require (
 	gioui.org v0.5.0
-	github.com/anderspitman/omnistreams-go v0.0.0-20240321185041-c8a7fda29c02
+	github.com/anderspitman/omnistreams-go v0.0.0-20240324225630-c70675b2fd1b
 	github.com/anderspitman/treemess-go v0.0.0-20210313015619-ba255d9f1e0f
 	github.com/caddyserver/certmagic v0.20.0
 	github.com/gemdrive/gemdrive-go v0.0.0-20240229172336-f3f7f72ae546
@@ -63,7 +63,6 @@ require (
 	github.com/mholt/acmez v1.2.0 // indirect
 	github.com/miekg/dns v1.1.55 // indirect
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646 // indirect
-	github.com/omnistreams/omnistreams-go v0.0.0-20240324225630-c70675b2fd1b // indirect
 	github.com/onsi/ginkgo/v2 v2.12.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/quic-go/qpack v0.4.0 // indirect
