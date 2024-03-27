@@ -284,17 +284,18 @@ func (s *Server) handleConn(
 
 	if clientHello.ServerName == s.config.AdminDomain && isTlsMuxado(clientHello) {
 
-		tlsConn := tls.Server(passConn, tlsConfig)
+		return errors.New("Muxado TLS not implemented")
+		//tlsConn := tls.Server(passConn, tlsConfig)
 
-		tunnel, err := NewTlsMuxadoServerTunnel(tlsConn, s.jose, s.config.Public)
-		if err != nil {
-			return err
-		}
+		//tunnel, err := NewTlsMuxadoServerTunnel(tlsConn, s.jose, s.config.Public)
+		//if err != nil {
+		//	return err
+		//}
 
-		s.mut.Lock()
-		defer s.mut.Unlock()
-		domain := tunnel.GetConfig().Domain
-		tunnels[domain] = tunnel
+		//s.mut.Lock()
+		//defer s.mut.Unlock()
+		//domain := tunnel.GetConfig().Domain
+		//tunnels[domain] = tunnel
 
 	} else if clientHello.ServerName == s.config.AdminDomain || clientHello.ServerName == authDomain {
 		waygateListener.PassConn(passConn)

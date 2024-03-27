@@ -46,13 +46,10 @@ func (t *OmnistreamsTunnel) AcceptStream() (connCloseWriter, error) {
 		return nil, err
 	}
 
-	msgTypeBuf := make([]byte, 1)
-	_, err = stream.Read(msgTypeBuf)
+	msgType, err := readStreamType(stream)
 	if err != nil {
 		return nil, err
 	}
-
-	msgType := MessageType(msgTypeBuf[0])
 
 	return &omnistreamWrapper{
 		msgType:         msgType,
@@ -212,15 +209,13 @@ func (w *omnistreamWrapper) Read(buf []byte) (int, error) {
 func (w *omnistreamWrapper) Write(buf []byte) (int, error) {
 	if w.sendMessageType {
 		w.sendMessageType = false
-		prependedBuf := make([]byte, len(buf)+1)
-		n := copy(prependedBuf[1:], buf)
-		prependedBuf[0] = byte(w.msgType)
-		n, err := w.ostream.Write(prependedBuf)
+
+		err := streamFirstWrite(w.ostream, buf, w.msgType)
 		if err != nil {
-			return n - 1, err
+			return len(buf) - 1, err
 		}
 
-		return n - 1, nil
+		return len(buf) - 1, nil
 	}
 
 	return w.ostream.Write(buf)

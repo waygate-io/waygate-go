@@ -33,6 +33,7 @@ type ListenResponse struct {
 
 type Tunnel interface {
 	OpenStream() (connCloseWriter, error)
+	OpenStreamType(MessageType) (connCloseWriter, error)
 	AcceptStream() (connCloseWriter, error)
 	GetConfig() TunnelConfig
 }
@@ -65,7 +66,7 @@ type WebTransportTunnel struct {
 //        return request(t, req)
 //}
 
-func request(t *OmnistreamsTunnel, req interface{}) (interface{}, error) {
+func request(t Tunnel, req interface{}) (interface{}, error) {
 
 	var msgType MessageType
 
@@ -213,24 +214,38 @@ func (t *WebTransportTunnel) ReceiveMessage() ([]byte, error) {
 }
 
 func (t *WebTransportTunnel) OpenStream() (connCloseWriter, error) {
+	return t.OpenStreamType(MessageTypeStream)
+}
+
+func (t *WebTransportTunnel) OpenStreamType(msgType MessageType) (connCloseWriter, error) {
 	stream, err := t.wtSession.OpenStreamSync(t.ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	return wtStreamWrapper{
-		wtStream: stream,
+	return &wtStreamWrapper{
+		msgType:         msgType,
+		sendMessageType: true,
+		wtStream:        stream,
 	}, nil
 }
 
 func (t *WebTransportTunnel) AcceptStream() (connCloseWriter, error) {
+
 	stream, err := t.wtSession.AcceptStream(t.ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	return wtStreamWrapper{
-		wtStream: stream,
+	msgType, err := readStreamType(stream)
+	if err != nil {
+		return nil, err
+	}
+
+	return &wtStreamWrapper{
+		msgType:         msgType,
+		sendMessageType: false,
+		wtStream:        stream,
 	}, nil
 }
 
@@ -374,32 +389,31 @@ func NewWebTransportServerTunnel(
 	tunnelDomains []string,
 ) (*WebTransportTunnel, error) {
 
-	ctx := context.Background()
+	tunnelReq := TunnelRequest{
+		Token:            r.URL.Query().Get("token"),
+		TerminationType:  r.URL.Query().Get("termination-type"),
+		UseProxyProtocol: r.URL.Query().Get("use-proxy-protocol") == "true",
+	}
+
+	tunConfig, err := processRequest(tunnelReq, tunnelDomains, jose, public)
+	if err != nil {
+		return nil, err
+	}
 
 	wtSession, err := wtServer.Upgrade(w, r)
 	if err != nil {
 		return nil, err
 	}
 
-	wtStream, err := wtSession.AcceptStream(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	controlStream := wtStreamWrapper{
-		wtStream: wtStream,
-	}
-
-	tunConfig, err := serverHandshake(controlStream, jose, public, tunnelDomains)
-	if err != nil {
-		return nil, err
-	}
-
 	t := &WebTransportTunnel{
-		ctx:           ctx,
-		wtSession:     wtSession,
-		controlStream: controlStream,
-		tunConfig:     *tunConfig,
+		ctx:       context.Background(),
+		wtSession: wtSession,
+		tunConfig: *tunConfig,
+	}
+
+	_, err = request(t, tunConfig)
+	if err != nil {
+		return nil, err
 	}
 
 	return t, nil
@@ -606,7 +620,7 @@ func NewWebTransportClientTunnel(tunnelReq TunnelRequest) (*WebTransportTunnel, 
 		return nil, err
 	}
 
-	controlStream := wtStreamWrapper{
+	controlStream := &wtStreamWrapper{
 		wtStream: wtStream,
 	}
 
@@ -647,46 +661,59 @@ func (t *WebTransportTunnel) GetConfig() TunnelConfig {
 }
 
 type wtStreamWrapper struct {
-	wtStream webtransport.Stream
+	msgType         MessageType
+	sendMessageType bool
+	wtStream        webtransport.Stream
 }
 
-func (w wtStreamWrapper) Read(buf []byte) (int, error) {
+func (w *wtStreamWrapper) Read(buf []byte) (int, error) {
 	return w.wtStream.Read(buf)
 }
-func (w wtStreamWrapper) Write(buf []byte) (int, error) {
+func (w *wtStreamWrapper) Write(buf []byte) (int, error) {
+	if w.sendMessageType {
+		w.sendMessageType = false
+
+		err := streamFirstWrite(w.wtStream, buf, w.msgType)
+		if err != nil {
+			return len(buf) - 1, err
+		}
+
+		return len(buf) - 1, nil
+	}
+
 	return w.wtStream.Write(buf)
 }
-func (w wtStreamWrapper) Close() error {
+func (w *wtStreamWrapper) Close() error {
 	// quic.Stream.Close only closes the write side, see here:
 	// https://pkg.go.dev/github.com/quic-go/quic-go#readme-using-streams
 	w.wtStream.CancelRead(WebTransportCodeCancel)
 	w.wtStream.CancelWrite(WebTransportCodeCancel)
 	return nil
 }
-func (w wtStreamWrapper) CloseWrite() error {
+func (w *wtStreamWrapper) CloseWrite() error {
 	// quic.Stream.Close only closes the write side, see here:
 	// https://pkg.go.dev/github.com/quic-go/quic-go#readme-using-streams
 	return w.wtStream.Close()
 }
-func (w wtStreamWrapper) LocalAddr() net.Addr {
+func (w *wtStreamWrapper) LocalAddr() net.Addr {
 	return addr{
 		network: fmt.Sprintf("webtransport-network-%d", w.wtStream.StreamID()),
 		address: fmt.Sprintf("webtransport-address-%d", w.wtStream.StreamID()),
 	}
 }
-func (w wtStreamWrapper) RemoteAddr() net.Addr {
+func (w *wtStreamWrapper) RemoteAddr() net.Addr {
 	return addr{
 		network: fmt.Sprintf("webtransport-network-%d", w.wtStream.StreamID()),
 		address: fmt.Sprintf("webtransport-address-%d", w.wtStream.StreamID()),
 	}
 }
-func (w wtStreamWrapper) SetDeadline(t time.Time) error {
+func (w *wtStreamWrapper) SetDeadline(t time.Time) error {
 	return w.wtStream.SetDeadline(t)
 }
-func (w wtStreamWrapper) SetReadDeadline(t time.Time) error {
+func (w *wtStreamWrapper) SetReadDeadline(t time.Time) error {
 	return w.wtStream.SetReadDeadline(t)
 }
-func (w wtStreamWrapper) SetWriteDeadline(t time.Time) error {
+func (w *wtStreamWrapper) SetWriteDeadline(t time.Time) error {
 	return w.wtStream.SetWriteDeadline(t)
 }
 
@@ -757,4 +784,34 @@ func receiveMessage(stream connCloseWriter) ([]byte, error) {
 	}
 
 	return msgBuf, nil
+}
+
+func readStreamType(stream io.Reader) (MessageType, error) {
+
+	msgTypeBuf := make([]byte, 1)
+	n, err := stream.Read(msgTypeBuf)
+	if err != nil {
+		return MessageTypeError, err
+	}
+
+	if n != 1 {
+		return MessageTypeError, errors.New("Read wrong number of bytes")
+	}
+
+	msgType := MessageType(msgTypeBuf[0])
+
+	return msgType, nil
+}
+
+func streamFirstWrite(stream io.Writer, buf []byte, msgType MessageType) error {
+
+	prependedBuf := make([]byte, len(buf)+1)
+	copy(prependedBuf[1:], buf)
+	prependedBuf[0] = byte(msgType)
+	_, err := stream.Write(prependedBuf)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

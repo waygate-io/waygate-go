@@ -4,7 +4,7 @@ go 1.22.0
 
 //replace github.com/lastlogin-io/obligator => ../obligator
 
-//replace github.com/anderspitman/omnistreams-go => ../omnistreams-go
+replace github.com/anderspitman/omnistreams-go => ../omnistreams-go
 
 //replace github.com/gemdrive/gemdrive-go => ../gemdrive-go
 
