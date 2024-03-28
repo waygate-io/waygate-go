@@ -241,7 +241,7 @@ func (s *ClientSession) start() {
 				if !exists {
 					listener, exists = s.listenMap[ListenerDefaultKey]
 					if !exists {
-						fmt.Println("No such listener")
+						fmt.Println("No such listener", key)
 						conn.Close()
 						return
 					}
@@ -270,18 +270,19 @@ func (s *ClientSession) Listen(network, address string) (*Listener, error) {
 	if address == "" {
 		address = ListenerDefaultKey
 	} else {
-		//listenReq := &ListenRequest{
-		//	Network: network,
-		//	Address: address,
-		//}
-		//listenRes, err := s.tunnel.Request(listenReq)
-		//if err != nil {
-		//	return nil, err
-		//}
+		listenReq := &ListenRequest{
+			Network: network,
+			Address: address,
+		}
 
-		//lres := listenRes.(*ListenResponse)
+		listenRes, err := s.tunnel.Request(listenReq)
+		if err != nil {
+			return nil, err
+		}
 
-		//printJson(lres)
+		lres := listenRes.(*ListenResponse)
+
+		printJson(lres)
 	}
 
 	//ip := net.ParseIP(address)

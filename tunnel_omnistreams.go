@@ -41,21 +41,26 @@ func (t *OmnistreamsTunnel) OpenStreamType(msgType MessageType) (connCloseWriter
 }
 
 func (t *OmnistreamsTunnel) AcceptStream() (connCloseWriter, error) {
+	stream, _, err := t.AcceptStreamType()
+	return stream, err
+}
+
+func (t *OmnistreamsTunnel) AcceptStreamType() (connCloseWriter, MessageType, error) {
 	stream, err := t.conn.AcceptStream()
 	if err != nil {
-		return nil, err
+		return nil, MessageTypeError, err
 	}
 
 	msgType, err := readStreamType(stream)
 	if err != nil {
-		return nil, err
+		return nil, MessageTypeError, err
 	}
 
 	return &omnistreamWrapper{
 		msgType:         msgType,
 		sendMessageType: false,
 		ostream:         stream,
-	}, nil
+	}, msgType, nil
 }
 
 func (t *OmnistreamsTunnel) SendMessage(msg interface{}) (interface{}, error) {
@@ -72,6 +77,14 @@ func (t *OmnistreamsTunnel) SendDatagram(msg []byte) error {
 
 func (t *OmnistreamsTunnel) GetConfig() TunnelConfig {
 	return *t.tunConfig
+}
+
+func (t *OmnistreamsTunnel) Request(req interface{}) (interface{}, error) {
+	return request(t, req)
+}
+
+func (t *OmnistreamsTunnel) HandleRequests(callback func(interface{}) interface{}) error {
+	return handleRequests(t, callback)
 }
 
 func NewOmnistreamsServerTunnel(
@@ -154,7 +167,11 @@ func NewOmnistreamsClientTunnel(tunReq TunnelRequest) (*OmnistreamsTunnel, error
 
 	var tunConfig TunnelConfig
 
-	tunConfigBytes, _ := io.ReadAll(tunConfigStream)
+	tunConfigBytes, err := io.ReadAll(tunConfigStream)
+	if err != nil {
+		return nil, err
+	}
+
 	if len(tunConfigBytes) == 0 {
 		return nil, errors.New("No tunnel config received")
 	}
@@ -212,10 +229,10 @@ func (w *omnistreamWrapper) Write(buf []byte) (int, error) {
 
 		err := streamFirstWrite(w.ostream, buf, w.msgType)
 		if err != nil {
-			return len(buf) - 1, err
+			return len(buf), err
 		}
 
-		return len(buf) - 1, nil
+		return len(buf), nil
 	}
 
 	return w.ostream.Write(buf)

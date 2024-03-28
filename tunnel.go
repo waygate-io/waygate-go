@@ -35,7 +35,10 @@ type Tunnel interface {
 	OpenStream() (connCloseWriter, error)
 	OpenStreamType(MessageType) (connCloseWriter, error)
 	AcceptStream() (connCloseWriter, error)
+	AcceptStreamType() (connCloseWriter, MessageType, error)
 	GetConfig() TunnelConfig
+	Request(req interface{}) (interface{}, error)
+	HandleRequests(callback func(interface{}) interface{}) error
 }
 
 type MuxadoTunnel struct {
@@ -62,9 +65,9 @@ type WebTransportTunnel struct {
 	ctx           context.Context
 }
 
-//func (t *WebTransportTunnel) Request(req interface{}) (interface{}, error) {
-//        return request(t, req)
-//}
+func (t *WebTransportTunnel) Request(req interface{}) (interface{}, error) {
+	return request(t, req)
+}
 
 func request(t Tunnel, req interface{}) (interface{}, error) {
 
@@ -144,22 +147,20 @@ func handleRequests(t Tunnel, callback func(interface{}) interface{}) error {
 	go func() {
 
 		for {
-			msgStream, err := t.AcceptStream()
+			msgStream, msgType, err := t.AcceptStreamType()
 			if err != nil {
 				fmt.Println(err)
 				continue
 			}
-
-			msgTypeBuf := make([]byte, 1)
-			_, err = msgStream.Read(msgTypeBuf)
-			if err != nil {
-				fmt.Println(err)
-				continue
-			}
-
-			msgType := MessageType(msgTypeBuf[0])
 
 			reqBytes, err := io.ReadAll(msgStream)
+			if err != nil {
+				continue
+			}
+
+			fmt.Println(string(reqBytes))
+
+			_, err = msgStream.Write([]byte{byte(msgType)})
 			if err != nil {
 				fmt.Println(err)
 				continue
@@ -231,22 +232,27 @@ func (t *WebTransportTunnel) OpenStreamType(msgType MessageType) (connCloseWrite
 }
 
 func (t *WebTransportTunnel) AcceptStream() (connCloseWriter, error) {
+	stream, _, err := t.AcceptStreamType()
+	return stream, err
+}
+
+func (t *WebTransportTunnel) AcceptStreamType() (connCloseWriter, MessageType, error) {
 
 	stream, err := t.wtSession.AcceptStream(t.ctx)
 	if err != nil {
-		return nil, err
+		return nil, MessageTypeError, err
 	}
 
 	msgType, err := readStreamType(stream)
 	if err != nil {
-		return nil, err
+		return nil, MessageTypeError, err
 	}
 
 	return &wtStreamWrapper{
 		msgType:         msgType,
 		sendMessageType: false,
 		wtStream:        stream,
-	}, nil
+	}, msgType, nil
 }
 
 func NewTlsMuxadoServerTunnel(tlsConn *tls.Conn, jose *josencillo.JOSE, public bool) (*MuxadoTunnel, error) {
@@ -675,10 +681,10 @@ func (w *wtStreamWrapper) Write(buf []byte) (int, error) {
 
 		err := streamFirstWrite(w.wtStream, buf, w.msgType)
 		if err != nil {
-			return len(buf) - 1, err
+			return len(buf), err
 		}
 
-		return len(buf) - 1, nil
+		return len(buf), nil
 	}
 
 	return w.wtStream.Write(buf)

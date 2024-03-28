@@ -197,38 +197,6 @@ func (s *Server) Run() {
 
 			tunnel = wtTun
 
-			wtTun.HandleRequests(func(req interface{}) interface{} {
-				switch r := req.(type) {
-				case *ListenRequest:
-					if strings.HasPrefix(r.Network, "tcp") {
-						_, err = handleListenTCP(tunnel, r.Address)
-						if err != nil {
-							return &ListenResponse{
-								Success: false,
-								Message: err.Error(),
-							}
-						}
-					} else {
-						_, err = handleListenUDP(wtTun, r.Address)
-						if err != nil {
-							return &ListenResponse{
-								Success: false,
-								Message: err.Error(),
-							}
-						}
-					}
-
-					return &ListenResponse{
-						Success: true,
-					}
-				default:
-					fmt.Println("Invalid request type")
-					return nil
-				}
-
-				return nil
-			})
-
 		} else {
 			//tunnel, err = NewWebSocketMuxadoServerTunnel(w, r, s.jose, s.config.Public, s.config.TunnelDomains)
 			omniTunnel, err := NewOmnistreamsServerTunnel(w, r, s.jose, s.config.Public, s.config.TunnelDomains)
@@ -258,6 +226,38 @@ func (s *Server) Run() {
 				}
 			}()
 		}
+
+		tunnel.HandleRequests(func(req interface{}) interface{} {
+			switch r := req.(type) {
+			case *ListenRequest:
+				if strings.HasPrefix(r.Network, "tcp") {
+					_, err = handleListenTCP(tunnel, r.Address)
+					if err != nil {
+						return &ListenResponse{
+							Success: false,
+							Message: err.Error(),
+						}
+					}
+				} else {
+					_, err = handleListenUDP(tunnel, r.Address)
+					if err != nil {
+						return &ListenResponse{
+							Success: false,
+							Message: err.Error(),
+						}
+					}
+				}
+
+				return &ListenResponse{
+					Success: true,
+				}
+			default:
+				fmt.Println("Invalid request type")
+				return nil
+			}
+
+			return nil
+		})
 
 		s.mut.Lock()
 		defer s.mut.Unlock()
@@ -384,7 +384,7 @@ func handleListenTCP(wtTun Tunnel, addr string) (net.Listener, error) {
 	return ln, nil
 }
 
-func handleListenUDP(wtTun *WebTransportTunnel, listenAddr string) (net.Conn, error) {
+func handleListenUDP(tunnel Tunnel, listenAddr string) (net.Conn, error) {
 
 	udpAddr, err := net.ResolveUDPAddr("udp", listenAddr)
 	if err != nil {
