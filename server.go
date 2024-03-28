@@ -207,24 +207,6 @@ func (s *Server) Run() {
 			}
 
 			tunnel = omniTunnel
-
-			go func() {
-				for {
-					msg, err := omniTunnel.ReceiveDatagram()
-					if err != nil {
-						fmt.Println(err)
-						continue
-					}
-
-					fmt.Println(string(msg))
-
-					err = omniTunnel.SendDatagram(msg)
-					if err != nil {
-						fmt.Println(err)
-						continue
-					}
-				}
-			}()
 		}
 
 		tunnel.HandleRequests(func(req interface{}) interface{} {
@@ -398,17 +380,18 @@ func handleListenUDP(tunnel Tunnel, listenAddr string) (net.Conn, error) {
 
 	go func() {
 
-		buf := make([]byte, 4096)
+		buf := make([]byte, 64*1024)
 
 		for {
-			n, addr, err := conn.ReadFromUDP(buf)
+			n, srcAddr, err := conn.ReadFromUDP(buf)
 			if err != nil {
 				fmt.Println("Failed to forward")
 				continue
 			}
 
-			fmt.Println("Read:", n, string(buf))
-			printJson(addr)
+			dstAddr := conn.LocalAddr()
+
+			tunnel.SendDatagram(buf[:n], srcAddr, dstAddr)
 		}
 	}()
 

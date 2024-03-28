@@ -39,6 +39,17 @@ func (l *Listener) Close() error {
 func (l *Listener) GetTunnelConfig() TunnelConfig {
 	return l.tunnel.GetConfig()
 }
+func ListenUDP(network string, udpAddr *net.UDPAddr) (*UDPConn, error) {
+
+	//address := fmt.Sprintf("%s:%d", udpAddr.IP, udpAddr.Port)
+
+	s, err := NewClientSession(DefaultToken, DefaultCertDir)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.ListenUDP(network, udpAddr)
+}
 func Listen(network, address string) (*Listener, error) {
 	return ListenWithOpts(network, address, DefaultToken, DefaultCertDir)
 }
@@ -58,6 +69,7 @@ type ClientSession struct {
 	tlsConfig      *tls.Config
 	tlsTermination string
 	listenMap      map[string]*PassthroughListener
+	udpMap         map[string]*UDPConn
 	mut            *sync.Mutex
 	logger         *zap.Logger
 }
@@ -143,6 +155,7 @@ func NewClientSession(token, certDir string) (*ClientSession, error) {
 		tlsConfig:      tlsConfig,
 		tlsTermination: tunnel.GetConfig().TerminationType,
 		listenMap:      make(map[string]*PassthroughListener),
+		udpMap:         make(map[string]*UDPConn),
 		mut:            &sync.Mutex{},
 		logger:         logger,
 	}
@@ -153,6 +166,26 @@ func NewClientSession(token, certDir string) (*ClientSession, error) {
 }
 
 func (s *ClientSession) start() {
+
+	go func() {
+		for {
+			dgram, _, dstAddr, err := s.tunnel.ReceiveDatagram()
+			if err != nil {
+				fmt.Println(err)
+				continue
+			}
+
+			//dst := fmt.Sprintf("%s:%d", dstAddr.IP, dstAddr.Port)
+
+			udpConn, ok := s.udpMap[dstAddr.String()]
+			if !ok {
+				fmt.Println("no such UDPConn")
+				continue
+			}
+
+			udpConn.recvCh <- dgram
+		}
+	}()
 
 	go func() {
 
@@ -257,8 +290,31 @@ func (s *ClientSession) GetTunnelConfig() TunnelConfig {
 	return s.tunnel.GetConfig()
 }
 
-func (s *ClientSession) ListenUDP(network string, address net.UDPAddr) (*Listener, error) {
-	return Listen(network, fmt.Sprintf("%s:%d", address.IP, address.Port))
+func (s *ClientSession) ListenUDP(network string, udpAddr *net.UDPAddr) (*UDPConn, error) {
+
+	address := fmt.Sprintf("%s:%d", udpAddr.IP, udpAddr.Port)
+
+	listenReq := &ListenRequest{
+		Network: network,
+		Address: address,
+	}
+
+	listenRes, err := s.tunnel.Request(listenReq)
+	if err != nil {
+		return nil, err
+	}
+
+	lres := listenRes.(*ListenResponse)
+
+	printJson(lres)
+
+	c := &UDPConn{
+		recvCh: make(chan []byte),
+	}
+
+	s.udpMap[address] = c
+
+	return c, nil
 }
 
 func (s *ClientSession) Listen(network, address string) (*Listener, error) {
@@ -300,4 +356,19 @@ func (s *ClientSession) Listen(network, address string) (*Listener, error) {
 	}
 
 	return l, nil
+}
+
+type UDPConn struct {
+	recvCh chan []byte
+}
+
+func (c *UDPConn) ReadFromUDP(buf []byte) (int, *net.UDPAddr, error) {
+	msg := <-c.recvCh
+	if len(msg) > len(buf) {
+		return 0, nil, errors.New("UDPConn.ReadFromUDP: buf not big enough")
+	}
+
+	n := copy(buf, msg)
+
+	return n, nil, nil
 }

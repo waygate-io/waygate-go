@@ -178,6 +178,7 @@ func buildCookieDomain(fullUrl string) (string, error) {
 }
 
 func addrToHostPort(addr net.Addr) (string, int, error) {
+
 	host, portStr, err := net.SplitHostPort(addr.String())
 	if err != nil {
 		return "", 0, err

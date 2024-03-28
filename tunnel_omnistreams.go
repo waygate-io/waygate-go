@@ -1,6 +1,7 @@
 package waygate
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"github.com/anderspitman/omnistreams-go"
+	"github.com/mailgun/proxyproto"
 	"github.com/waygate-io/waygate-go/josencillo"
 	"nhooyr.io/websocket"
 )
@@ -67,12 +69,53 @@ func (t *OmnistreamsTunnel) SendMessage(msg interface{}) (interface{}, error) {
 	return request(t, msg)
 }
 
-func (t *OmnistreamsTunnel) ReceiveDatagram() ([]byte, error) {
-	return t.conn.ReceiveMessage()
+func (t *OmnistreamsTunnel) ReceiveDatagram() ([]byte, net.Addr, net.Addr, error) {
+	msg, err := t.conn.ReceiveMessage()
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	reader := bytes.NewReader(msg)
+
+	ppHeader, err := proxyproto.ReadHeader(reader)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	remaining, err := io.ReadAll(reader)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	return remaining, ppHeader.Source, ppHeader.Destination, nil
 }
 
-func (t *OmnistreamsTunnel) SendDatagram(msg []byte) error {
-	return t.conn.SendMessage(msg)
+func (t *OmnistreamsTunnel) SendDatagram(msg []byte, srcAddr, dstAddr net.Addr) error {
+
+	conn := &wrapperConn{
+		localAddr:  dstAddr,
+		remoteAddr: srcAddr,
+	}
+
+	// TODO: maybe pass addr.IP as serverName?
+	proxyHeader, err := buildProxyProtoHeader(conn, "")
+	if err != nil {
+		return err
+	}
+
+	prependedBuf := &bytes.Buffer{}
+
+	_, err = proxyHeader.WriteTo(prependedBuf)
+	if err != nil {
+		return err
+	}
+
+	_, err = prependedBuf.Write(msg)
+	if err != nil {
+		return err
+	}
+
+	return t.conn.SendMessage(prependedBuf.Bytes())
 }
 
 func (t *OmnistreamsTunnel) GetConfig() TunnelConfig {

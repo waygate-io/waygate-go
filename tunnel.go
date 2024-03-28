@@ -39,6 +39,8 @@ type Tunnel interface {
 	GetConfig() TunnelConfig
 	Request(req interface{}) (interface{}, error)
 	HandleRequests(callback func(interface{}) interface{}) error
+	SendDatagram(msg []byte, srcAddr, dstAddr net.Addr) error
+	ReceiveDatagram() ([]byte, net.Addr, net.Addr, error)
 }
 
 type MuxadoTunnel struct {
@@ -204,6 +206,14 @@ func handleRequests(t Tunnel, callback func(interface{}) interface{}) error {
 	}()
 
 	return nil
+}
+
+func (t *WebTransportTunnel) ReceiveDatagram() ([]byte, net.Addr, net.Addr, error) {
+	return nil, nil, nil, errors.New("WebTransportTunnel.ReceiveDatagram not implemented")
+}
+
+func (t *WebTransportTunnel) SendDatagram(msg []byte, srcAddr, dstAdd net.Addr) error {
+	return errors.New("WebTransportTunnel.SendDatagram not implemented")
 }
 
 func (t *WebTransportTunnel) SendMessage(msg []byte) error {
