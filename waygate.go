@@ -15,6 +15,8 @@ const (
 	MessageTypeSuccess
 	MessageTypeListen
 	MessageTypeStream
+	MessageTypeDial
+	MessageTypeError
 )
 
 type TunnelRequest struct {

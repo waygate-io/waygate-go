@@ -207,8 +207,83 @@ func (s *Server) Run() {
 			}
 		}
 
+		udpMap := make(map[string]*net.UDPConn)
+		mut := &sync.Mutex{}
+
+		go func() {
+			for {
+				dgram, srcAddr, dstAddr, err := tunnel.ReceiveDatagram()
+				if err != nil {
+					fmt.Println(err)
+					continue
+				}
+
+				fmt.Println(dgram, srcAddr, dstAddr)
+
+				//udpDstAddr, err := net.ResolveUDPAddr("udp", dstAddr.String())
+				//if err != nil {
+				//        fmt.Println(err)
+				//        continue
+				//}
+
+				mut.Lock()
+				conn := udpMap[dstAddr.String()]
+				mut.Unlock()
+
+				//_, err = conn.WriteToUDP(dgram, udpDstAddr)
+				_, err = conn.Write(dgram)
+				if err != nil {
+					fmt.Println(err)
+					continue
+				}
+			}
+		}()
+
 		tunnel.HandleRequests(func(req interface{}) interface{} {
 			switch r := req.(type) {
+			case *DialRequest:
+				udpAddr, err := net.ResolveUDPAddr("udp", r.Address)
+				if err != nil {
+					return &DialResponse{
+						Success: false,
+						Message: err.Error(),
+					}
+				}
+
+				conn, err := net.DialUDP("udp", nil, udpAddr)
+				if err != nil {
+					return &DialResponse{
+						Success: false,
+						Message: err.Error(),
+					}
+				}
+
+				mut.Lock()
+				udpMap[r.Address] = conn
+				mut.Unlock()
+
+				go func() {
+
+					buf := make([]byte, 64*1024)
+
+					for {
+						n, srcAddr, err := conn.ReadFromUDP(buf)
+						if err != nil {
+							fmt.Println("Failed to forward:", err)
+							continue
+						}
+
+						dstAddr := conn.LocalAddr()
+
+						tunnel.SendDatagram(buf[:n], srcAddr, dstAddr)
+					}
+				}()
+
+				return &DialResponse{
+					Success: true,
+					Address: conn.LocalAddr().String(),
+				}
+
 			case *ListenRequest:
 				if strings.HasPrefix(r.Network, "tcp") {
 					_, err = handleListenTCP(tunnel, r.Address)

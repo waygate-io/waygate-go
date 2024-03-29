@@ -39,6 +39,14 @@ func (l *Listener) Close() error {
 func (l *Listener) GetTunnelConfig() TunnelConfig {
 	return l.tunnel.GetConfig()
 }
+func DialUDP(network string, udpAddr *net.UDPAddr) (*UDPConn, error) {
+	s, err := NewClientSession(DefaultToken, DefaultCertDir)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.DialUDP(network, udpAddr)
+}
 func ListenUDP(network string, udpAddr *net.UDPAddr) (*UDPConn, error) {
 
 	//address := fmt.Sprintf("%s:%d", udpAddr.IP, udpAddr.Port)
@@ -290,6 +298,52 @@ func (s *ClientSession) GetTunnelConfig() TunnelConfig {
 	return s.tunnel.GetConfig()
 }
 
+func (s *ClientSession) DialUDP(network string, dstAddr *net.UDPAddr) (*UDPConn, error) {
+
+	address := fmt.Sprintf("%s:%d", dstAddr.IP, dstAddr.Port)
+
+	req := &DialRequest{
+		Network: network,
+		Address: address,
+	}
+
+	res, err := s.tunnel.Request(req)
+	if err != nil {
+		return nil, err
+	}
+
+	dialRes := res.(*DialResponse)
+
+	if !dialRes.Success {
+		return nil, errors.New(dialRes.Message)
+	}
+
+	srcAddr, err := net.ResolveUDPAddr("udp", dialRes.Address)
+	if err != nil {
+		return nil, err
+	}
+
+	conn := &UDPConn{
+		recvCh: make(chan []byte),
+		sendCh: make(chan []byte),
+	}
+
+	go func() {
+		for {
+			msg := <-conn.sendCh
+			s.tunnel.SendDatagram(msg, srcAddr, dstAddr)
+		}
+	}()
+
+	s.mut.Lock()
+	s.udpMap[dialRes.Address] = conn
+	s.mut.Unlock()
+
+	printJson(s.udpMap)
+
+	return conn, nil
+}
+
 func (s *ClientSession) ListenUDP(network string, udpAddr *net.UDPAddr) (*UDPConn, error) {
 
 	address := fmt.Sprintf("%s:%d", udpAddr.IP, udpAddr.Port)
@@ -312,7 +366,9 @@ func (s *ClientSession) ListenUDP(network string, udpAddr *net.UDPAddr) (*UDPCon
 		recvCh: make(chan []byte),
 	}
 
+	s.mut.Lock()
 	s.udpMap[address] = c
+	s.mut.Unlock()
 
 	return c, nil
 }
@@ -360,6 +416,7 @@ func (s *ClientSession) Listen(network, address string) (*Listener, error) {
 
 type UDPConn struct {
 	recvCh chan []byte
+	sendCh chan []byte
 }
 
 func (c *UDPConn) ReadFromUDP(buf []byte) (int, *net.UDPAddr, error) {
@@ -371,4 +428,15 @@ func (c *UDPConn) ReadFromUDP(buf []byte) (int, *net.UDPAddr, error) {
 	n := copy(buf, msg)
 
 	return n, nil, nil
+}
+
+func (c *UDPConn) WriteToUDP(p []byte, addr *net.UDPAddr) (int, error) {
+
+	buf := make([]byte, len(p))
+
+	copy(buf, p)
+
+	c.sendCh <- buf
+
+	return len(p), nil
 }

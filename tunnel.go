@@ -11,8 +11,6 @@ import (
 	"github.com/waygate-io/waygate-go/josencillo"
 )
 
-const MessageTypeError = 0
-
 type Tunnel interface {
 	OpenStream() (connCloseWriter, error)
 	OpenStreamType(MessageType) (connCloseWriter, error)
@@ -23,6 +21,16 @@ type Tunnel interface {
 	HandleRequests(callback func(interface{}) interface{}) error
 	SendDatagram(msg []byte, srcAddr, dstAddr net.Addr) error
 	ReceiveDatagram() ([]byte, net.Addr, net.Addr, error)
+}
+
+type DialRequest struct {
+	Network string `json:"network"`
+	Address string `json:"address"`
+}
+type DialResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+	Address string `json:"address"`
 }
 
 type ListenRequest struct {
@@ -39,6 +47,8 @@ func request(t Tunnel, req interface{}) (interface{}, error) {
 	var msgType MessageType
 
 	switch req.(type) {
+	case *DialRequest:
+		msgType = MessageTypeDial
 	case *ListenRequest:
 		msgType = MessageTypeListen
 	case *TunnelConfig:
@@ -67,19 +77,23 @@ func request(t Tunnel, req interface{}) (interface{}, error) {
 		return nil, err
 	}
 
-	msgTypeBuf := make([]byte, 1)
-	_, err = reqStream.Read(msgTypeBuf)
-	if err != nil {
-		return nil, err
-	}
-
-	msgType = MessageType(msgTypeBuf[0])
-
 	switch msgType {
-	case MessageTypeSuccess:
-
+	case MessageTypeTunnelConfig:
 		return nil, nil
+	case MessageTypeDial:
 
+		resBytes, err := io.ReadAll(reqStream)
+		if err != nil {
+			return nil, err
+		}
+
+		var res DialResponse
+		err = json.Unmarshal(resBytes, &res)
+		if err != nil {
+			return nil, err
+		}
+
+		return &res, nil
 	case MessageTypeListen:
 
 		resBytes, err := io.ReadAll(reqStream)
@@ -95,7 +109,7 @@ func request(t Tunnel, req interface{}) (interface{}, error) {
 
 		return &listenRes, nil
 	default:
-		return nil, errors.New("Unknown request type")
+		return nil, errors.New("Unknown message type for response")
 	}
 
 	return nil, nil
@@ -119,17 +133,19 @@ func handleRequests(t Tunnel, callback func(interface{}) interface{}) error {
 				continue
 			}
 
-			fmt.Println(string(reqBytes))
-
-			_, err = msgStream.Write([]byte{byte(msgType)})
-			if err != nil {
-				fmt.Println(err)
-				continue
-			}
-
 			var response interface{}
 
 			switch msgType {
+			case MessageTypeDial:
+				var req DialRequest
+				err = json.Unmarshal(reqBytes, &req)
+				if err != nil {
+					fmt.Println(err)
+					continue
+				}
+
+				response = callback(&req)
+
 			case MessageTypeListen:
 				var listenReq ListenRequest
 				err = json.Unmarshal(reqBytes, &listenReq)
@@ -139,8 +155,9 @@ func handleRequests(t Tunnel, callback func(interface{}) interface{}) error {
 				}
 
 				response = callback(&listenReq)
+
 			default:
-				fmt.Println(err)
+				fmt.Println("Unknown message type", msgType)
 				continue
 			}
 
