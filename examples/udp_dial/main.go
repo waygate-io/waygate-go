@@ -10,7 +10,7 @@ import (
 
 func main() {
 
-	udpAddr, err := net.ResolveUDPAddr("udp", "waygate.io:5757")
+	udpAddr, err := net.ResolveUDPAddr("udp", "127.0.0.1:6868")
 	checkErr(err)
 
 	fmt.Println(udpAddr)

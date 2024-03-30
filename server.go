@@ -212,27 +212,23 @@ func (s *Server) Run() {
 
 		go func() {
 			for {
-				dgram, srcAddr, dstAddr, err := tunnel.ReceiveDatagram()
+				dgram, _, dstAddr, err := tunnel.ReceiveDatagram()
 				if err != nil {
 					fmt.Println(err)
 					continue
 				}
 
-				fmt.Println(dgram, srcAddr, dstAddr)
-
-				//udpDstAddr, err := net.ResolveUDPAddr("udp", dstAddr.String())
-				//if err != nil {
-				//        fmt.Println(err)
-				//        continue
-				//}
-
 				mut.Lock()
 				conn := udpMap[dstAddr.String()]
 				mut.Unlock()
 
-				//_, err = conn.WriteToUDP(dgram, udpDstAddr)
-				_, err = conn.Write(dgram)
+				n, err := conn.Write(dgram)
 				if err != nil {
+					fmt.Println(err)
+					continue
+				}
+
+				if n != len(dgram) {
 					fmt.Println(err)
 					continue
 				}
@@ -262,18 +258,19 @@ func (s *Server) Run() {
 				udpMap[r.Address] = conn
 				mut.Unlock()
 
+				srcAddr := conn.RemoteAddr()
+				dstAddr := conn.LocalAddr()
+
 				go func() {
 
 					buf := make([]byte, 64*1024)
 
 					for {
-						n, srcAddr, err := conn.ReadFromUDP(buf)
+						n, err := conn.Read(buf)
 						if err != nil {
 							fmt.Println("Failed to forward:", err)
 							continue
 						}
-
-						dstAddr := conn.LocalAddr()
 
 						tunnel.SendDatagram(buf[:n], srcAddr, dstAddr)
 					}
@@ -281,7 +278,7 @@ func (s *Server) Run() {
 
 				return &DialResponse{
 					Success: true,
-					Address: conn.LocalAddr().String(),
+					Address: dstAddr.String(),
 				}
 
 			case *ListenRequest:
