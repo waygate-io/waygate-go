@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -86,6 +87,127 @@ func (t *MuxadoTunnel) GetConfig() TunnelConfig {
 	return t.tunConfig
 }
 
+func NewWebSocketMuxadoServerTunnel(
+	w http.ResponseWriter,
+	r *http.Request,
+	jose *josencillo.JOSE,
+	public bool,
+	tunnelDomains []string,
+) (*MuxadoTunnel, error) {
+
+	tunnelReq := TunnelRequest{
+		Token:            r.URL.Query().Get("token"),
+		TerminationType:  r.URL.Query().Get("termination-type"),
+		UseProxyProtocol: r.URL.Query().Get("use-proxy-protocol") == "true",
+	}
+
+	tunConfig, err := processRequest(tunnelReq, tunnelDomains, jose, public)
+	if err != nil {
+		return nil, err
+	}
+
+	c, err := websocket.Accept(w, r, &websocket.AcceptOptions{
+		OriginPatterns: []string{"*"},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	ctx := context.Background()
+
+	sessConn := websocket.NetConn(ctx, c, websocket.MessageBinary)
+
+	muxSess := muxado.Server(sessConn, &muxado.Config{
+		MaxWindowSize: 1 * 1024 * 1024,
+	})
+
+	t := &MuxadoTunnel{
+		muxSess:   muxSess,
+		tunConfig: *tunConfig,
+	}
+
+	_, err = request(t, tunConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	return t, nil
+}
+
+func NewWebSocketMuxadoClientTunnel(tunReq TunnelRequest) (*MuxadoTunnel, error) {
+
+	ctx := context.Background()
+
+	uri := fmt.Sprintf("wss://%s/waygate?token=%s&termination-type=%s&use-proxy-protocol=%t",
+		WaygateServerDomain,
+		tunReq.Token,
+		tunReq.TerminationType,
+		tunReq.UseProxyProtocol,
+	)
+
+	wsConn, _, err := websocket.Dial(ctx, uri, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	sessConn := websocket.NetConn(ctx, wsConn, websocket.MessageBinary)
+
+	muxSess := muxado.Client(sessConn, &muxado.Config{})
+
+	conn := muxSess
+
+	tunConfigStream, err := conn.AcceptStream()
+	if err != nil {
+		return nil, err
+	}
+
+	msgTypeBuf := make([]byte, 1)
+	_, err = tunConfigStream.Read(msgTypeBuf)
+	if err != nil {
+		return nil, err
+	}
+
+	msgType := MessageType(msgTypeBuf[0])
+
+	if msgType != MessageTypeTunnelConfig {
+		return nil, errors.New("Expected MessageTypeTunnelConfig")
+	}
+
+	var tunConfig TunnelConfig
+
+	tunConfigBytes, err := io.ReadAll(tunConfigStream)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(tunConfigBytes) == 0 {
+		return nil, errors.New("No tunnel config received")
+	}
+
+	err = json.Unmarshal(tunConfigBytes, &tunConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	msgTypeBuf[0] = byte(MessageTypeSuccess)
+	_, err = tunConfigStream.Write(msgTypeBuf)
+	if err != nil {
+		return nil, err
+	}
+
+	err = tunConfigStream.CloseWrite()
+	if err != nil {
+		return nil, err
+	}
+
+	t := &MuxadoTunnel{
+		muxSess:   muxSess,
+		tunConfig: tunConfig,
+	}
+
+	return t, nil
+}
+
 func NewTlsMuxadoServerTunnel(tlsConn *tls.Conn, jose *josencillo.JOSE, public bool) (*MuxadoTunnel, error) {
 	msgSizeBuf := make([]byte, 4)
 
@@ -160,53 +282,6 @@ func NewTlsMuxadoServerTunnel(tlsConn *tls.Conn, jose *josencillo.JOSE, public b
 	t := &MuxadoTunnel{
 		muxSess:   muxSess,
 		tunConfig: tunConfig,
-	}
-
-	return t, nil
-}
-
-func NewWebSocketMuxadoServerTunnel(
-	w http.ResponseWriter,
-	r *http.Request,
-	jose *josencillo.JOSE,
-	public bool,
-	tunnelDomains []string,
-) (*MuxadoTunnel, error) {
-
-	tunnelReq := TunnelRequest{
-		Token:            r.URL.Query().Get("token"),
-		TerminationType:  r.URL.Query().Get("termination-type"),
-		UseProxyProtocol: r.URL.Query().Get("use-proxy-protocol") == "true",
-	}
-
-	tunConfig, err := processRequest(tunnelReq, tunnelDomains, jose, public)
-	if err != nil {
-		return nil, err
-	}
-
-	c, err := websocket.Accept(w, r, &websocket.AcceptOptions{
-		OriginPatterns: []string{"*"},
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	ctx := context.Background()
-
-	sessConn := websocket.NetConn(ctx, c, websocket.MessageBinary)
-
-	muxSess := muxado.Server(sessConn, &muxado.Config{
-		MaxWindowSize: 1 * 1024 * 1024,
-	})
-
-	t := &MuxadoTunnel{
-		muxSess:   muxSess,
-		tunConfig: *tunConfig,
-	}
-
-	_, err = request(t, tunConfig)
-	if err != nil {
-		return nil, err
 	}
 
 	return t, nil
