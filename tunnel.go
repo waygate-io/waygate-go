@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"strings"
+	"time"
 
 	"github.com/waygate-io/waygate-go/josencillo"
 )
@@ -254,4 +255,66 @@ func streamFirstWrite(stream io.Writer, buf []byte, msgType MessageType) error {
 	}
 
 	return nil
+}
+
+type stream interface {
+	Read([]byte) (int, error)
+	Write([]byte) (int, error)
+	Close() error
+	CloseWrite() error
+}
+
+type streamWrapper struct {
+	msgType         MessageType
+	sendMessageType bool
+	stream          stream
+	id              uint32
+}
+
+func (w *streamWrapper) Read(buf []byte) (int, error) {
+
+	n, err := w.stream.Read(buf)
+
+	return n, err
+}
+func (w *streamWrapper) Write(buf []byte) (int, error) {
+	if w.sendMessageType {
+		w.sendMessageType = false
+
+		err := streamFirstWrite(w.stream, buf, w.msgType)
+		if err != nil {
+			return len(buf), err
+		}
+
+		return len(buf), nil
+	}
+
+	return w.stream.Write(buf)
+}
+func (w *streamWrapper) Close() error {
+	return w.stream.Close()
+}
+func (w *streamWrapper) CloseWrite() error {
+	return w.stream.CloseWrite()
+}
+func (w *streamWrapper) LocalAddr() net.Addr {
+	return addr{
+		network: fmt.Sprintf("streamwrapper-network-%d", w.id),
+		address: fmt.Sprintf("streamwrapper-address-%d", w.id),
+	}
+}
+func (w *streamWrapper) RemoteAddr() net.Addr {
+	return addr{
+		network: fmt.Sprintf("streamwrapper-network-%d", w.id),
+		address: fmt.Sprintf("streamwrapper-address-%d", w.id),
+	}
+}
+func (w *streamWrapper) SetDeadline(t time.Time) error {
+	return errors.New("SetDeadline not implemented")
+}
+func (w *streamWrapper) SetReadDeadline(t time.Time) error {
+	return errors.New("SetReadDeadline not implemented")
+}
+func (w *streamWrapper) SetWriteDeadline(t time.Time) error {
+	return errors.New("SetWriteDeadline not implemented")
 }

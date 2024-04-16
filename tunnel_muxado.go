@@ -5,9 +5,12 @@ import (
 	"crypto/tls"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
+	"time"
 
 	"github.com/waygate-io/waygate-go/josencillo"
 	"golang.ngrok.com/muxado/v2"
@@ -20,11 +23,63 @@ type MuxadoTunnel struct {
 }
 
 func (t *MuxadoTunnel) OpenStream() (connCloseWriter, error) {
-	return t.muxSess.OpenStream()
+	return t.OpenStreamType(MessageTypeStream)
+}
+
+func (t *MuxadoTunnel) OpenStreamType(msgType MessageType) (connCloseWriter, error) {
+	stream, err := t.muxSess.OpenStream()
+	if err != nil {
+		return nil, err
+	}
+
+	return &streamWrapper{
+		msgType:         msgType,
+		sendMessageType: true,
+		stream:          stream,
+		id:              stream.Id(),
+	}, nil
 }
 
 func (t *MuxadoTunnel) AcceptStream() (connCloseWriter, error) {
-	return t.muxSess.AcceptStream()
+	stream, _, err := t.AcceptStreamType()
+	return stream, err
+}
+
+func (t *MuxadoTunnel) AcceptStreamType() (connCloseWriter, MessageType, error) {
+	stream, err := t.muxSess.AcceptStream()
+	if err != nil {
+		return nil, MessageTypeError, err
+	}
+
+	msgType, err := readStreamType(stream)
+	if err != nil {
+		return nil, MessageTypeError, err
+	}
+
+	return &streamWrapper{
+		msgType:         msgType,
+		sendMessageType: false,
+		stream:          stream,
+		id:              stream.Id(),
+	}, msgType, nil
+}
+
+func (t *MuxadoTunnel) ReceiveDatagram() ([]byte, net.Addr, net.Addr, error) {
+	time.Sleep(10 * time.Second)
+	return nil, nil, nil, errors.New("ReceiveDatagram not implemented")
+}
+
+func (t *MuxadoTunnel) SendDatagram(msg []byte, srcAddr, dstAddr net.Addr) error {
+	time.Sleep(10 * time.Second)
+	return errors.New("SendDatagram not implemented")
+}
+
+func (t *MuxadoTunnel) Request(req interface{}) (interface{}, error) {
+	return request(t, req)
+}
+
+func (t *MuxadoTunnel) HandleRequests(callback func(interface{}) interface{}) error {
+	return handleRequests(t, callback)
 }
 
 func (t *MuxadoTunnel) GetConfig() TunnelConfig {
@@ -136,17 +191,7 @@ func NewWebSocketMuxadoServerTunnel(
 		return nil, err
 	}
 
-	bytes, err := json.Marshal(tunConfig)
-	if err != nil {
-		return nil, err
-	}
-
 	ctx := context.Background()
-
-	err = c.Write(ctx, websocket.MessageBinary, bytes)
-	if err != nil {
-		return nil, err
-	}
 
 	sessConn := websocket.NetConn(ctx, c, websocket.MessageBinary)
 
@@ -157,6 +202,11 @@ func NewWebSocketMuxadoServerTunnel(
 	t := &MuxadoTunnel{
 		muxSess:   muxSess,
 		tunConfig: *tunConfig,
+	}
+
+	_, err = request(t, tunConfig)
+	if err != nil {
+		return nil, err
 	}
 
 	return t, nil

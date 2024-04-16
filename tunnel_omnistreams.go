@@ -9,10 +9,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"runtime"
-	"strconv"
-	"strings"
-	"time"
 
 	"github.com/anderspitman/omnistreams-go"
 	"github.com/mailgun/proxyproto"
@@ -35,10 +31,11 @@ func (t *OmnistreamsTunnel) OpenStreamType(msgType MessageType) (connCloseWriter
 		return nil, err
 	}
 
-	return &omnistreamWrapper{
+	return &streamWrapper{
 		msgType:         msgType,
 		sendMessageType: true,
-		ostream:         stream,
+		stream:          stream,
+		id:              stream.StreamID(),
 	}, nil
 }
 
@@ -58,10 +55,11 @@ func (t *OmnistreamsTunnel) AcceptStreamType() (connCloseWriter, MessageType, er
 		return nil, MessageTypeError, err
 	}
 
-	return &omnistreamWrapper{
+	return &streamWrapper{
 		msgType:         msgType,
 		sendMessageType: false,
-		ostream:         stream,
+		stream:          stream,
+		id:              stream.StreamID(),
 	}, msgType, nil
 }
 
@@ -241,69 +239,4 @@ func NewOmnistreamsClientTunnel(tunReq TunnelRequest) (*OmnistreamsTunnel, error
 	}
 
 	return t, nil
-}
-
-type omnistreamWrapper struct {
-	msgType         MessageType
-	sendMessageType bool
-	ostream         *omnistreams.Stream
-}
-
-func goid() int {
-	var buf [64]byte
-	n := runtime.Stack(buf[:], false)
-	idField := strings.Fields(strings.TrimPrefix(string(buf[:n]), "goroutine "))[0]
-	id, err := strconv.Atoi(idField)
-	if err != nil {
-		panic(fmt.Sprintf("cannot get goroutine id: %v", err))
-	}
-	return id
-}
-
-func (w *omnistreamWrapper) Read(buf []byte) (int, error) {
-
-	n, err := w.ostream.Read(buf)
-
-	return n, err
-}
-func (w *omnistreamWrapper) Write(buf []byte) (int, error) {
-	if w.sendMessageType {
-		w.sendMessageType = false
-
-		err := streamFirstWrite(w.ostream, buf, w.msgType)
-		if err != nil {
-			return len(buf), err
-		}
-
-		return len(buf), nil
-	}
-
-	return w.ostream.Write(buf)
-}
-func (w *omnistreamWrapper) Close() error {
-	return w.ostream.Close()
-}
-func (w *omnistreamWrapper) CloseWrite() error {
-	return w.ostream.CloseWrite()
-}
-func (w *omnistreamWrapper) LocalAddr() net.Addr {
-	return addr{
-		network: fmt.Sprintf("omnistreams-network-%d", w.ostream.StreamID()),
-		address: fmt.Sprintf("omnistreams-address-%d", w.ostream.StreamID()),
-	}
-}
-func (w *omnistreamWrapper) RemoteAddr() net.Addr {
-	return addr{
-		network: fmt.Sprintf("omnistreams-network-%d", w.ostream.StreamID()),
-		address: fmt.Sprintf("omnistreams-address-%d", w.ostream.StreamID()),
-	}
-}
-func (w *omnistreamWrapper) SetDeadline(t time.Time) error {
-	return errors.New("SetDeadline not implemented")
-}
-func (w *omnistreamWrapper) SetReadDeadline(t time.Time) error {
-	return errors.New("SetReadDeadline not implemented")
-}
-func (w *omnistreamWrapper) SetWriteDeadline(t time.Time) error {
-	return errors.New("SetWriteDeadline not implemented")
 }
