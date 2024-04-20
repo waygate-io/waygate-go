@@ -67,12 +67,12 @@ func (t *MuxadoTunnel) AcceptStreamType() (connCloseWriter, MessageType, error) 
 
 func (t *MuxadoTunnel) ReceiveDatagram() ([]byte, net.Addr, net.Addr, error) {
 	time.Sleep(10 * time.Second)
-	return nil, nil, nil, errors.New("ReceiveDatagram not implemented")
+	return nil, nil, nil, errors.New("MuxadoTunnel.ReceiveDatagram not implemented")
 }
 
 func (t *MuxadoTunnel) SendDatagram(msg []byte, srcAddr, dstAddr net.Addr) error {
 	time.Sleep(10 * time.Second)
-	return errors.New("SendDatagram not implemented")
+	return errors.New("MuxadoTunnel.SendDatagram not implemented")
 }
 
 func (t *MuxadoTunnel) Request(req interface{}) (interface{}, error) {

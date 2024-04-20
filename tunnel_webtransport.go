@@ -31,10 +31,12 @@ func (t *WebTransportTunnel) HandleRequests(callback func(interface{}) interface
 }
 
 func (t *WebTransportTunnel) ReceiveDatagram() ([]byte, net.Addr, net.Addr, error) {
+	time.Sleep(10 * time.Second)
 	return nil, nil, nil, errors.New("WebTransportTunnel.ReceiveDatagram not implemented")
 }
 
 func (t *WebTransportTunnel) SendDatagram(msg []byte, srcAddr, dstAdd net.Addr) error {
+	time.Sleep(10 * time.Second)
 	return errors.New("WebTransportTunnel.SendDatagram not implemented")
 }
 

@@ -156,7 +156,9 @@ func NewOmnistreamsServerTunnel(
 
 	wsConn.SetReadLimit(128 * 1024)
 
-	conn := omnistreams.NewConnection(wsConn, false)
+	wr := NewWsConnWrapper(wsConn)
+
+	conn := omnistreams.NewConnection(wr, false)
 
 	t := &OmnistreamsTunnel{
 		conn:      conn,
@@ -187,7 +189,9 @@ func NewOmnistreamsClientTunnel(tunReq TunnelRequest) (*OmnistreamsTunnel, error
 		return nil, err
 	}
 
-	conn := omnistreams.NewConnection(wsConn, true)
+	wr := NewWsConnWrapper(wsConn)
+
+	conn := omnistreams.NewConnection(wr, true)
 
 	tunConfigStream, err := conn.AcceptStream()
 	if err != nil {
@@ -239,4 +243,32 @@ func NewOmnistreamsClientTunnel(tunReq TunnelRequest) (*OmnistreamsTunnel, error
 	}
 
 	return t, nil
+}
+
+type wsConnWrapper struct {
+	wsConn *websocket.Conn
+}
+
+func NewWsConnWrapper(wsConn *websocket.Conn) *wsConnWrapper {
+	return &wsConnWrapper{
+		wsConn,
+	}
+}
+
+func (wr *wsConnWrapper) Read(ctx context.Context) ([]byte, error) {
+
+	msgType, msgBytes, err := wr.wsConn.Read(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if msgType != websocket.MessageBinary {
+		return nil, errors.New("Invalid WS message type")
+	}
+
+	return msgBytes, nil
+}
+
+func (wr *wsConnWrapper) Write(ctx context.Context, msg []byte) error {
+	return wr.wsConn.Write(ctx, websocket.MessageBinary, msg)
 }
