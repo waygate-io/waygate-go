@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sync"
@@ -97,6 +98,8 @@ func (c *Client) Run() error {
 	}
 
 	certDir := filepath.Join(c.config.Dir, "certs")
+
+	//fmt.Println(token)
 
 	listener, err := ListenWithOpts("tcp", "", token, certDir)
 	if err != nil {
@@ -250,6 +253,11 @@ func (c *Client) Run() error {
 	return nil
 }
 
+func (c *Client) AddForward(domain string, forward *Forward) error {
+	c.forwardMan.Set(domain, forward)
+	return nil
+}
+
 func (c *Client) GetUsers() ([]obligator.User, error) {
 	if c.authServer == nil {
 		return nil, errors.New("No auth server")
@@ -338,7 +346,7 @@ func (m *ClientMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		_, err := m.authServer.Validate(r)
+		validation, err := m.authServer.Validate(r)
 		if err != nil {
 
 			redirectUri := fmt.Sprintf("https://%s%s", host, r.URL.Path)
@@ -354,6 +362,28 @@ func (m *ClientMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 			http.Redirect(w, r, authUri, 303)
 			return
+		}
+
+		// TODO: strip auth cookies before sending upstream
+
+		originHeader := r.Header.Get("Origin")
+		origin := ""
+
+		if originHeader != "" {
+			originUrl, err := url.Parse(originHeader)
+			if err != nil {
+				w.WriteHeader(500)
+				return
+			}
+
+			origin = originUrl.Host
+		}
+
+		if origin == "" || origin == r.Host {
+			// TODO: according to the docs we're not supposed to be
+			// modifying r: https://pkg.go.dev/net/http#Handler
+			r.Header.Set("UserIDType", validation.IdType)
+			r.Header.Set("UserID", validation.Id)
 		}
 
 		if host == m.fileServer.DashboardDomain() {

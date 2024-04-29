@@ -15,6 +15,9 @@ import (
 
 	"github.com/caddyserver/certmagic"
 	"github.com/lastlogin-io/obligator"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/quic-go/quic-go"
 	"github.com/quic-go/quic-go/http3"
 	"github.com/quic-go/webtransport-go"
@@ -130,6 +133,13 @@ func (s *Server) Run() {
 	//mux := http.NewServeMux()
 	mux := NewServerMux(authServer, s.config.AdminDomain)
 
+	numStreamsGauge := promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "waygate_num_streams",
+		Help: "Number of active streams",
+	})
+	http.Handle("/metrics", promhttp.Handler())
+	go http.ListenAndServe(":9500", nil)
+
 	mux.Handle(oauth2Prefix+"/", http.StripPrefix(oauth2Prefix, oauth2Handler))
 
 	listenAddr := fmt.Sprintf(":%d", s.config.Port)
@@ -199,7 +209,7 @@ func (s *Server) Run() {
 
 		} else {
 			//tunnel, err = NewWebSocketMuxadoServerTunnel(w, r, s.jose, s.config.Public, s.config.TunnelDomains)
-			tunnel, err = NewOmnistreamsServerTunnel(w, r, s.jose, s.config.Public, s.config.TunnelDomains)
+			tunnel, err = NewOmnistreamsServerTunnel(w, r, s.jose, s.config.Public, s.config.TunnelDomains, numStreamsGauge)
 			if err != nil {
 				w.WriteHeader(500)
 				log.Println(err)

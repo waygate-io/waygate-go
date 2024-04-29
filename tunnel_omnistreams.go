@@ -12,6 +12,7 @@ import (
 
 	"github.com/anderspitman/omnistreams-go"
 	"github.com/mailgun/proxyproto"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/waygate-io/waygate-go/josencillo"
 	"nhooyr.io/websocket"
 )
@@ -134,6 +135,7 @@ func NewOmnistreamsServerTunnel(
 	jose *josencillo.JOSE,
 	public bool,
 	tunnelDomains []string,
+	numStreamsGauge prometheus.Gauge,
 ) (*OmnistreamsTunnel, error) {
 
 	tunnelReq := TunnelRequest{
@@ -159,6 +161,19 @@ func NewOmnistreamsServerTunnel(
 	wr := NewWsConnWrapper(wsConn)
 
 	conn := omnistreams.NewConnection(wr, false)
+
+	eventCh := conn.Events()
+	go func() {
+		for {
+			evt := <-eventCh
+			switch evt.(type) {
+			case *omnistreams.StreamCreatedEvent:
+				numStreamsGauge.Inc()
+			default:
+				fmt.Println("Unknown omnistreams event", evt)
+			}
+		}
+	}()
 
 	t := &OmnistreamsTunnel{
 		conn:      conn,

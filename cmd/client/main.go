@@ -1,8 +1,11 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/waygate-io/waygate-go"
 )
@@ -11,6 +14,9 @@ func main() {
 	serverDomainArg := flag.String("server-domain", "waygate.io", "Server domain")
 	tokenArg := flag.String("token", "", "Token")
 	userArg := flag.String("user", "", "User")
+	var forwards arrayFlags
+	flag.Var(&forwards, "forward", "Forwards")
+
 	flag.Parse()
 
 	if *userArg == "" {
@@ -24,6 +30,22 @@ func main() {
 	}
 
 	client := waygate.NewClient(config)
+
+	for _, forward := range forwards {
+
+		fmt.Println(forward)
+		parts := strings.Split(forward, "->")
+
+		domain := parts[0]
+		target := parts[1]
+
+		client.AddForward(domain, &waygate.Forward{
+			TargetAddress: target,
+			Protected:     true,
+		})
+
+	}
+
 	eventCh := make(chan interface{})
 	client.ListenEvents(eventCh)
 	go client.Run()
@@ -35,4 +57,22 @@ func main() {
 			fmt.Println(evt.Uri)
 		}
 	}
+}
+
+func exitOnError(err error) {
+	if err != nil {
+		fmt.Fprintf(os.Stderr, err.Error())
+		os.Exit(1)
+	}
+}
+
+type arrayFlags []string
+
+func (i *arrayFlags) String() string {
+	return "my string representation"
+}
+
+func (i *arrayFlags) Set(value string) error {
+	*i = append(*i, value)
+	return nil
 }
