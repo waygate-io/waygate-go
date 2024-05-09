@@ -79,11 +79,11 @@ func ConnectConns(downstreamConn connCloseWriter, upstreamConn connCloseWriter) 
 	defer func() {
 		err := downstreamConn.Close()
 		if err != nil {
-			fmt.Println("ConnectConns: downstreamConn.Close()", err)
+			log.Println("ConnectConns: downstreamConn.Close()", err)
 		}
 		err = upstreamConn.Close()
 		if err != nil {
-			fmt.Println("ConnectConns: upstreamConn.Close()", err)
+			log.Println("ConnectConns: upstreamConn.Close()", err)
 		}
 	}()
 

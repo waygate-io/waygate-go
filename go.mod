@@ -1,15 +1,20 @@
 module github.com/waygate-io/waygate-go
 
-go 1.22.0
+go 1.22.2
 
 replace github.com/lastlogin-io/obligator => ../obligator
 
 replace github.com/anderspitman/omnistreams-go => ../omnistreams-go
 
+replace github.com/anderspitman/dashtui => ../dashtui
+
+replace github.com/navidys/tvxwidgets => ../tvxwidgets
+
 //replace github.com/gemdrive/gemdrive-go => ../gemdrive-go
 
 require (
 	gioui.org v0.5.0
+	github.com/anderspitman/dashtui v0.0.0-00010101000000-000000000000
 	github.com/anderspitman/omnistreams-go v0.0.0-20240324225630-c70675b2fd1b
 	github.com/anderspitman/treemess-go v0.0.0-20210313015619-ba255d9f1e0f
 	github.com/caddyserver/certmagic v0.20.0
@@ -48,6 +53,8 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.2.0 // indirect
+	github.com/gdamore/encoding v1.0.0 // indirect
+	github.com/gdamore/tcell/v2 v2.7.4 // indirect
 	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
 	github.com/go-text/typesetting v0.0.0-20230803102845-24e03d8b5372 // indirect
 	github.com/goccy/go-json v0.10.2 // indirect
@@ -62,16 +69,21 @@ require (
 	github.com/lestrrat-go/iter v1.0.2 // indirect
 	github.com/lestrrat-go/option v1.0.1 // indirect
 	github.com/libdns/libdns v0.2.1 // indirect
+	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
+	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/mattn/go-sqlite3 v1.14.18 // indirect
 	github.com/mholt/acmez v1.2.0 // indirect
 	github.com/miekg/dns v1.1.55 // indirect
+	github.com/navidys/tvxwidgets v0.6.0 // indirect
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646 // indirect
-	github.com/onsi/ginkgo/v2 v2.12.0 // indirect
+	github.com/onsi/ginkgo/v2 v2.17.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/prometheus/client_model v0.5.0 // indirect
 	github.com/prometheus/common v0.48.0 // indirect
 	github.com/prometheus/procfs v0.12.0 // indirect
 	github.com/quic-go/qpack v0.4.0 // indirect
+	github.com/rivo/tview v0.0.0-20240501114654-1f4d5e8f881d // indirect
+	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/segmentio/asm v1.2.0 // indirect
 	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e // indirect
 	github.com/zeebo/blake3 v0.2.3 // indirect
@@ -82,11 +94,12 @@ require (
 	golang.org/x/exp v0.0.0-20230817173708-d852ddb80c63 // indirect
 	golang.org/x/exp/shiny v0.0.0-20220827204233-334a2380cb91 // indirect
 	golang.org/x/image v0.11.0 // indirect
-	golang.org/x/mod v0.12.0 // indirect
+	golang.org/x/mod v0.14.0 // indirect
 	golang.org/x/net v0.20.0 // indirect
-	golang.org/x/sys v0.16.0 // indirect
+	golang.org/x/sys v0.17.0 // indirect
+	golang.org/x/term v0.17.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
-	golang.org/x/tools v0.12.1-0.20230815132531-74c255bcf846 // indirect
+	golang.org/x/tools v0.17.0 // indirect
 	google.golang.org/protobuf v1.32.0 // indirect
 	lukechampine.com/uint128 v1.2.0 // indirect
 )

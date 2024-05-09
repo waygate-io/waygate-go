@@ -12,7 +12,9 @@ import (
 	"os"
 	"strings"
 	"sync"
+	//_ "expvar"
 
+	"github.com/anderspitman/dashtui"
 	"github.com/caddyserver/certmagic"
 	"github.com/lastlogin-io/obligator"
 	"github.com/prometheus/client_golang/prometheus"
@@ -22,6 +24,7 @@ import (
 	"github.com/quic-go/quic-go/http3"
 	"github.com/quic-go/webtransport-go"
 	"github.com/waygate-io/waygate-go/josencillo"
+	"go.uber.org/zap"
 )
 
 type ServerConfig struct {
@@ -52,6 +55,14 @@ func NewServer(config *ServerConfig) *Server {
 
 func (s *Server) Run() {
 
+	dash, err := dashtui.NewBuilder().
+		//Disable().
+		Build()
+	if err != nil {
+		log.Fatalf("failed to initialize dashtui: %v", err)
+	}
+	defer dash.Close()
+
 	// Use random unprivileged port for ACME challenges. This is necessary
 	// because of the way certmagic works, in that if it fails to bind
 	// HTTPSPort (443 by default) and doesn't detect anything else binding
@@ -59,12 +70,12 @@ func (s *Server) Run() {
 	// running on a machine where 443 isn't bound, so we need a different
 	// port to hack around this. See here for more details:
 	// https://github.com/caddyserver/certmagic/issues/111
-	var err error
 	certmagic.HTTPSPort, err = randomOpenPort()
 	exitOnError(err)
 
 	certmagic.DefaultACME.DisableHTTPChallenge = true
 	certmagic.DefaultACME.Agreed = true
+	certmagic.Default.Logger = zap.NewNop()
 	//certmagic.DefaultACME.CA = certmagic.LetsEncryptStagingCA
 
 	if s.config.DnsProvider != "" {
@@ -194,6 +205,8 @@ func (s *Server) Run() {
 		w.Write([]byte("<h1>Hi there</h1>"))
 	})
 
+        count := 0
+
 	mux.HandleFunc("/waygate", func(w http.ResponseWriter, r *http.Request) {
 
 		var tunnel Tunnel
@@ -209,7 +222,7 @@ func (s *Server) Run() {
 
 		} else {
 			//tunnel, err = NewWebSocketMuxadoServerTunnel(w, r, s.jose, s.config.Public, s.config.TunnelDomains)
-			tunnel, err = NewOmnistreamsServerTunnel(w, r, s.jose, s.config.Public, s.config.TunnelDomains, numStreamsGauge)
+			tunnel, err = NewOmnistreamsServerTunnel(w, r, s.jose, s.config.Public, s.config.TunnelDomains, numStreamsGauge, dash)
 			if err != nil {
 				w.WriteHeader(500)
 				log.Println(err)
@@ -220,7 +233,13 @@ func (s *Server) Run() {
 		udpMap := make(map[string]*net.UDPConn)
 		mut := &sync.Mutex{}
 
+
 		go func() {
+
+                        count++
+
+                        dash.Set("debug", float64(count))
+
 			for {
 				dgram, _, dstAddr, err := tunnel.ReceiveDatagram()
 				if err != nil {
@@ -243,6 +262,9 @@ func (s *Server) Run() {
 					continue
 				}
 			}
+
+                        count--
+                        dash.Set("debug", float64(count))
 		}()
 
 		tunnel.HandleRequests(func(req interface{}) interface{} {

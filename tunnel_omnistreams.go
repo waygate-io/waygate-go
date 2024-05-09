@@ -1,6 +1,7 @@
 package waygate
 
 import (
+	//"log"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -10,11 +11,14 @@ import (
 	"net"
 	"net/http"
 
+	"github.com/anderspitman/dashtui"
 	"github.com/anderspitman/omnistreams-go"
 	"github.com/mailgun/proxyproto"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/waygate-io/waygate-go/josencillo"
 	"nhooyr.io/websocket"
+	//"github.com/gizak/termui/v3"
+	//"github.com/gizak/termui/v3/widgets"
 )
 
 type OmnistreamsTunnel struct {
@@ -136,6 +140,7 @@ func NewOmnistreamsServerTunnel(
 	public bool,
 	tunnelDomains []string,
 	numStreamsGauge prometheus.Gauge,
+	dash *dashtui.DashTUI,
 ) (*OmnistreamsTunnel, error) {
 
 	tunnelReq := TunnelRequest{
@@ -164,11 +169,20 @@ func NewOmnistreamsServerTunnel(
 
 	eventCh := conn.Events()
 	go func() {
+		numStreams := 0
 		for {
 			evt := <-eventCh
 			switch evt.(type) {
 			case *omnistreams.StreamCreatedEvent:
+				numStreams++
+				dash.Set("num-streams", float64(numStreams))
+
 				numStreamsGauge.Inc()
+			case *omnistreams.StreamDeletedEvent:
+				numStreams--
+				dash.Set("num-streams", float64(numStreams))
+
+				numStreamsGauge.Dec()
 			default:
 				fmt.Println("Unknown omnistreams event", evt)
 			}
