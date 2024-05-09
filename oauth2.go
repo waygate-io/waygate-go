@@ -228,7 +228,7 @@ func (f *TokenFlow) GetToken() (string, error) {
 func (f *TokenFlow) GetTokenWithRedirect(redirUriCh chan string) (string, error) {
 
 	debugToken := os.Getenv("WAYGATE_DEBUG_TOKEN")
-	if debugToken != "" {
+	if debugToken != "" && debugToken != "reset" {
 		if redirUriCh != nil {
 			go func() {
 				fmt.Println("would redirect to", <-redirUriCh)

@@ -74,7 +74,7 @@ func (c *Client) Run() error {
 	token := c.config.Token
 	redirUriCh := make(chan string)
 
-	if token == "" && !c.config.Public {
+	if (token == "" && !c.config.Public) || os.Getenv("WAYGATE_DEBUG_TOKEN") == "reset" {
 
 		tokenFlow, err := NewTokenFlow()
 		if err != nil {
@@ -99,7 +99,9 @@ func (c *Client) Run() error {
 
 	certDir := filepath.Join(c.config.Dir, "certs")
 
-	//fmt.Println(token)
+	if os.Getenv("WAYGATE_DEBUG_TOKEN") == "reset" {
+		fmt.Println(token)
+	}
 
 	listener, err := ListenWithOpts("tcp", "", token, certDir)
 	if err != nil {
