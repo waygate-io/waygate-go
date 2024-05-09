@@ -1,7 +1,6 @@
 package waygate
 
 import (
-	//"log"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -170,9 +169,8 @@ func NewOmnistreamsServerTunnel(
 	eventCh := conn.Events()
 	go func() {
 		numStreams := 0
-		for {
-			evt := <-eventCh
-			switch evt.(type) {
+		for evt := range eventCh {
+			switch e := evt.(type) {
 			case *omnistreams.StreamCreatedEvent:
 				numStreams++
 				dash.Set("num-streams", float64(numStreams))
@@ -183,6 +181,9 @@ func NewOmnistreamsServerTunnel(
 				dash.Set("num-streams", float64(numStreams))
 
 				numStreamsGauge.Dec()
+			case omnistreams.DebugEvent:
+				count += int(e)
+				dash.Set("debug", float64(count))
 			default:
 				fmt.Println("Unknown omnistreams event", evt)
 			}

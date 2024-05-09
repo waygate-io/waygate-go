@@ -52,9 +52,13 @@ func NewServer(config *ServerConfig) *Server {
 	return s
 }
 
+var count int = 0
+var dash *dashtui.DashTUI
+
 func (s *Server) Run() {
 
-	dash, err := dashtui.NewBuilder().
+	var err error
+	dash, err = dashtui.NewBuilder().
 		//Disable().
 		Build()
 	if err != nil {
@@ -216,8 +220,6 @@ func (s *Server) Run() {
 		w.Write([]byte("<h1>Hi there</h1>"))
 	})
 
-	count := 0
-
 	mux.HandleFunc("/waygate", func(w http.ResponseWriter, r *http.Request) {
 
 		var tunnel Tunnel
@@ -236,7 +238,7 @@ func (s *Server) Run() {
 			tunnel, err = NewOmnistreamsServerTunnel(w, r, s.jose, s.config.Public, s.config.TunnelDomains, numStreamsGauge, dash)
 			if err != nil {
 				w.WriteHeader(500)
-				log.Println(err)
+				log.Println("NewOmnistreamsClientTunnel error", err)
 				return
 			}
 		}
@@ -244,38 +246,37 @@ func (s *Server) Run() {
 		udpMap := make(map[string]*net.UDPConn)
 		mut := &sync.Mutex{}
 
-		go func() {
+		//go func() {
 
-			count++
+		//	count++
+		//	dash.Set("debug", float64(count))
 
-			dash.Set("debug", float64(count))
+		//	for {
+		//		dgram, _, dstAddr, err := tunnel.ReceiveDatagram()
+		//		if err != nil {
+		//			fmt.Println(err)
+		//			continue
+		//		}
 
-			for {
-				dgram, _, dstAddr, err := tunnel.ReceiveDatagram()
-				if err != nil {
-					fmt.Println(err)
-					continue
-				}
+		//		mut.Lock()
+		//		conn := udpMap[dstAddr.String()]
+		//		mut.Unlock()
 
-				mut.Lock()
-				conn := udpMap[dstAddr.String()]
-				mut.Unlock()
+		//		n, err := conn.Write(dgram)
+		//		if err != nil {
+		//			fmt.Println(err)
+		//			continue
+		//		}
 
-				n, err := conn.Write(dgram)
-				if err != nil {
-					fmt.Println(err)
-					continue
-				}
+		//		if n != len(dgram) {
+		//			fmt.Println(err)
+		//			continue
+		//		}
+		//	}
 
-				if n != len(dgram) {
-					fmt.Println(err)
-					continue
-				}
-			}
-
-			count--
-			dash.Set("debug", float64(count))
-		}()
+		//	count--
+		//	dash.Set("debug", float64(count))
+		//}()
 
 		tunnel.HandleRequests(func(req interface{}) interface{} {
 			switch r := req.(type) {

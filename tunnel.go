@@ -80,7 +80,10 @@ func request(t Tunnel, req interface{}) (interface{}, error) {
 
 	switch msgType {
 	case MessageTypeTunnelConfig:
-		return nil, nil
+		_, err := io.ReadAll(reqStream)
+		if err != nil {
+			return nil, err
+		}
 	case MessageTypeDial:
 
 		resBytes, err := io.ReadAll(reqStream)
