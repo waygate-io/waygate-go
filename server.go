@@ -9,7 +9,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"sync"
 	//_ "expvar"
@@ -62,6 +61,9 @@ func (s *Server) Run() {
 		log.Fatalf("failed to initialize dashtui: %v", err)
 	}
 	defer dash.Close()
+
+	db, err := NewDatabase("waygate_db.sqlite")
+	exitOnError(err)
 
 	// Use random unprivileged port for ACME challenges. This is necessary
 	// because of the way certmagic works, in that if it fails to bind
@@ -132,10 +134,19 @@ func (s *Server) Run() {
 	})
 	exitOnError(err)
 
-	s.jose, err = josencillo.NewJOSE()
+	jwksJson, err := db.GetJWKS()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err.Error())
-		os.Exit(1)
+		s.jose, err = josencillo.NewJOSE()
+		exitOnError(err)
+
+		jwksJson, err := s.jose.GetJwksJson()
+		exitOnError(err)
+
+		err = db.SetJWKS(jwksJson)
+		exitOnError(err)
+	} else {
+		s.jose, err = josencillo.NewWithJwkJson(jwksJson)
+		exitOnError(err)
 	}
 
 	oauth2Prefix := "/oauth2"
@@ -205,7 +216,7 @@ func (s *Server) Run() {
 		w.Write([]byte("<h1>Hi there</h1>"))
 	})
 
-        count := 0
+	count := 0
 
 	mux.HandleFunc("/waygate", func(w http.ResponseWriter, r *http.Request) {
 
@@ -233,12 +244,11 @@ func (s *Server) Run() {
 		udpMap := make(map[string]*net.UDPConn)
 		mut := &sync.Mutex{}
 
-
 		go func() {
 
-                        count++
+			count++
 
-                        dash.Set("debug", float64(count))
+			dash.Set("debug", float64(count))
 
 			for {
 				dgram, _, dstAddr, err := tunnel.ReceiveDatagram()
@@ -263,8 +273,8 @@ func (s *Server) Run() {
 				}
 			}
 
-                        count--
-                        dash.Set("debug", float64(count))
+			count--
+			dash.Set("debug", float64(count))
 		}()
 
 		tunnel.HandleRequests(func(req interface{}) interface{} {

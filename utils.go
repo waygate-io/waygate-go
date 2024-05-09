@@ -71,7 +71,7 @@ func randomOpenPort() (int, error) {
 
 func printJson(data interface{}) {
 	d, _ := json.MarshalIndent(data, "", "  ")
-	fmt.Println(string(d))
+	fmt.Fprintln(os.Stderr, string(d))
 }
 
 func ConnectConns(downstreamConn connCloseWriter, upstreamConn connCloseWriter) {

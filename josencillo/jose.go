@@ -20,16 +20,29 @@ type JOSE struct {
 }
 
 func NewJOSE() (*JOSE, error) {
-	j := &JOSE{
-		privateKeyset: jwk.NewSet(),
-	}
-
-	key, err := GenerateJWK()
+	keyset, err := GenerateJWK()
 	if err != nil {
 		return nil, err
 	}
 
-	j.privateKeyset.AddKey(key)
+	jsonKey, err := json.Marshal(keyset)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewWithJwkJson(string(jsonKey))
+}
+
+func NewWithJwkJson(jwkJson string) (*JOSE, error) {
+
+	keyset, err := jwk.Parse([]byte(jwkJson))
+	if err != nil {
+		return nil, err
+	}
+
+	j := &JOSE{
+		privateKeyset: keyset,
+	}
 
 	publicKeyset, err := jwk.PublicSetOf(j.privateKeyset)
 	if err != nil {
@@ -39,6 +52,15 @@ func NewJOSE() (*JOSE, error) {
 	j.publicKeyset = publicKeyset
 
 	return j, nil
+}
+
+func (j *JOSE) GetJwksJson() (string, error) {
+	jsonJwks, err := json.Marshal(j.privateKeyset)
+	if err != nil {
+		return "", err
+	}
+
+	return string(jsonJwks), nil
 }
 
 func (j *JOSE) NewJWTBuilder() *JWTBuilder {
@@ -125,7 +147,7 @@ func (b *JWTBuilder) Build() (JWT, error) {
 	return "", nil
 }
 
-func GenerateJWK() (jwk.Key, error) {
+func GenerateJWK() (jwk.Set, error) {
 	raw, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		return nil, err
@@ -147,12 +169,9 @@ func GenerateJWK() (jwk.Key, error) {
 
 	key.Set("alg", "RS256")
 
-	//key.Set(jwk.KeyUsageKey, "sig")
-	//keyset := jwk.NewSet()
-	//keyset.Add(key)
-	//return keyset, nil
-
-	return key, nil
+	keyset := jwk.NewSet()
+	keyset.AddKey(key)
+	return keyset, nil
 }
 
 func printJson(data interface{}) {
