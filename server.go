@@ -243,8 +243,8 @@ func (s *Server) Run() {
 			}
 		}
 
-		udpMap := make(map[string]*net.UDPConn)
-		mut := &sync.Mutex{}
+		//udpMap := make(map[string]*net.UDPConn)
+		//mut := &sync.Mutex{}
 
 		//go func() {
 
@@ -278,81 +278,81 @@ func (s *Server) Run() {
 		//	dash.Set("debug", float64(count))
 		//}()
 
-		tunnel.HandleRequests(func(req interface{}) interface{} {
-			switch r := req.(type) {
-			case *DialRequest:
-				udpAddr, err := net.ResolveUDPAddr("udp", r.Address)
-				if err != nil {
-					return &DialResponse{
-						Success: false,
-						Message: err.Error(),
-					}
-				}
+		//tunnel.HandleRequests(func(req interface{}) interface{} {
+		//	switch r := req.(type) {
+		//	case *DialRequest:
+		//		udpAddr, err := net.ResolveUDPAddr("udp", r.Address)
+		//		if err != nil {
+		//			return &DialResponse{
+		//				Success: false,
+		//				Message: err.Error(),
+		//			}
+		//		}
 
-				conn, err := net.DialUDP("udp", nil, udpAddr)
-				if err != nil {
-					return &DialResponse{
-						Success: false,
-						Message: err.Error(),
-					}
-				}
+		//		conn, err := net.DialUDP("udp", nil, udpAddr)
+		//		if err != nil {
+		//			return &DialResponse{
+		//				Success: false,
+		//				Message: err.Error(),
+		//			}
+		//		}
 
-				mut.Lock()
-				udpMap[r.Address] = conn
-				mut.Unlock()
+		//		mut.Lock()
+		//		udpMap[r.Address] = conn
+		//		mut.Unlock()
 
-				srcAddr := conn.RemoteAddr()
-				dstAddr := conn.LocalAddr()
+		//		srcAddr := conn.RemoteAddr()
+		//		dstAddr := conn.LocalAddr()
 
-				go func() {
+		//		go func() {
 
-					buf := make([]byte, 64*1024)
+		//			buf := make([]byte, 64*1024)
 
-					for {
-						n, err := conn.Read(buf)
-						if err != nil {
-							fmt.Println("Failed to forward:", err)
-							continue
-						}
+		//			for {
+		//				n, err := conn.Read(buf)
+		//				if err != nil {
+		//					fmt.Println("Failed to forward:", err)
+		//					continue
+		//				}
 
-						tunnel.SendDatagram(buf[:n], srcAddr, dstAddr)
-					}
-				}()
+		//				tunnel.SendDatagram(buf[:n], srcAddr, dstAddr)
+		//			}
+		//		}()
 
-				return &DialResponse{
-					Success: true,
-					Address: dstAddr.String(),
-				}
+		//		return &DialResponse{
+		//			Success: true,
+		//			Address: dstAddr.String(),
+		//		}
 
-			case *ListenRequest:
-				if strings.HasPrefix(r.Network, "tcp") {
-					_, err = handleListenTCP(tunnel, r.Address)
-					if err != nil {
-						return &ListenResponse{
-							Success: false,
-							Message: err.Error(),
-						}
-					}
-				} else {
-					_, err = handleListenUDP(tunnel, r.Address)
-					if err != nil {
-						return &ListenResponse{
-							Success: false,
-							Message: err.Error(),
-						}
-					}
-				}
+		//	case *ListenRequest:
+		//		if strings.HasPrefix(r.Network, "tcp") {
+		//			_, err = handleListenTCP(tunnel, r.Address)
+		//			if err != nil {
+		//				return &ListenResponse{
+		//					Success: false,
+		//					Message: err.Error(),
+		//				}
+		//			}
+		//		} else {
+		//			_, err = handleListenUDP(tunnel, r.Address)
+		//			if err != nil {
+		//				return &ListenResponse{
+		//					Success: false,
+		//					Message: err.Error(),
+		//				}
+		//			}
+		//		}
 
-				return &ListenResponse{
-					Success: true,
-				}
-			default:
-				fmt.Println("Invalid request type")
-				return nil
-			}
+		//		return &ListenResponse{
+		//			Success: true,
+		//		}
+		//	default:
+		//		fmt.Println("Invalid request type")
+		//		return nil
+		//	}
 
-			return nil
-		})
+		//	return nil
+		//})
 
 		s.mut.Lock()
 		defer s.mut.Unlock()
