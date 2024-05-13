@@ -14,6 +14,7 @@ import (
 	//_ "expvar"
 
 	"github.com/anderspitman/dashtui"
+	"github.com/anderspitman/omnistreams-go"
 	"github.com/caddyserver/certmagic"
 	"github.com/lastlogin-io/obligator"
 	"github.com/prometheus/client_golang/prometheus"
@@ -65,6 +66,8 @@ func (s *Server) Run() {
 		log.Fatalf("failed to initialize dashtui: %v", err)
 	}
 	defer dash.Close()
+
+	omnistreams.Dash = dash
 
 	db, err := NewDatabase("waygate_db.sqlite")
 	exitOnError(err)
@@ -243,116 +246,110 @@ func (s *Server) Run() {
 			}
 		}
 
-		//udpMap := make(map[string]*net.UDPConn)
-		//mut := &sync.Mutex{}
+		udpMap := make(map[string]*net.UDPConn)
+		mut := &sync.Mutex{}
 
-		//go func() {
+		// TODO: if this goroutine exits unexpectedly we probably need to shut it down.
+		go func() {
 
-		//	count++
-		//	dash.Set("debug", float64(count))
+			for {
+				dgram, _, dstAddr, err := tunnel.ReceiveDatagram()
+				if err != nil {
+					fmt.Println(err)
+					break
+				}
 
-		//	for {
-		//		dgram, _, dstAddr, err := tunnel.ReceiveDatagram()
-		//		if err != nil {
-		//			fmt.Println(err)
-		//			continue
-		//		}
+				mut.Lock()
+				conn := udpMap[dstAddr.String()]
+				mut.Unlock()
 
-		//		mut.Lock()
-		//		conn := udpMap[dstAddr.String()]
-		//		mut.Unlock()
+				n, err := conn.Write(dgram)
+				if err != nil {
+					fmt.Println(err)
+					break
+				}
 
-		//		n, err := conn.Write(dgram)
-		//		if err != nil {
-		//			fmt.Println(err)
-		//			continue
-		//		}
+				if n != len(dgram) {
+					fmt.Println(err)
+					break
+				}
+			}
+		}()
 
-		//		if n != len(dgram) {
-		//			fmt.Println(err)
-		//			continue
-		//		}
-		//	}
+		tunnel.HandleRequests(func(req interface{}) interface{} {
+			switch r := req.(type) {
+			case *DialRequest:
+				udpAddr, err := net.ResolveUDPAddr("udp", r.Address)
+				if err != nil {
+					return &DialResponse{
+						Success: false,
+						Message: err.Error(),
+					}
+				}
 
-		//	count--
-		//	dash.Set("debug", float64(count))
-		//}()
+				conn, err := net.DialUDP("udp", nil, udpAddr)
+				if err != nil {
+					return &DialResponse{
+						Success: false,
+						Message: err.Error(),
+					}
+				}
 
-		//tunnel.HandleRequests(func(req interface{}) interface{} {
-		//	switch r := req.(type) {
-		//	case *DialRequest:
-		//		udpAddr, err := net.ResolveUDPAddr("udp", r.Address)
-		//		if err != nil {
-		//			return &DialResponse{
-		//				Success: false,
-		//				Message: err.Error(),
-		//			}
-		//		}
+				mut.Lock()
+				udpMap[r.Address] = conn
+				mut.Unlock()
 
-		//		conn, err := net.DialUDP("udp", nil, udpAddr)
-		//		if err != nil {
-		//			return &DialResponse{
-		//				Success: false,
-		//				Message: err.Error(),
-		//			}
-		//		}
+				srcAddr := conn.RemoteAddr()
+				dstAddr := conn.LocalAddr()
 
-		//		mut.Lock()
-		//		udpMap[r.Address] = conn
-		//		mut.Unlock()
+				go func() {
+					buf := make([]byte, 64*1024)
 
-		//		srcAddr := conn.RemoteAddr()
-		//		dstAddr := conn.LocalAddr()
+					for {
+						n, err := conn.Read(buf)
+						if err != nil {
+							fmt.Println("Failed to forward:", err)
+							continue
+						}
 
-		//		go func() {
+						tunnel.SendDatagram(buf[:n], srcAddr, dstAddr)
+					}
+				}()
 
-		//			buf := make([]byte, 64*1024)
+				return &DialResponse{
+					Success: true,
+					Address: dstAddr.String(),
+				}
 
-		//			for {
-		//				n, err := conn.Read(buf)
-		//				if err != nil {
-		//					fmt.Println("Failed to forward:", err)
-		//					continue
-		//				}
+			case *ListenRequest:
+				if strings.HasPrefix(r.Network, "tcp") {
+					_, err = handleListenTCP(tunnel, r.Address)
+					if err != nil {
+						return &ListenResponse{
+							Success: false,
+							Message: err.Error(),
+						}
+					}
+				} else {
+					_, err = handleListenUDP(tunnel, r.Address)
+					if err != nil {
+						return &ListenResponse{
+							Success: false,
+							Message: err.Error(),
+						}
+					}
+				}
 
-		//				tunnel.SendDatagram(buf[:n], srcAddr, dstAddr)
-		//			}
-		//		}()
+				return &ListenResponse{
+					Success: true,
+				}
+			default:
+				fmt.Println("Invalid request type")
+				return nil
+			}
 
-		//		return &DialResponse{
-		//			Success: true,
-		//			Address: dstAddr.String(),
-		//		}
-
-		//	case *ListenRequest:
-		//		if strings.HasPrefix(r.Network, "tcp") {
-		//			_, err = handleListenTCP(tunnel, r.Address)
-		//			if err != nil {
-		//				return &ListenResponse{
-		//					Success: false,
-		//					Message: err.Error(),
-		//				}
-		//			}
-		//		} else {
-		//			_, err = handleListenUDP(tunnel, r.Address)
-		//			if err != nil {
-		//				return &ListenResponse{
-		//					Success: false,
-		//					Message: err.Error(),
-		//				}
-		//			}
-		//		}
-
-		//		return &ListenResponse{
-		//			Success: true,
-		//		}
-		//	default:
-		//		fmt.Println("Invalid request type")
-		//		return nil
-		//	}
-
-		//	return nil
-		//})
+			return nil
+		})
 
 		s.mut.Lock()
 		defer s.mut.Unlock()

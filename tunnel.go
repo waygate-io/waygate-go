@@ -124,12 +124,11 @@ func handleRequests(t Tunnel, callback func(interface{}) interface{}) error {
 	// TODO: make thread safe
 
 	go func() {
-
 		for {
 			msgStream, msgType, err := t.AcceptStreamType()
 			if err != nil {
 				fmt.Println(err)
-				continue
+				break
 			}
 
 			reqBytes, err := io.ReadAll(msgStream)
