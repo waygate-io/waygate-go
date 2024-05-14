@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"time"
 	//_ "expvar"
 
 	"github.com/anderspitman/dashtui"
@@ -28,13 +29,15 @@ import (
 )
 
 type ServerConfig struct {
-	AdminDomain   string
-	Port          int
-	Public        bool
-	DnsProvider   string
-	DnsToken      string
-	DnsUser       string
-	TunnelDomains []string
+	AdminDomain      string
+	Port             int
+	Public           bool
+	DnsProvider      string
+	DnsToken         string
+	DnsUser          string
+	TunnelDomains    []string
+	DisableTUI       bool
+	TUIDisplayPeriod time.Duration
 }
 
 type Server struct {
@@ -60,7 +63,8 @@ func (s *Server) Run() {
 
 	var err error
 	dash, err = dashtui.NewBuilder().
-		//Disable().
+		Disable(s.config.DisableTUI).
+		DisplayPeriod(s.config.TUIDisplayPeriod).
 		Build()
 	if err != nil {
 		log.Fatalf("failed to initialize dashtui: %v", err)
