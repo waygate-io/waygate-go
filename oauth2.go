@@ -81,6 +81,8 @@ func NewOAuth2Handler(prefix string, jose *josencillo.JOSE) *OAuth2Handler {
 
 	mux.HandleFunc("/approve", func(w http.ResponseWriter, r *http.Request) {
 
+		r.ParseForm()
+
 		jwtCookie, err := r.Cookie("waygate_auth_request")
 		if err != nil {
 			w.WriteHeader(401)
