@@ -115,7 +115,6 @@ func (c *Client) Run() error {
 
 	authDomain := "auth." + tunConfig.Domain
 	authConfig := obligator.ServerConfig{
-		RootUri:      "https://" + authDomain,
 		Prefix:       "waygate_client_auth_",
 		StorageDir:   c.config.Dir,
 		DatabaseDir:  c.config.Dir,
@@ -353,7 +352,7 @@ func (m *ClientMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 			redirectUri := fmt.Sprintf("https://%s%s", host, r.URL.Path)
 
-			authUri := m.authServer.AuthUri(&obligator.OAuth2AuthRequest{
+			authUri := obligator.AuthUri("todofixme", &obligator.OAuth2AuthRequest{
 				// https://openid.net/specs/oauth-v2-multiple-response-types-1_0.html#none
 				ResponseType: "none",
 				ClientId:     "https://" + host,

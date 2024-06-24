@@ -8,7 +8,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -132,8 +131,10 @@ func (s *Server) Run() {
 
 	authDomain := "auth." + s.config.AdminDomain
 	authConfig := obligator.ServerConfig{
-		RootUri: "https://" + authDomain,
-		Prefix:  "waygate_auth_",
+		Prefix: "waygate_auth_",
+		Domains: []string{
+			s.config.AdminDomain,
+		},
 	}
 	authServer := obligator.NewServer(authConfig)
 	err = authServer.SetOAuth2Provider(obligator.OAuth2Provider{
@@ -533,24 +534,13 @@ func (m *ServerMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	host := r.Host
 
-	authDomain := m.authServer.AuthDomains()[0]
+	authDomain := "auth." + m.adminDomain
 
 	if r.URL.Path != "/waygate" && host != authDomain && r.URL.Path != "/oauth2/token" {
 		_, err := m.authServer.Validate(r)
 		if err != nil {
-
-			redirectUri := fmt.Sprintf("https://%s/%s?%s", host, r.URL.Path, r.URL.RawQuery)
-
-			authUri := m.authServer.AuthUri(&obligator.OAuth2AuthRequest{
-				// https://openid.net/specs/oauth-v2-multiple-response-types-1_0.html#none
-				ResponseType: "none",
-				ClientId:     url.QueryEscape("https://" + m.adminDomain),
-				RedirectUri:  url.QueryEscape(redirectUri),
-				State:        "",
-				Scope:        "",
-			})
-
-			http.Redirect(w, r, authUri, 303)
+			uri := fmt.Sprintf("https://%s/login?return_uri=https://%s", authDomain, r.Host)
+			http.Redirect(w, r, uri, 303)
 			return
 		}
 	} else if host == authDomain {
