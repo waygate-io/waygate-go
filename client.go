@@ -119,6 +119,12 @@ func (c *Client) Run() error {
 		StorageDir:   c.config.Dir,
 		DatabaseDir:  c.config.Dir,
 		ApiSocketDir: c.config.Dir,
+		//Domains: []string{
+		//        authDomain,
+		//},
+		AuthDomains: []string{
+			authDomain,
+		},
 	}
 	authServer := obligator.NewServer(authConfig)
 	c.authServer = authServer
@@ -352,7 +358,9 @@ func (m *ClientMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 			redirectUri := fmt.Sprintf("https://%s%s", host, r.URL.Path)
 
-			authUri := obligator.AuthUri("todofixme", &obligator.OAuth2AuthRequest{
+			authRedirUri := fmt.Sprintf("https://%s/auth", authDomain)
+
+			authUri := obligator.AuthUri(authRedirUri, &obligator.OAuth2AuthRequest{
 				// https://openid.net/specs/oauth-v2-multiple-response-types-1_0.html#none
 				ResponseType: "none",
 				ClientId:     "https://" + host,

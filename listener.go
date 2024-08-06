@@ -147,13 +147,14 @@ func NewClientSession(token, certDir string) (*ClientSession, error) {
 		Token:           token,
 		TerminationType: "client",
 		//TerminationType:  "server",
+		//UseProxyProtocol: false,
 		UseProxyProtocol: true,
 	}
 
-	tunnel, err := NewOmnistreamsClientTunnel(tunReq)
+	//tunnel, err := NewOmnistreamsClientTunnel(tunReq)
 	//tunnel, err := NewWebTransportClientTunnel(tunReq)
 	//tunnel, err := NewTlsMuxadoClientTunnel(tunReq)
-	//tunnel, err := NewWebSocketMuxadoClientTunnel(tunReq)
+	tunnel, err := NewWebSocketMuxadoClientTunnel(tunReq)
 	if err != nil {
 		return nil, err
 	}
