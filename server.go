@@ -14,12 +14,11 @@ import (
 	//_ "expvar"
 
 	"github.com/anderspitman/dashtui"
-	"github.com/anderspitman/omnistreams-go"
 	"github.com/caddyserver/certmagic"
 	"github.com/lastlogin-io/obligator"
-	//"github.com/prometheus/client_golang/prometheus"
-	//"github.com/prometheus/client_golang/prometheus/promauto"
-	//"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/quic-go/quic-go"
 	"github.com/quic-go/quic-go/http3"
 	"github.com/quic-go/webtransport-go"
@@ -70,8 +69,6 @@ func (s *Server) Run() {
 	}
 	defer dash.Close()
 
-	omnistreams.Dash = dash
-
 	db, err := NewDatabase("waygate_db.sqlite")
 	exitOnError(err)
 
@@ -90,24 +87,24 @@ func (s *Server) Run() {
 	certmagic.Default.Logger = zap.NewNop()
 	//certmagic.DefaultACME.CA = certmagic.LetsEncryptStagingCA
 
-	if s.config.DnsProvider != "" {
-		dnsProvider, err := getDnsProvider(s.config.DnsProvider, s.config.DnsToken, s.config.DnsUser)
-		exitOnError(err)
+	//if s.config.DnsProvider != "" {
+	//	dnsProvider, err := getDnsProvider(s.config.DnsProvider, s.config.DnsToken, s.config.DnsUser)
+	//	exitOnError(err)
 
-		certmagic.DefaultACME.DNS01Solver = &certmagic.DNS01Solver{
-			DNSProvider: dnsProvider,
-		}
-	}
-
-	//certmagic.Default.OnDemand = &certmagic.OnDemandConfig{
-	//	DecisionFunc: func(ctx context.Context, name string) error {
-	//		// TODO: verify domain is in tunnels
-	//		//if name != tunnelDomain {
-	//		//	return fmt.Errorf("not allowed")
-	//		//}
-	//		return nil
-	//	},
+	//	certmagic.DefaultACME.DNS01Solver = &certmagic.DNS01Solver{
+	//		DNSProvider: dnsProvider,
+	//	}
 	//}
+
+	certmagic.Default.OnDemand = &certmagic.OnDemandConfig{
+		DecisionFunc: func(ctx context.Context, name string) error {
+			// TODO: verify domain is in tunnels
+			//if name != tunnelDomain {
+			//	return fmt.Errorf("not allowed")
+			//}
+			return nil
+		},
+	}
 
 	certmagic.Default.Storage = &certmagic.FileStorage{"./certs"}
 
@@ -167,12 +164,12 @@ func (s *Server) Run() {
 	//mux := http.NewServeMux()
 	mux := NewServerMux(authServer, s.config.AdminDomain)
 
-	//numStreamsGauge := promauto.NewGauge(prometheus.GaugeOpts{
-	//	Name: "waygate_num_streams",
-	//	Help: "Number of active streams",
-	//})
-	//http.Handle("/metrics", promhttp.Handler())
-	//go http.ListenAndServe(":9500", nil)
+	numStreamsGauge := promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "waygate_num_streams",
+		Help: "Number of active streams",
+	})
+	http.Handle("/metrics", promhttp.Handler())
+	go http.ListenAndServe(":9500", nil)
 
 	mux.Handle(oauth2Prefix+"/", http.StripPrefix(oauth2Prefix, oauth2Handler))
 
@@ -242,8 +239,8 @@ func (s *Server) Run() {
 			tunnel = wtTun
 
 		} else {
-			tunnel, err = NewWebSocketMuxadoServerTunnel(w, r, s.jose, s.config.Public, s.config.TunnelDomains)
-			//tunnel, err = NewOmnistreamsServerTunnel(w, r, s.jose, s.config.Public, s.config.TunnelDomains, numStreamsGauge, dash)
+			//tunnel, err = NewWebSocketMuxadoServerTunnel(w, r, s.jose, s.config.Public, s.config.TunnelDomains)
+			tunnel, err = NewOmnistreamsServerTunnel(w, r, s.jose, s.config.Public, s.config.TunnelDomains, numStreamsGauge, dash)
 			if err != nil {
 				w.WriteHeader(500)
 				log.Println("NewOmnistreamsClientTunnel error", err)
