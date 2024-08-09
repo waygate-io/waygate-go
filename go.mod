@@ -1,6 +1,6 @@
 module github.com/waygate-io/waygate-go
 
-go 1.22.2
+go 1.22.6
 
 replace github.com/lastlogin-io/obligator => ../obligator
 
@@ -19,6 +19,7 @@ require (
 	github.com/anderspitman/treemess-go v0.0.0-20210313015619-ba255d9f1e0f
 	github.com/caddyserver/certmagic v0.20.0
 	github.com/gemdrive/gemdrive-go v0.0.0-20240229172336-f3f7f72ae546
+	github.com/jmoiron/sqlx v1.3.5
 	github.com/lastlogin-io/obligator v0.0.0-20240320141513-ad56a2786bf7
 	github.com/lestrrat-go/jwx/v2 v2.0.11
 	github.com/libdns/namedotcom v0.3.3
@@ -61,7 +62,6 @@ require (
 	github.com/google/pprof v0.0.0-20230821062121-407c9e7a662f // indirect
 	github.com/ip2location/ip2location-go/v9 v9.6.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
-	github.com/jmoiron/sqlx v1.3.5 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.5 // indirect
 	github.com/lestrrat-go/blackmagic v1.0.1 // indirect
 	github.com/lestrrat-go/httpcc v1.0.1 // indirect
