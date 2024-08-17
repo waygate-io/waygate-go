@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/waygate-io/waygate-go/josencillo"
 	"golang.ngrok.com/muxado/v2"
 	"nhooyr.io/websocket"
@@ -93,6 +94,7 @@ func NewWebSocketMuxadoServerTunnel(
 	jose *josencillo.JOSE,
 	public bool,
 	tunnelDomains []string,
+	gauge prometheus.Gauge,
 ) (*MuxadoTunnel, error) {
 
 	tunnelReq := TunnelRequest{
