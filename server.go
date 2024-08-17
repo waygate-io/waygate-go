@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -536,7 +537,8 @@ func (m *ServerMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/waygate" && host != authDomain && r.URL.Path != "/oauth2/token" {
 		_, err := m.authServer.Validate(r)
 		if err != nil {
-			uri := fmt.Sprintf("https://%s/login?return_uri=https://%s", authDomain, r.Host)
+			returnUri := url.QueryEscape(fmt.Sprintf("https://%s%s", r.Host, r.URL.RequestURI()))
+			uri := fmt.Sprintf("https://%s/login?return_uri=%s", authDomain, returnUri)
 			http.Redirect(w, r, uri, 303)
 			return
 		}
