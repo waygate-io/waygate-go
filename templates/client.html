@@ -1,32 +1,47 @@
-<h1>Waygate Client Dashboard</h1>
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-<h2>Forwards</h2>
+    <title>Waygate Client Dashboard</title>
 
-{{range $subdomain, $forward := .Forwards}}
-<div class='forward'>
-  <a href='https://{{$subdomain}}' target='_blank'>{{$subdomain}}</a> -> {{$forward.TargetAddress}} (protected: {{$forward.Protected}})
-</div>
-{{end}}
-<h2>Add Forward</h2>
+  </head>
 
-<form action='/add-forward', method='POST'>
-  <input type='text' name='hostname' />
-  .
-  <select name='domain'>
-    {{range .Domains}}
-    <option>{{.}}</option>
+  <body>
+
+    <h1>Waygate Client Dashboard</h1>
+    
+    <h2>Forwards</h2>
+    
+    {{range $subdomain, $forward := .Forwards}}
+    <div class='forward'>
+      <a href='https://{{$subdomain}}' target='_blank'>{{$subdomain}}</a> -> {{$forward.TargetAddress}} (protected: {{$forward.Protected}})
+    </div>
     {{end}}
-  </select>
-  ->
-  <input type='text' name='target-address' />
+    <h2>Add Forward</h2>
+    
+    <form action='/add-forward', method='POST'>
+      <input type='text' name='hostname' />
+      .
+      <select name='domain'>
+        {{range .Domains}}
+        <option>{{.}}</option>
+        {{end}}
+      </select>
+      ->
+      <input type='text' name='target-address' />
+    
+      <div>
+        <label for='protected-checkbox'>Protected:</label>
+        <input id='protected-checkbox' type='checkbox' name='protected' />
+      </div>
+    
+      <div>
+        <button>Submit</button>
+      </div>
 
-  <div>
-    <label for='protected-checkbox'>Protected:</label>
-    <input id='protected-checkbox' type='checkbox' name='protected' />
-  </div>
-
-  <div>
-    <button>Submit</button>
-  </div>
-</form>
+    </form>
+  </body>
+</html>
 
