@@ -179,16 +179,16 @@ func (s *ClientSession) start() {
 		for {
 			dgram, _, dstAddr, err := s.tunnel.ReceiveDatagram()
 			if err != nil {
-				fmt.Println(err)
-				continue
+				fmt.Println("ClientSession.start ReceiveDatagram:", err)
+				break
 			}
 
 			//dst := fmt.Sprintf("%s:%d", dstAddr.IP, dstAddr.Port)
 
 			udpConn, ok := s.udpMap[dstAddr.String()]
 			if !ok {
-				fmt.Println("no such UDPConn")
-				continue
+				fmt.Println("ClientSession.start udpMap: no such UDPConn")
+				break
 			}
 
 			udpConn.recvCh <- dgram
@@ -202,9 +202,8 @@ func (s *ClientSession) start() {
 		for {
 			downstreamConn, err := s.tunnel.AcceptStream()
 			if err != nil {
-				// TODO: close on error
-				log.Println(err)
-				continue
+				log.Println("ClientSession.start AcceptStream:", err)
+				break
 			}
 
 			go func() {
