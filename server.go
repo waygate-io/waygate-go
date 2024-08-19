@@ -37,6 +37,7 @@ type ServerConfig struct {
 	TunnelDomains    []string
 	DisableTUI       bool
 	TUIDisplayPeriod time.Duration
+	Users            []string
 }
 
 type Server struct {
@@ -129,11 +130,12 @@ func (s *Server) Run() {
 
 	authDomain := "auth." + s.config.AdminDomain
 	authConfig := obligator.ServerConfig{
-		Prefix:   "auth_",
+		DbPrefix: "auth_",
 		Database: db.db.DB,
 		Domains: []string{
 			s.config.AdminDomain,
 		},
+		Users: s.config.Users,
 	}
 	authServer := obligator.NewServer(authConfig)
 	err = authServer.SetOAuth2Provider(obligator.OAuth2Provider{

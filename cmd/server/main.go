@@ -22,6 +22,8 @@ func main() {
 	tuiDisplayPeriod := flag.Duration("tui-display-period", 100*time.Millisecond, "TUI Display Refresh Period")
 	var tunnelDomains arrayFlags
 	flag.Var(&tunnelDomains, "tunnel-domain", "Tunnel domains")
+	var users arrayFlags
+	flag.Var(&users, "user", "Users array")
 	flag.Parse()
 
 	waygate.DebugMode = *debug
@@ -36,6 +38,7 @@ func main() {
 		TunnelDomains:    tunnelDomains,
 		DisableTUI:       *disableTui,
 		TUIDisplayPeriod: *tuiDisplayPeriod,
+		Users:            users,
 	}
 
 	server := waygate.NewServer(config)

@@ -139,7 +139,8 @@ func (c *Client) Run() error {
 
 	authDomain := "auth." + tunConfig.Domain
 	authConfig := obligator.ServerConfig{
-		Prefix:       "auth_",
+		Prefix:       "waygate_client_",
+		DbPrefix:     "auth_",
 		Database:     c.db.db.DB,
 		StorageDir:   c.config.Dir,
 		DatabaseDir:  c.config.Dir,
@@ -150,6 +151,7 @@ func (c *Client) Run() error {
 		AuthDomains: []string{
 			authDomain,
 		},
+		Users: c.config.Users,
 	}
 	authServer := obligator.NewServer(authConfig)
 	c.authServer = authServer
