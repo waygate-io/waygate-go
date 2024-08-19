@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"sync"
 
 	"github.com/anderspitman/treemess-go"
 	"github.com/gemdrive/gemdrive-go"
@@ -27,14 +26,20 @@ type ClientConfig struct {
 }
 
 type Client struct {
+	db         *ClientDatabase
 	config     *ClientConfig
 	eventCh    chan interface{}
-	forwardMan *ForwardManager
 	authServer *obligator.Server
 	tmpl       *template.Template
 }
 
 func NewClient(config *ClientConfig) *Client {
+
+	db, err := NewClientDatabase("waygate.sqlite")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+		os.Exit(1)
+	}
 
 	tmpl, err := template.ParseFS(fs, "templates/*")
 	if err != nil {
@@ -44,15 +49,21 @@ func NewClient(config *ClientConfig) *Client {
 
 	configCopy := *config
 
-	if configCopy.ServerDomain != "" {
-		WaygateServerDomain = configCopy.ServerDomain
+	if configCopy.ServerDomain != WaygateServerDomain {
+		db.SetServerUri(configCopy.ServerDomain)
+	}
+
+	WaygateServerDomain, err = db.GetServerUri()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+		os.Exit(1)
 	}
 
 	return &Client{
-		config:     &configCopy,
-		eventCh:    nil,
-		forwardMan: NewForwardManager(),
-		tmpl:       tmpl,
+		db:      db,
+		config:  &configCopy,
+		eventCh: nil,
+		tmpl:    tmpl,
 	}
 }
 
@@ -168,7 +179,7 @@ func (c *Client) Run() error {
 		}
 	}()
 
-	mux := NewClientMux(authServer, gdServer, c.forwardMan)
+	mux := NewClientMux(authServer, gdServer, c.db)
 
 	httpClient := &http.Client{
 		// Don't follow redirects
@@ -179,18 +190,24 @@ func (c *Client) Run() error {
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 
-		forward, exists := c.forwardMan.Get(r.Host)
-		if exists {
+		forward, err := c.db.GetForward(r.Host)
+		if err == nil {
 			proxyHttp(w, r, httpClient, forward.TargetAddress, false)
+			return
+		}
+
+		forwards, err := c.db.GetForwards()
+		if err != nil {
+			fmt.Println(err)
 			return
 		}
 
 		tmplData := struct {
 			Domains  []string
-			Forwards map[string]*Forward
+			Forwards []*Forward
 		}{
 			Domains:  []string{tunConfig.Domain},
-			Forwards: c.forwardMan.GetAll(),
+			Forwards: forwards,
 		}
 
 		err = c.tmpl.ExecuteTemplate(w, "client.html", tmplData)
@@ -232,10 +249,16 @@ func (c *Client) Run() error {
 
 		subdomain := fmt.Sprintf("%s.%s", hostname, domain)
 
-		c.forwardMan.Set(subdomain, &Forward{
+		err := c.db.SetForward(&Forward{
+			Domain:        subdomain,
 			TargetAddress: targetAddr,
 			Protected:     protected,
 		})
+		if err != nil {
+			w.WriteHeader(500)
+			io.WriteString(w, err.Error())
+			return
+		}
 
 		http.Redirect(w, r, "/", 303)
 	})
@@ -260,9 +283,8 @@ func (c *Client) Run() error {
 	return nil
 }
 
-func (c *Client) AddForward(domain string, forward *Forward) error {
-	c.forwardMan.Set(domain, forward)
-	return nil
+func (c *Client) SetForward(forward *Forward) error {
+	return c.db.SetForward(forward)
 }
 
 func (c *Client) GetUsers() ([]obligator.User, error) {
@@ -310,18 +332,18 @@ type OAuth2AuthUriEvent struct {
 }
 
 type ClientMux struct {
+	db         *ClientDatabase
 	mux        *http.ServeMux
 	authServer *obligator.Server
 	fileServer *gemdrive.Server
-	forwardMan *ForwardManager
 }
 
-func NewClientMux(authServer *obligator.Server, fileServer *gemdrive.Server, forwardMan *ForwardManager) *ClientMux {
+func NewClientMux(authServer *obligator.Server, fileServer *gemdrive.Server, db *ClientDatabase) *ClientMux {
 	m := &ClientMux{
+		db:         db,
 		mux:        http.NewServeMux(),
 		authServer: authServer,
 		fileServer: fileServer,
-		forwardMan: forwardMan,
 	}
 	return m
 }
@@ -347,8 +369,8 @@ func (m *ClientMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	} else if host != authDomain {
 
-		forward, exists := m.forwardMan.Get(host)
-		if exists && !forward.Protected {
+		forward, err := m.db.GetForward(host)
+		if err == nil && !forward.Protected {
 			m.mux.ServeHTTP(w, r)
 			return
 		}
@@ -405,50 +427,4 @@ func (m *ClientMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	m.mux.ServeHTTP(w, r)
-}
-
-type Forward struct {
-	Protected     bool
-	TargetAddress string
-}
-
-type ForwardManager struct {
-	forwardMap map[string]*Forward
-	mut        *sync.Mutex
-}
-
-func NewForwardManager() *ForwardManager {
-	m := &ForwardManager{
-		forwardMap: make(map[string]*Forward),
-		mut:        &sync.Mutex{},
-	}
-
-	return m
-}
-
-func (m *ForwardManager) GetAll() map[string]*Forward {
-	m.mut.Lock()
-	defer m.mut.Unlock()
-
-	mapCopy := make(map[string]*Forward)
-	for k, v := range m.forwardMap {
-		mapCopy[k] = &(*v)
-	}
-
-	return mapCopy
-}
-
-func (m *ForwardManager) Get(domain string) (*Forward, bool) {
-	m.mut.Lock()
-	defer m.mut.Unlock()
-
-	forward, exists := m.forwardMap[domain]
-	return forward, exists
-}
-
-func (m *ForwardManager) Set(domain string, forward *Forward) {
-	m.mut.Lock()
-	defer m.mut.Unlock()
-
-	m.forwardMap[domain] = forward
 }

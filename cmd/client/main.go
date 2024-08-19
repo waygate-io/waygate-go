@@ -11,7 +11,7 @@ import (
 )
 
 func main() {
-	serverDomainArg := flag.String("server-domain", "waygate.io", "Server domain")
+	serverDomainArg := flag.String("server-domain", waygate.WaygateServerDomain, "Server domain")
 	tokenArg := flag.String("token", "", "Token")
 	userArg := flag.String("user", "", "User")
 	var forwards arrayFlags
@@ -39,7 +39,8 @@ func main() {
 		domain := parts[0]
 		target := parts[1]
 
-		client.AddForward(domain, &waygate.Forward{
+		client.SetForward(&waygate.Forward{
+			Domain:        domain,
 			TargetAddress: target,
 			Protected:     true,
 		})

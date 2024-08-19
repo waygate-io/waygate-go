@@ -5,6 +5,12 @@ import (
 	//"github.com/mattn/go-sqlite3"
 )
 
+type Forward struct {
+	Domain        string `db:"domain"`
+	Protected     bool   `db:"protected"`
+	TargetAddress string `db:"target_address"`
+}
+
 type Database struct {
 	db *sqlx.DB
 }
@@ -71,6 +77,130 @@ func (d *Database) SetJWKS(jwks string) error {
         UPDATE config SET jwks_json=?;
         `
 	_, err := d.db.Exec(stmt, jwks)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+type ClientDatabase struct {
+	db *sqlx.DB
+}
+
+func NewClientDatabase(path string) (*ClientDatabase, error) {
+	db, err := sqlx.Open("sqlite3", path)
+	if err != nil {
+		return nil, err
+	}
+
+	stmt := `
+        CREATE TABLE IF NOT EXISTS config(
+                server_uri TEXT UNIQUE
+        );
+        `
+	_, err = db.Exec(stmt)
+	if err != nil {
+		return nil, err
+	}
+
+	stmt = `
+        SELECT COUNT(*) FROM config;
+        `
+	var numRows int
+	err = db.QueryRow(stmt).Scan(&numRows)
+	if err != nil {
+		return nil, err
+	}
+
+	if numRows == 0 {
+		stmt = `
+                INSERT INTO config DEFAULT VALUES;
+                `
+		_, err = db.Exec(stmt)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	stmt = `
+        CREATE TABLE IF NOT EXISTS forwards(
+                domain TEXT UNIQUE NOT NULL,
+                target_address TEXT NOT NULL,
+                protected BOOLEAN
+        );
+        `
+	_, err = db.Exec(stmt)
+	if err != nil {
+		return nil, err
+	}
+
+	s := &ClientDatabase{
+		db: db,
+	}
+
+	return s, nil
+}
+
+func (d *ClientDatabase) GetServerUri() (string, error) {
+	var value string
+
+	stmt := `
+        SELECT server_uri FROM config;
+        `
+	err := d.db.QueryRow(stmt).Scan(&value)
+	if err != nil {
+		return "", err
+	}
+
+	return value, nil
+}
+func (d *ClientDatabase) SetServerUri(serverUri string) error {
+	stmt := `
+        UPDATE config SET server_uri=?;
+        `
+	_, err := d.db.Exec(stmt, serverUri)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (d *ClientDatabase) GetForwards() ([]*Forward, error) {
+
+	stmt := `
+        SELECT * FROM forwards;
+        `
+
+	var forwards []*Forward
+
+	err := d.db.Select(&forwards, stmt)
+	if err != nil {
+		return nil, err
+	}
+
+	return forwards, nil
+}
+
+func (s *ClientDatabase) GetForward(domain string) (*Forward, error) {
+
+	var forward Forward
+
+	stmt := "SELECT * FROM forwards WHERE domain = ?"
+	err := s.db.Get(&forward, stmt, domain)
+	if err != nil {
+		return nil, err
+	}
+
+	return &forward, nil
+}
+
+func (d *ClientDatabase) SetForward(f *Forward) error {
+	stmt := `
+        INSERT OR REPLACE INTO forwards(domain,target_address,protected) VALUES(?,?,?);
+        `
+	_, err := d.db.Exec(stmt, f.Domain, f.TargetAddress, f.Protected)
 	if err != nil {
 		return err
 	}

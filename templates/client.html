@@ -14,9 +14,9 @@
     
     <h2>Forwards</h2>
     
-    {{range $subdomain, $forward := .Forwards}}
+    {{range $forward := .Forwards}}
     <div class='forward'>
-      <a href='https://{{$subdomain}}' target='_blank'>{{$subdomain}}</a> -> {{$forward.TargetAddress}} (protected: {{$forward.Protected}})
+      <a href='https://{{$forward.Domain}}' target='_blank'>{{$forward.Domain}}</a> -> {{$forward.TargetAddress}} (protected: {{$forward.Protected}})
     </div>
     {{end}}
     <h2>Add Forward</h2>
