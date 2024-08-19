@@ -126,7 +126,8 @@ func (c *Client) Run() error {
 
 	authDomain := "auth." + tunConfig.Domain
 	authConfig := obligator.ServerConfig{
-		Prefix:       "waygate_client_auth_",
+		Prefix:       "auth_",
+		Database:     c.db.db.DB,
 		StorageDir:   c.config.Dir,
 		DatabaseDir:  c.config.Dir,
 		ApiSocketDir: c.config.Dir,
