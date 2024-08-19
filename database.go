@@ -96,7 +96,8 @@ func NewClientDatabase(path string) (*ClientDatabase, error) {
 
 	stmt := `
         CREATE TABLE IF NOT EXISTS config(
-                server_uri TEXT UNIQUE
+                server_uri TEXT DEFAULT "" UNIQUE NOT NULL,
+                token TEXT DEFAULT "" UNIQUE NOT NULL
         );
         `
 	_, err = db.Exec(stmt)
@@ -160,6 +161,31 @@ func (d *ClientDatabase) SetServerUri(serverUri string) error {
         UPDATE config SET server_uri=?;
         `
 	_, err := d.db.Exec(stmt, serverUri)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (d *ClientDatabase) GetToken() (string, error) {
+	var value string
+
+	stmt := `
+        SELECT token FROM config;
+        `
+	err := d.db.QueryRow(stmt).Scan(&value)
+	if err != nil {
+		return "", err
+	}
+
+	return value, nil
+}
+func (d *ClientDatabase) SetToken(value string) error {
+	stmt := `
+        UPDATE config SET token=?;
+        `
+	_, err := d.db.Exec(stmt, value)
 	if err != nil {
 		return err
 	}

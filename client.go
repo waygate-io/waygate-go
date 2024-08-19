@@ -85,6 +85,14 @@ func (c *Client) Run() error {
 	token := c.config.Token
 	redirUriCh := make(chan string)
 
+	if token == "" {
+		var err error
+		token, err = c.db.GetToken()
+		if err != nil {
+			return err
+		}
+	}
+
 	if (token == "" && !c.config.Public) || os.Getenv("WAYGATE_DEBUG_TOKEN") == "reset" {
 
 		tokenFlow, err := NewTokenFlow()
@@ -99,6 +107,11 @@ func (c *Client) Run() error {
 		}
 
 		token, err = tokenFlow.GetTokenWithRedirect(redirUriCh)
+		if err != nil {
+			return err
+		}
+
+		err = c.db.SetToken(token)
 		if err != nil {
 			return err
 		}
