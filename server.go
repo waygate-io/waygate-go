@@ -70,7 +70,7 @@ func (s *Server) Run() {
 	}
 	defer dash.Close()
 
-	db, err := NewDatabase("waygate_db.sqlite")
+	db, err := NewDatabase("waygate.sqlite")
 	exitOnError(err)
 
 	// Use random unprivileged port for ACME challenges. This is necessary
@@ -129,7 +129,8 @@ func (s *Server) Run() {
 
 	authDomain := "auth." + s.config.AdminDomain
 	authConfig := obligator.ServerConfig{
-		Prefix: "waygate_auth_",
+		Prefix:   "auth_",
+		Database: db.db.DB,
 		Domains: []string{
 			s.config.AdminDomain,
 		},

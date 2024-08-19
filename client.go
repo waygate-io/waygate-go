@@ -288,7 +288,7 @@ func (c *Client) SetForward(forward *Forward) error {
 	return c.db.SetForward(forward)
 }
 
-func (c *Client) GetUsers() ([]obligator.User, error) {
+func (c *Client) GetUsers() ([]*obligator.User, error) {
 	if c.authServer == nil {
 		return nil, errors.New("No auth server")
 	}
@@ -321,7 +321,7 @@ func (c *Client) AddUser(user obligator.User) error {
 }
 
 type UsersUpdatedEvent struct {
-	Users []obligator.User
+	Users []*obligator.User
 }
 
 type TunnelConnectedEvent struct {
