@@ -49,14 +49,22 @@ func NewClient(config *ClientConfig) *Client {
 
 	configCopy := *config
 
-	if configCopy.ServerDomain != WaygateServerDomain {
-		db.SetServerUri(configCopy.ServerDomain)
+	if configCopy.ServerDomain != "" && configCopy.ServerDomain != WaygateServerDomain {
+		err := db.SetServerUri(configCopy.ServerDomain)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err.Error())
+			os.Exit(1)
+		}
 	}
 
-	WaygateServerDomain, err = db.GetServerUri()
+	dbServerUri, err := db.GetServerUri()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
+	}
+
+	if dbServerUri != "" {
+		WaygateServerDomain = configCopy.ServerDomain
 	}
 
 	return &Client{
