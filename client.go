@@ -150,7 +150,6 @@ func (c *Client) Run() error {
 		Prefix:       "waygate_client_",
 		DbPrefix:     "auth_",
 		Database:     c.db.db.DB,
-		StorageDir:   c.config.Dir,
 		DatabaseDir:  c.config.Dir,
 		ApiSocketDir: c.config.Dir,
 		//Domains: []string{
@@ -160,19 +159,18 @@ func (c *Client) Run() error {
 			authDomain,
 		},
 		Users: c.config.Users,
+		OAuth2Providers: []*obligator.OAuth2Provider{
+			&obligator.OAuth2Provider{
+				ID:            "lastlogin",
+				Name:          "LastLogin",
+				URI:           "https://lastlogin.io",
+				ClientID:      "https://" + authDomain,
+				OpenIDConnect: true,
+			},
+		},
 	}
 	authServer := obligator.NewServer(authConfig)
 	c.authServer = authServer
-	err = authServer.SetOAuth2Provider(obligator.OAuth2Provider{
-		ID:            "lastlogin",
-		Name:          "LastLogin",
-		URI:           "https://lastlogin.io",
-		ClientID:      "https://" + authDomain,
-		OpenIDConnect: true,
-	})
-	if err != nil {
-		return err
-	}
 
 	filesDomain := "files." + tunConfig.Domain
 
