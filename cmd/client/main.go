@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -19,14 +18,13 @@ func main() {
 
 	flag.Parse()
 
-	if *userArg == "" {
-		exitOnError(errors.New("Must provide user"))
-	}
-
 	config := &waygate.ClientConfig{
 		ServerDomain: *serverDomainArg,
 		Token:        *tokenArg,
-		Users:        []string{*userArg},
+	}
+
+	if *userArg != "" {
+		config.Users = []string{*userArg}
 	}
 
 	client := waygate.NewClient(config)
