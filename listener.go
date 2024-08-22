@@ -145,8 +145,8 @@ func NewClientSession(token, certDir string) (*ClientSession, error) {
 
 	tunReq := TunnelRequest{
 		Token: token,
-		//TerminationType: "client",
-		TerminationType:  "server",
+		TerminationType: "client",
+		//TerminationType:  "server",
 		UseProxyProtocol: true,
 	}
 
