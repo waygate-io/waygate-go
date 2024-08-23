@@ -233,3 +233,15 @@ func (d *ClientDatabase) SetForward(f *Forward) error {
 
 	return nil
 }
+
+func (d *ClientDatabase) DeleteForwardByDomain(domain string) error {
+	stmt := `
+        DELETE FROM forwards WHERE domain = ?;
+        `
+	_, err := d.db.Exec(stmt, domain)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

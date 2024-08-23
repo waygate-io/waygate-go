@@ -6,6 +6,12 @@
 
     <title>Waygate Client Dashboard</title>
 
+  <style>
+    html {
+      font-family: Arial;
+    }
+  </style>
+
   </head>
 
   <body>
@@ -17,11 +23,15 @@
     {{range $forward := .Forwards}}
     <div class='forward'>
       <a href='https://{{$forward.Domain}}' target='_blank'>{{$forward.Domain}}</a> -> {{$forward.TargetAddress}} (protected: {{$forward.Protected}})
+      <form action='/delete-forward' method='POST'>
+        <input type='hidden' name='domain' value='{{$forward.Domain}}' />
+        <button>Delete</button>
+      </form>
     </div>
     {{end}}
     <h2>Add Forward</h2>
     
-    <form action='/add-forward', method='POST'>
+    <form action='/add-forward' method='POST'>
       <input type='text' name='hostname' />
       .
       <select name='domain'>

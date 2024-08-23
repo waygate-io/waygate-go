@@ -243,7 +243,6 @@ func (c *Client) Run() error {
 
 	mux.HandleFunc("/add-forward", func(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
-		printJson(r.Form)
 
 		hostname := r.Form.Get("hostname")
 		if hostname == "" {
@@ -253,14 +252,14 @@ func (c *Client) Run() error {
 		}
 
 		domain := r.Form.Get("domain")
-		if hostname == "" {
+		if domain == "" {
 			w.WriteHeader(400)
 			io.WriteString(w, "Missing domain")
 			return
 		}
 
 		targetAddr := r.Form.Get("target-address")
-		if hostname == "" {
+		if targetAddr == "" {
 			w.WriteHeader(400)
 			io.WriteString(w, "Missing target-address")
 			return
@@ -276,6 +275,26 @@ func (c *Client) Run() error {
 			TargetAddress: targetAddr,
 			Protected:     protected,
 		})
+		if err != nil {
+			w.WriteHeader(500)
+			io.WriteString(w, err.Error())
+			return
+		}
+
+		http.Redirect(w, r, "/", 303)
+	})
+
+	mux.HandleFunc("/delete-forward", func(w http.ResponseWriter, r *http.Request) {
+		r.ParseForm()
+
+		domain := r.Form.Get("domain")
+		if domain == "" {
+			w.WriteHeader(400)
+			io.WriteString(w, "Missing domain")
+			return
+		}
+
+		err := c.db.DeleteForwardByDomain(domain)
 		if err != nil {
 			w.WriteHeader(500)
 			io.WriteString(w, err.Error())
