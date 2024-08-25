@@ -90,7 +90,7 @@ func (t *OmnistreamsTunnel) ReceiveDatagram() ([]byte, net.Addr, net.Addr, error
 
 	//return remaining, ppHeader.Source, ppHeader.Destination, nil
 	time.Sleep(10 * time.Second)
-	return nil, nil, nil, errors.New("MuxadoTunnel.ReceiveDatagram not implemented")
+	return nil, nil, nil, errors.New("OmnistreamsTunnel.ReceiveDatagram not implemented")
 }
 
 func (t *OmnistreamsTunnel) SendDatagram(msg []byte, srcAddr, dstAddr net.Addr) error {
@@ -121,7 +121,7 @@ func (t *OmnistreamsTunnel) SendDatagram(msg []byte, srcAddr, dstAddr net.Addr) 
 	//return t.conn.SendMessage(prependedBuf.Bytes())
 
 	time.Sleep(10 * time.Second)
-	return errors.New("MuxadoTunnel.SendDatagram not implemented")
+	return errors.New("OmnistreamsTunnel.SendDatagram not implemented")
 }
 
 func (t *OmnistreamsTunnel) GetConfig() TunnelConfig {
