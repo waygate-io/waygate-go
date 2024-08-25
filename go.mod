@@ -4,7 +4,9 @@ go 1.22.6
 
 replace github.com/lastlogin-io/obligator => ../obligator
 
-replace github.com/anderspitman/omnistreams-go => ../omnistreams-go
+replace github.com/omnistreams/omnistreams-go => ../omnistreams-go
+
+replace github.com/omnistreams/omnistreams-go/transports => ../omnistreams-go/transports
 
 replace github.com/anderspitman/dashtui => ../dashtui
 
@@ -15,7 +17,6 @@ replace github.com/navidys/tvxwidgets => ../tvxwidgets
 require (
 	gioui.org v0.5.0
 	github.com/anderspitman/dashtui v0.0.0-00010101000000-000000000000
-	github.com/anderspitman/omnistreams-go v0.0.0-20240324225630-c70675b2fd1b
 	github.com/anderspitman/treemess-go v0.0.0-20210313015619-ba255d9f1e0f
 	github.com/caddyserver/certmagic v0.20.0
 	github.com/gemdrive/gemdrive-go v0.0.0-20240229172336-f3f7f72ae546
@@ -25,6 +26,8 @@ require (
 	github.com/libdns/namedotcom v0.3.3
 	github.com/libdns/route53 v1.3.3
 	github.com/mailgun/proxyproto v1.0.0
+	github.com/omnistreams/omnistreams-go v0.0.0-00010101000000-000000000000
+	github.com/omnistreams/omnistreams-go/transports v0.0.0-00010101000000-000000000000
 	github.com/pires/go-proxyproto v0.7.0
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
 	github.com/prometheus/client_golang v1.19.0
@@ -58,6 +61,9 @@ require (
 	github.com/gdamore/tcell/v2 v2.7.4 // indirect
 	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
 	github.com/go-text/typesetting v0.0.0-20230803102845-24e03d8b5372 // indirect
+	github.com/gobwas/httphead v0.1.0 // indirect
+	github.com/gobwas/pool v0.2.1 // indirect
+	github.com/gobwas/ws v1.4.0 // indirect
 	github.com/goccy/go-json v0.10.2 // indirect
 	github.com/google/pprof v0.0.0-20230821062121-407c9e7a662f // indirect
 	github.com/ip2location/ip2location-go/v9 v9.6.0 // indirect

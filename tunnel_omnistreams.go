@@ -1,7 +1,6 @@
 package waygate
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -9,13 +8,13 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"time"
 
 	"github.com/anderspitman/dashtui"
-	"github.com/anderspitman/omnistreams-go"
-	"github.com/mailgun/proxyproto"
+	"github.com/omnistreams/omnistreams-go"
+	"github.com/omnistreams/omnistreams-go/transports"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/waygate-io/waygate-go/josencillo"
-	"nhooyr.io/websocket"
 	//"github.com/gizak/termui/v3"
 	//"github.com/gizak/termui/v3/widgets"
 )
@@ -72,52 +71,57 @@ func (t *OmnistreamsTunnel) SendMessage(msg interface{}) (interface{}, error) {
 }
 
 func (t *OmnistreamsTunnel) ReceiveDatagram() ([]byte, net.Addr, net.Addr, error) {
-	msg, err := t.conn.ReceiveMessage()
-	if err != nil {
-		return nil, nil, nil, err
-	}
+	//msg, err := t.conn.ReceiveMessage()
+	//if err != nil {
+	//	return nil, nil, nil, err
+	//}
 
-	reader := bytes.NewReader(msg)
+	//reader := bytes.NewReader(msg)
 
-	ppHeader, err := proxyproto.ReadHeader(reader)
-	if err != nil {
-		return nil, nil, nil, err
-	}
+	//ppHeader, err := proxyproto.ReadHeader(reader)
+	//if err != nil {
+	//	return nil, nil, nil, err
+	//}
 
-	remaining, err := io.ReadAll(reader)
-	if err != nil {
-		return nil, nil, nil, err
-	}
+	//remaining, err := io.ReadAll(reader)
+	//if err != nil {
+	//	return nil, nil, nil, err
+	//}
 
-	return remaining, ppHeader.Source, ppHeader.Destination, nil
+	//return remaining, ppHeader.Source, ppHeader.Destination, nil
+	time.Sleep(10 * time.Second)
+	return nil, nil, nil, errors.New("MuxadoTunnel.ReceiveDatagram not implemented")
 }
 
 func (t *OmnistreamsTunnel) SendDatagram(msg []byte, srcAddr, dstAddr net.Addr) error {
 
-	conn := &wrapperConn{
-		localAddr:  dstAddr,
-		remoteAddr: srcAddr,
-	}
+	//conn := &wrapperConn{
+	//	localAddr:  dstAddr,
+	//	remoteAddr: srcAddr,
+	//}
 
-	// TODO: maybe pass addr.IP as serverName?
-	proxyHeader, err := buildProxyProtoHeader(conn, "")
-	if err != nil {
-		return err
-	}
+	//// TODO: maybe pass addr.IP as serverName?
+	//proxyHeader, err := buildProxyProtoHeader(conn, "")
+	//if err != nil {
+	//	return err
+	//}
 
-	prependedBuf := &bytes.Buffer{}
+	//prependedBuf := &bytes.Buffer{}
 
-	_, err = proxyHeader.WriteTo(prependedBuf)
-	if err != nil {
-		return err
-	}
+	//_, err = proxyHeader.WriteTo(prependedBuf)
+	//if err != nil {
+	//	return err
+	//}
 
-	_, err = prependedBuf.Write(msg)
-	if err != nil {
-		return err
-	}
+	//_, err = prependedBuf.Write(msg)
+	//if err != nil {
+	//	return err
+	//}
 
-	return t.conn.SendMessage(prependedBuf.Bytes())
+	//return t.conn.SendMessage(prependedBuf.Bytes())
+
+	time.Sleep(10 * time.Second)
+	return errors.New("MuxadoTunnel.SendDatagram not implemented")
 }
 
 func (t *OmnistreamsTunnel) GetConfig() TunnelConfig {
@@ -153,16 +157,10 @@ func NewOmnistreamsServerTunnel(
 		return nil, err
 	}
 
-	wsConn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
-		OriginPatterns: []string{"*"},
-	})
+	wr, err := transports.NewWebSocketServerTransport(w, r)
 	if err != nil {
 		return nil, err
 	}
-
-	wsConn.SetReadLimit(128 * 1024)
-
-	wr := NewWsConnWrapper(wsConn)
 
 	conn := omnistreams.NewConnection(wr, false)
 
@@ -214,12 +212,10 @@ func NewOmnistreamsClientTunnel(tunReq TunnelRequest) (*OmnistreamsTunnel, error
 		tunReq.UseProxyProtocol,
 	)
 
-	wsConn, _, err := websocket.Dial(ctx, uri, nil)
+	wr, err := transports.NewWebSocketClientTransport(ctx, uri)
 	if err != nil {
 		return nil, err
 	}
-
-	wr := NewWsConnWrapper(wsConn)
 
 	conn := omnistreams.NewConnection(wr, true)
 
@@ -273,32 +269,4 @@ func NewOmnistreamsClientTunnel(tunReq TunnelRequest) (*OmnistreamsTunnel, error
 	}
 
 	return t, nil
-}
-
-type wsConnWrapper struct {
-	wsConn *websocket.Conn
-}
-
-func NewWsConnWrapper(wsConn *websocket.Conn) *wsConnWrapper {
-	return &wsConnWrapper{
-		wsConn,
-	}
-}
-
-func (wr *wsConnWrapper) Read(ctx context.Context) ([]byte, error) {
-
-	msgType, msgBytes, err := wr.wsConn.Read(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	if msgType != websocket.MessageBinary {
-		return nil, errors.New("Invalid WS message type")
-	}
-
-	return msgBytes, nil
-}
-
-func (wr *wsConnWrapper) Write(ctx context.Context, msg []byte) error {
-	return wr.wsConn.Write(ctx, websocket.MessageBinary, msg)
 }
