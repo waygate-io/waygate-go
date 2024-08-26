@@ -128,10 +128,13 @@ func (s *Server) Run() {
 		NextProtos: []string{"http/1.1", "acme-tls/1", "waygate-tls-muxado"},
 	}
 
+	dbPrefix := "auth_"
+	authDb, err := obligator.NewSqliteDatabaseWithDb(db.db.DB, dbPrefix)
+	exitOnError(err)
+
 	authDomain := "auth." + s.config.AdminDomain
 	authConfig := obligator.ServerConfig{
-		DbPrefix: "auth_",
-		Database: db.db.DB,
+		Database: authDb,
 		Domains: []string{
 			s.config.AdminDomain,
 		},

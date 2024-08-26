@@ -145,11 +145,14 @@ func (c *Client) Run() error {
 	dashUri := "https://dash." + tunConfig.Domain
 	redirUriCh <- dashUri
 
+	dbPrefix := "auth_"
+	authDb, err := obligator.NewSqliteDatabaseWithDb(c.db.db.DB, dbPrefix)
+	exitOnError(err)
+
 	authDomain := "auth." + tunConfig.Domain
 	authConfig := obligator.ServerConfig{
 		Prefix:       "waygate_client_",
-		DbPrefix:     "auth_",
-		Database:     c.db.db.DB,
+		Database:     authDb,
 		DatabaseDir:  c.config.Dir,
 		ApiSocketDir: c.config.Dir,
 		//Domains: []string{
