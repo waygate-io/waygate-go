@@ -108,7 +108,9 @@ func (s *Server) Run() {
 		},
 	}
 
-	certmagic.Default.Storage = &certmagic.FileStorage{"./certs"}
+	//certmagic.Default.Storage = &certmagic.FileStorage{"./certs"}
+	certmagic.Default.Storage, err = NewCertmagicSqliteStorage(db.db.DB)
+	exitOnError(err)
 
 	certConfig := certmagic.NewDefault()
 
