@@ -4,9 +4,8 @@ package waygate
 import (
 	"context"
 	"database/sql"
-	"errors"
-	"fmt"
 	iofs "io/fs"
+	"path/filepath"
 	"sync"
 
 	"github.com/caddyserver/certmagic"
@@ -47,7 +46,6 @@ func NewCertmagicSqliteStorage(sqlDb *sql.DB) (*CertmagicSqliteStorage, error) {
 }
 
 func (s *CertmagicSqliteStorage) Store(ctx context.Context, key string, value []byte) error {
-	fmt.Println("Store", key, len(value))
 
 	stmt := `
         INSERT OR REPLACE INTO kv(key, value) VALUES(?, ?);
@@ -61,7 +59,6 @@ func (s *CertmagicSqliteStorage) Store(ctx context.Context, key string, value []
 }
 
 func (s *CertmagicSqliteStorage) Load(ctx context.Context, key string) ([]byte, error) {
-	fmt.Println("Load", key)
 
 	var value []byte
 
@@ -76,34 +73,28 @@ func (s *CertmagicSqliteStorage) Load(ctx context.Context, key string) ([]byte, 
 		return nil, err
 	}
 
-	fmt.Println(len(value))
-
 	return value, nil
 }
 
 func (s *CertmagicSqliteStorage) Exists(ctx context.Context, key string) bool {
-	fmt.Println("Exists", key)
 
 	var value bool
 
 	stmt := `
-        SELECT count(*) FROM kv WHERE key GLOB '?*';
+        SELECT count(*) FROM kv WHERE key GLOB ? || '*';
         `
 	err := s.db.QueryRowContext(ctx, stmt, key).Scan(&value)
 	if err != nil {
 		return false
 	}
 
-	fmt.Println(value)
-
 	return value
 }
 
 func (s *CertmagicSqliteStorage) Delete(ctx context.Context, key string) error {
-	fmt.Println("Delete", key)
 
 	stmt := `
-        DELETE FROM kv WHERE key = ?;
+        DELETE FROM kv WHERE key GLOB ? || '*';
         `
 	result, err := s.db.ExecContext(ctx, stmt, key)
 	if err != nil {
@@ -119,21 +110,18 @@ func (s *CertmagicSqliteStorage) Delete(ctx context.Context, key string) error {
 		return iofs.ErrNotExist
 	}
 
-	fmt.Println("deleted")
-
 	return nil
 }
 
 func (s *CertmagicSqliteStorage) List(ctx context.Context, prefix string, recursive bool) ([]string, error) {
-	fmt.Println("List", prefix, recursive)
 
 	stmt := `
-        SELECT key FROM kv;
+        SELECT key FROM kv WHERE key GLOB ? || '*';
         `
 
 	var results []string
 
-	err := s.db.SelectContext(ctx, &results, stmt)
+	err := s.db.SelectContext(ctx, &results, stmt, prefix)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, iofs.ErrNotExist
@@ -141,32 +129,53 @@ func (s *CertmagicSqliteStorage) List(ctx context.Context, prefix string, recurs
 		return nil, err
 	}
 
-	fmt.Println(results)
+	if !recursive {
+		pruned := []string{}
+		for _, key := range results {
+			if filepath.Dir(key) == prefix {
+				pruned = append(pruned, key)
+			}
+		}
+
+		return pruned, nil
+	}
 
 	return results, nil
 }
 
 func (s *CertmagicSqliteStorage) Stat(ctx context.Context, key string) (certmagic.KeyInfo, error) {
-	fmt.Println("Stat")
-	return certmagic.KeyInfo{}, errors.New("Not implemented")
+
+	ki := certmagic.KeyInfo{}
+
+	recursive := true
+	keys, err := s.List(ctx, key, recursive)
+	if err != nil {
+		return ki, err
+	}
+
+	isTerminal := true
+	if len(keys) > 1 {
+		isTerminal = false
+	}
+
+	ki = certmagic.KeyInfo{
+		Key:        key,
+		IsTerminal: isTerminal,
+	}
+
+	return ki, nil
 }
 
 func (s *CertmagicSqliteStorage) Lock(ctx context.Context, name string) error {
-	fmt.Println("Lock")
 
 	s.mu.Lock()
-
-	fmt.Println("locked")
 
 	return nil
 }
 
 func (s *CertmagicSqliteStorage) Unlock(ctx context.Context, name string) error {
-	fmt.Println("Unlock")
 
 	s.mu.Unlock()
-
-	fmt.Println("unlocked")
 
 	return nil
 }
