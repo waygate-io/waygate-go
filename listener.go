@@ -40,7 +40,7 @@ func (l *Listener) GetTunnelConfig() TunnelConfig {
 	return l.tunnel.GetConfig()
 }
 func DialUDP(network string, udpAddr *net.UDPAddr) (*UDPConn, error) {
-	s, err := NewClientSession(DefaultToken, DefaultCertDir)
+	s, err := NewClientSession(DefaultToken, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +51,7 @@ func ListenUDP(network string, udpAddr *net.UDPAddr) (*UDPConn, error) {
 
 	//address := fmt.Sprintf("%s:%d", udpAddr.IP, udpAddr.Port)
 
-	s, err := NewClientSession(DefaultToken, DefaultCertDir)
+	s, err := NewClientSession(DefaultToken, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -59,11 +59,11 @@ func ListenUDP(network string, udpAddr *net.UDPAddr) (*UDPConn, error) {
 	return s.ListenUDP(network, udpAddr)
 }
 func Listen(network, address string) (*Listener, error) {
-	return ListenWithOpts(network, address, DefaultToken, DefaultCertDir)
+	return ListenWithOpts(network, address, DefaultToken, nil)
 }
-func ListenWithOpts(network, address, token, certDir string) (*Listener, error) {
+func ListenWithOpts(network, address, token string, db *ClientDatabase) (*Listener, error) {
 
-	s, err := NewClientSession(token, certDir)
+	s, err := NewClientSession(token, db)
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +82,7 @@ type ClientSession struct {
 	logger         *zap.Logger
 }
 
-func NewClientSession(token, certDir string) (*ClientSession, error) {
+func NewClientSession(token string, db *ClientDatabase) (*ClientSession, error) {
 
 	// Use random unprivileged port for ACME challenges. This is necessary
 	// because of the way certmagic works, in that if it fails to bind
@@ -116,7 +116,8 @@ func NewClientSession(token, certDir string) (*ClientSession, error) {
 		},
 	}
 
-	certmagic.Default.Storage = &certmagic.FileStorage{certDir}
+	certmagic.Default.Storage, err = NewCertmagicSqliteStorage(db.db.DB)
+	exitOnError(err)
 
 	var output zapcore.WriteSyncer = os.Stdout
 	logOutput := zapcore.Lock(output)

@@ -129,13 +129,11 @@ func (c *Client) Run() error {
 		}()
 	}
 
-	certDir := filepath.Join(c.config.Dir, "certs")
-
 	if os.Getenv("WAYGATE_DEBUG_TOKEN") == "reset" {
 		fmt.Println(token)
 	}
 
-	listener, err := ListenWithOpts("tcp", "", token, certDir)
+	listener, err := ListenWithOpts("tcp", "", token, c.db)
 	if err != nil {
 		return err
 	}
