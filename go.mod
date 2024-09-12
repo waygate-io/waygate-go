@@ -12,11 +12,14 @@ replace github.com/anderspitman/dashtui => ../dashtui
 
 replace github.com/navidys/tvxwidgets => ../tvxwidgets
 
+replace github.com/anderspitman/little-oauth2-go => ../little-oauth2-go
+
 //replace github.com/gemdrive/gemdrive-go => ../gemdrive-go
 
 require (
 	gioui.org v0.5.0
 	github.com/anderspitman/dashtui v0.0.0-00010101000000-000000000000
+	github.com/anderspitman/little-oauth2-go v0.0.0-20240904162115-5d18e06f4a81
 	github.com/anderspitman/treemess-go v0.0.0-20210313015619-ba255d9f1e0f
 	github.com/caddyserver/certmagic v0.20.0
 	github.com/gemdrive/gemdrive-go v0.0.0-20240229172336-f3f7f72ae546

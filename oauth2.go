@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lastlogin-io/obligator"
+	oauth "github.com/anderspitman/little-oauth2-go"
 	"github.com/waygate-io/waygate-go/josencillo"
 )
 
@@ -36,8 +36,12 @@ func NewOAuth2Handler(prefix string, jose *josencillo.JOSE) *OAuth2Handler {
 
 	mux.HandleFunc("/authorize", func(w http.ResponseWriter, r *http.Request) {
 
-		authReq, err := obligator.ParseAuthRequest(w, r)
+		r.ParseForm()
+
+		authReq, err := oauth.ParseAuthRequest(r.Form)
 		if err != nil {
+			w.WriteHeader(500)
+			io.WriteString(w, err.Error())
 			return
 		}
 
@@ -119,15 +123,8 @@ func NewOAuth2Handler(prefix string, jose *josencillo.JOSE) *OAuth2Handler {
 
 		redirectUri := claims["redirect_uri"].(string)
 
-		fullRedirectUri := obligator.AuthUri(redirectUri, &obligator.OAuth2AuthRequest{
-			ClientId:     claims["client_id"].(string),
-			RedirectUri:  redirectUri,
-			ResponseType: "code",
-			Scope:        "waygate",
-			State:        claims["state"].(string),
-		})
-
-		fullRedirectUri = fmt.Sprintf("%s&code=%s", fullRedirectUri, codeJwt)
+		state := claims["state"].(string)
+		fullRedirectUri := fmt.Sprintf("%s?code=%s&state=%s", redirectUri, codeJwt, state)
 
 		http.Redirect(w, r, fullRedirectUri, 307)
 	})
@@ -156,7 +153,7 @@ func NewOAuth2Handler(prefix string, jose *josencillo.JOSE) *OAuth2Handler {
 		w.Header().Set("Content-Type", "application/json;charset=UTF-8")
 		w.Header().Set("Cache-Control", "no-store")
 
-		tokenRes := obligator.OAuth2TokenResponse{
+		tokenRes := oauth.TokenResponse{
 			AccessToken: accessTokenJwt,
 			ExpiresIn:   3600,
 			TokenType:   "bearer",
@@ -179,10 +176,9 @@ func (h *OAuth2Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type TokenFlow struct {
-	authUri       string
+	flowState     *oauth.AuthCodeFlowState
 	authServerUri string
 	port          int
-	state         string
 }
 
 func NewTokenFlow() (*TokenFlow, error) {
@@ -196,31 +192,26 @@ func NewTokenFlow() (*TokenFlow, error) {
 
 	localUri := fmt.Sprintf("http://localhost:%d", port)
 
-	state, err := genRandomText(32)
+	flowState, err := oauth.StartAuthCodeFlow(authServerUri+"/authorize", &oauth.AuthRequest{
+		ClientId:    localUri,
+		RedirectUri: fmt.Sprintf("%s/oauth2/callback", localUri),
+		Scope:       "waygate",
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	authUri := obligator.AuthUri(authServerUri+"/authorize", &obligator.OAuth2AuthRequest{
-		ClientId:     localUri,
-		RedirectUri:  fmt.Sprintf("%s/oauth2/callback", localUri),
-		ResponseType: "code",
-		Scope:        "waygate",
-		State:        state,
-	})
-
 	flow := &TokenFlow{
-		authUri:       authUri,
+		flowState:     flowState,
 		authServerUri: authServerUri,
 		port:          port,
-		state:         state,
 	}
 
 	return flow, nil
 }
 
 func (f *TokenFlow) GetAuthUri() string {
-	return f.authUri
+	return f.flowState.AuthUri
 }
 
 func (f *TokenFlow) GetToken() (string, error) {
@@ -255,7 +246,7 @@ func (f *TokenFlow) GetTokenWithRedirect(redirUriCh chan string) (string, error)
 		r.ParseForm()
 
 		stateParam := r.Form.Get("state")
-		if stateParam != f.state {
+		if stateParam != f.flowState.State {
 			w.WriteHeader(500)
 			io.WriteString(w, "Invalid state param")
 			return
@@ -293,7 +284,7 @@ func (f *TokenFlow) GetTokenWithRedirect(redirUriCh chan string) (string, error)
 		//	return
 		//}
 
-		var tokenRes obligator.OAuth2TokenResponse
+		var tokenRes oauth.TokenResponse
 
 		bodyBytes, err := io.ReadAll(res.Body)
 		if err != nil {
