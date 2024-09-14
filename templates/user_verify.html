@@ -1,0 +1,31 @@
+{{ template "header.html" . }}
+
+<h1>Verify Device</h1>
+
+<form action='{{.Prefix}}/approve-device' method='POST'>
+
+  {{if .UserCode}}
+  <p>
+    Confirm that the code below is displayed on your device:
+  </p>
+  {{else}}
+  <p>
+    Enter the code from the device:
+  </p>
+  {{end}}
+
+  <div>
+    <label for='code-input'>Code:</label>
+    <input id='code-input' type='text' name='user_code' value='{{.UserCode}}'/>
+  </div>
+
+  <div>
+    <label for='domain-input'>Domain:</label>
+    <input id='domain-input' type='text' name='domain' />
+  </div>
+
+  <button type='submit'>Approve</button>
+
+</form>
+
+{{ template "footer.html" . }}

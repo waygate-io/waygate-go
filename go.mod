@@ -29,6 +29,7 @@ require (
 	github.com/libdns/namedotcom v0.3.3
 	github.com/libdns/route53 v1.3.3
 	github.com/mailgun/proxyproto v1.0.0
+	github.com/mdp/qrterminal/v3 v3.2.0
 	github.com/omnistreams/omnistreams-go v0.0.0-00010101000000-000000000000
 	github.com/omnistreams/omnistreams-go/transports v0.0.0-00010101000000-000000000000
 	github.com/pires/go-proxyproto v0.7.0
@@ -111,4 +112,5 @@ require (
 	golang.org/x/tools v0.17.0 // indirect
 	google.golang.org/protobuf v1.32.0 // indirect
 	lukechampine.com/uint128 v1.2.0 // indirect
+	rsc.io/qr v0.2.0 // indirect
 )

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	oauth "github.com/anderspitman/little-oauth2-go"
+	"github.com/mdp/qrterminal/v3"
 	"github.com/waygate-io/waygate-go/josencillo"
 )
 
@@ -38,12 +39,17 @@ func NewOAuth2Handler(db *Database, serverUri, prefix string, jose *josencillo.J
 	mux.Handle("/device-verify", oauthServer)
 
 	mux.HandleFunc("/user-verify", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Println("/user-verify")
+
+		r.ParseForm()
+
+		userCode := r.Form.Get("code")
 
 		tmplData := struct {
-			Prefix string
+			Prefix   string
+			UserCode string
 		}{
-			Prefix: prefix,
+			Prefix:   prefix,
+			UserCode: userCode,
 		}
 
 		err = tmpl.ExecuteTemplate(w, "user_verify.html", tmplData)
@@ -367,6 +373,14 @@ func DoDeviceFlow() (string, error) {
 		return "", err
 	}
 
+	qrterminal.GenerateHalfBlock(flow.DeviceResponse.VerificationUriComplete, qrterminal.L, os.Stdout)
+
+	fmt.Println("Use the QR code above")
+
+	fmt.Println("\nOr click the link below")
+	fmt.Println(flow.DeviceResponse.VerificationUriComplete)
+
+	fmt.Println("\nOr enter the link and code below")
 	fmt.Println(flow.DeviceResponse.VerificationUri)
 	fmt.Println(flow.DeviceResponse.UserCode)
 
