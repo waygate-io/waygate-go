@@ -322,7 +322,12 @@ func (c *Client) Run() error {
 		http.Redirect(w, r, "/", 303)
 	})
 
-	go http.Serve(listener, mux)
+	go func() {
+		err := http.Serve(listener, mux)
+		if err != nil {
+			fmt.Println("listener done", err)
+		}
+	}()
 
 	users, err := c.authServer.GetUsers()
 	if err != nil {

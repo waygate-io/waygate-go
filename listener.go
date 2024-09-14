@@ -177,6 +177,7 @@ func NewClientSession(token string, db *ClientDatabase) (*ClientSession, error) 
 func (s *ClientSession) start() {
 
 	go func() {
+
 		for {
 			dgram, _, dstAddr, err := s.tunnel.ReceiveDatagram()
 			if err != nil {
@@ -194,6 +195,7 @@ func (s *ClientSession) start() {
 
 			udpConn.recvCh <- dgram
 		}
+
 	}()
 
 	go func() {
@@ -208,90 +210,94 @@ func (s *ClientSession) start() {
 			}
 
 			go func() {
-
-				var conn connCloseWriter = downstreamConn
-
-				serverName := ""
-				remoteAddress := "dummy-address:0"
-				localAddress := "dummy-address:0"
-				if s.tunnel.GetConfig().UseProxyProtocol {
-					ppHeader, err := proxyproto.ReadHeader(conn)
-					if err != nil {
-						log.Println(err)
-						return
-					}
-
-					remoteAddress = ppHeader.Source.String()
-					localAddress = ppHeader.Destination.String()
-
-					tlvs, err := ppHeader.ParseTLVs()
-					if err != nil {
-						log.Println(err)
-						return
-					}
-
-					serverName = string(tlvs[PROXY_PROTO_SERVER_NAME_OFFSET])
-				}
-
-				// TODO: figure out a cleaner way to disable TLS for raw TCP.
-				// TerminationType should probably be a per-listen setting, instead
-				// of per-tunnel
-				if s.tlsTermination == "client" && serverName != "" {
-					tlsConn := tls.Server(conn, s.tlsConfig)
-					err := tlsConn.Handshake()
-					if err != nil {
-						fmt.Println("fatal fail", err)
-						return
-					}
-					conn = tlsConn
-				}
-
-				conn = wrapperConn{
-					conn: conn,
-					localAddr: addr{
-						network: "waygate-network",
-						address: localAddress,
-					},
-					remoteAddr: addr{
-						network: "waygate-network",
-						address: remoteAddress,
-					},
-				}
-
-				s.mut.Lock()
-				defer s.mut.Unlock()
-
-				_, portStr, err := net.SplitHostPort(localAddress)
-				if err != nil {
-					log.Println("Error splitting address")
-					return
-				}
-
-				port, err := strconv.Atoi(portStr)
-				if err != nil {
-					log.Println("Error parsing port")
-					return
-				}
-
-				key := serverName
-				if key == "" {
-					key = fmt.Sprintf(":%d", port)
-				}
-
-				listener, exists := s.listenMap[key]
-				if !exists {
-					listener, exists = s.listenMap[ListenerDefaultKey]
-					if !exists {
-						fmt.Println("No such listener", key)
-						conn.Close()
-						return
-					}
-				}
-
-				listener.PassConn(conn)
+				s.handleStream(downstreamConn)
 			}()
 		}
 	}()
+}
+
+func (s *ClientSession) handleStream(downstreamConn connCloseWriter) {
+
+	var conn connCloseWriter = downstreamConn
+
+	serverName := ""
+	remoteAddress := "dummy-address:0"
+	localAddress := "dummy-address:0"
+	if s.tunnel.GetConfig().UseProxyProtocol {
+		ppHeader, err := proxyproto.ReadHeader(conn)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+
+		remoteAddress = ppHeader.Source.String()
+		localAddress = ppHeader.Destination.String()
+
+		tlvs, err := ppHeader.ParseTLVs()
+		if err != nil {
+			log.Println(err)
+			return
+		}
+
+		serverName = string(tlvs[PROXY_PROTO_SERVER_NAME_OFFSET])
+	}
+
+	// TODO: figure out a cleaner way to disable TLS for raw TCP.
+	// TerminationType should probably be a per-listen setting, instead
+	// of per-tunnel
+	if s.tlsTermination == "client" && serverName != "" {
+		tlsConn := tls.Server(conn, s.tlsConfig)
+		err := tlsConn.Handshake()
+		if err != nil {
+			fmt.Println("fatal fail", err)
+			return
+		}
+		conn = tlsConn
+	}
+
+	conn = wrapperConn{
+		conn: conn,
+		localAddr: addr{
+			network: "waygate-network",
+			address: localAddress,
+		},
+		remoteAddr: addr{
+			network: "waygate-network",
+			address: remoteAddress,
+		},
+	}
+
+	s.mut.Lock()
+	defer s.mut.Unlock()
+
+	_, portStr, err := net.SplitHostPort(localAddress)
+	if err != nil {
+		log.Println("Error splitting address")
+		return
+	}
+
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		log.Println("Error parsing port")
+		return
+	}
+
+	key := serverName
+	if key == "" {
+		key = fmt.Sprintf(":%d", port)
+	}
+
+	listener, exists := s.listenMap[key]
+	if !exists {
+		listener, exists = s.listenMap[ListenerDefaultKey]
+		if !exists {
+			fmt.Println("No such listener", key)
+			conn.Close()
+			return
+		}
+	}
+
+	listener.PassConn(conn)
 }
 
 func (s *ClientSession) GetTunnelConfig() TunnelConfig {
