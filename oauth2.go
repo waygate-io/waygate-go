@@ -8,9 +8,7 @@ import (
 	"html/template"
 	"io"
 	"net/http"
-	"net/url"
 	"os"
-	"strings"
 	"time"
 
 	oauth "github.com/anderspitman/little-oauth2-go"
@@ -24,15 +22,67 @@ type OAuth2Handler struct {
 	mux *http.ServeMux
 }
 
-func NewOAuth2Handler(prefix string, jose *josencillo.JOSE) *OAuth2Handler {
+func NewOAuth2Handler(db *Database, serverUri, prefix string, jose *josencillo.JOSE) *OAuth2Handler {
 
 	tmpl, err := template.ParseFS(fs, "templates/*")
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err.Error())
-		os.Exit(1)
-	}
+	exitOnError(err)
 
 	mux := http.NewServeMux()
+
+	kvStore, err := NewKvStore(db.db.DB)
+	exitOnError(err)
+
+	oauthServer := oauth.NewServer(serverUri+prefix, kvStore)
+
+	mux.Handle("/device", oauthServer)
+	mux.Handle("/device-verify", oauthServer)
+
+	mux.HandleFunc("/user-verify", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Println("/user-verify")
+
+		tmplData := struct {
+			Prefix string
+		}{
+			Prefix: prefix,
+		}
+
+		err = tmpl.ExecuteTemplate(w, "user_verify.html", tmplData)
+		if err != nil {
+			w.WriteHeader(500)
+			io.WriteString(w, err.Error())
+			return
+		}
+	})
+
+	mux.HandleFunc("/approve-device", func(w http.ResponseWriter, r *http.Request) {
+
+		fmt.Println("/approve-device")
+
+		r.ParseForm()
+
+		userCode := r.Form.Get("user_code")
+		domain := r.Form.Get("domain")
+
+		issuedAt := time.Now().UTC()
+		accessTokenJwt, err := jose.NewJWT(map[string]interface{}{
+			"iat":    issuedAt,
+			"type":   "access_token",
+			"domain": domain,
+		})
+
+		tokenRes := &oauth.TokenResponse{
+			AccessToken: accessTokenJwt,
+			ExpiresIn:   3600,
+			TokenType:   "bearer",
+		}
+
+		err = oauthServer.CompleteDeviceFlow(userCode, tokenRes)
+		if err != nil {
+			w.WriteHeader(500)
+			io.WriteString(w, err.Error())
+			return
+		}
+	})
 
 	mux.HandleFunc("/authorize", func(w http.ResponseWriter, r *http.Request) {
 
@@ -133,7 +183,19 @@ func NewOAuth2Handler(prefix string, jose *josencillo.JOSE) *OAuth2Handler {
 		r.ParseForm()
 
 		// TODO: proper Access Token Request parsing: https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.3
-		codeJwt := r.Form.Get("code")
+		tokenReq, err := oauth.ParseTokenRequest(r.Form)
+		if err != nil {
+			w.WriteHeader(400)
+			io.WriteString(w, err.Error())
+			return
+		}
+
+		if tokenReq.GrantType == "urn:ietf:params:oauth:grant-type:device_code" {
+			oauthServer.ServeHTTP(w, r)
+			return
+		}
+
+		codeJwt := tokenReq.Code
 
 		claims, err := jose.ParseJWT(codeJwt)
 		if err != nil {
@@ -254,46 +316,16 @@ func (f *TokenFlow) GetTokenWithRedirect(redirUriCh chan string) (string, error)
 
 		code := r.Form.Get("code")
 
-		httpClient := &http.Client{}
+		localUri := fmt.Sprintf("http://localhost:%d", f.port)
 
-		params := url.Values{}
-		params.Set("code", code)
-		body := strings.NewReader(params.Encode())
-
-		tokenUri := fmt.Sprintf("%s/token", f.authServerUri)
-
-		req, err := http.NewRequest(http.MethodPost, tokenUri, body)
-		if err != nil {
-			w.WriteHeader(500)
-			io.WriteString(w, err.Error())
-			return
+		tokenReq := &oauth.TokenRequest{
+			Code:         code,
+			RedirectUri:  fmt.Sprintf("%s/oauth2/callback", localUri),
+			ClientId:     localUri,
+			CodeVerifier: f.flowState.CodeVerifier,
 		}
 
-		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-
-		res, err := httpClient.Do(req)
-		if err != nil {
-			w.WriteHeader(500)
-			io.WriteString(w, err.Error())
-			return
-		}
-
-		//if res.StatusCode != 200 {
-		//	w.WriteHeader(500)
-		//	io.WriteString(w, "Bad HTTP response code")
-		//	return
-		//}
-
-		var tokenRes oauth.TokenResponse
-
-		bodyBytes, err := io.ReadAll(res.Body)
-		if err != nil {
-			w.WriteHeader(500)
-			io.WriteString(w, err.Error())
-			return
-		}
-
-		err = json.Unmarshal(bodyBytes, &tokenRes)
+		tokenRes, err := oauth.MakeTokenRequest(f.authServerUri, tokenReq)
 		if err != nil {
 			w.WriteHeader(500)
 			io.WriteString(w, err.Error())
@@ -319,4 +351,29 @@ func (f *TokenFlow) GetTokenWithRedirect(redirUriCh chan string) (string, error)
 	//fmt.Println(token)
 
 	return token, nil
+}
+
+func DoDeviceFlow() (string, error) {
+
+	authServerUri := fmt.Sprintf("https://%s/oauth2", WaygateServerDomain)
+
+	localUri := fmt.Sprintf("http://localhost")
+
+	flow, err := oauth.StartDeviceFlow(authServerUri+"/device", &oauth.AuthRequest{
+		ClientId: localUri,
+		Scope:    "waygate",
+	})
+	if err != nil {
+		return "", err
+	}
+
+	fmt.Println(flow.DeviceResponse.VerificationUri)
+	fmt.Println(flow.DeviceResponse.UserCode)
+
+	tokenRes, err := flow.Complete(authServerUri + "/token")
+	if err != nil {
+		return "", err
+	}
+
+	return tokenRes.AccessToken, nil
 }

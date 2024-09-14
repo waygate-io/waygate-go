@@ -167,8 +167,9 @@ func (s *Server) Run() {
 		exitOnError(err)
 	}
 
+	serverUri := "https://" + s.config.AdminDomain
 	oauth2Prefix := "/oauth2"
-	oauth2Handler := NewOAuth2Handler(oauth2Prefix, s.jose)
+	oauth2Handler := NewOAuth2Handler(db, serverUri, oauth2Prefix, s.jose)
 
 	//mux := http.NewServeMux()
 	mux := NewServerMux(authServer, s.config.AdminDomain)
@@ -542,7 +543,7 @@ func (m *ServerMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	authDomain := "auth." + m.adminDomain
 
-	if r.URL.Path != "/waygate" && host != authDomain && r.URL.Path != "/oauth2/token" {
+	if r.URL.Path != "/waygate" && host != authDomain && r.URL.Path != "/oauth2/token" && r.URL.Path != "/oauth2/device" && r.URL.Path != "/oauth2/device-verify" {
 		_, err := m.authServer.Validate(r)
 		if err != nil {
 			returnUri := url.QueryEscape(fmt.Sprintf("https://%s%s", r.Host, r.URL.RequestURI()))

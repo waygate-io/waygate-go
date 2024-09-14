@@ -23,6 +23,7 @@ type ClientConfig struct {
 	Token        string
 	Dir          string
 	Public       bool
+	NoBrowser    bool
 }
 
 type Client struct {
@@ -103,20 +104,36 @@ func (c *Client) Run() error {
 
 	if (token == "" && !c.config.Public) || os.Getenv("WAYGATE_DEBUG_TOKEN") == "reset" {
 
-		tokenFlow, err := NewTokenFlow()
-		if err != nil {
-			return err
-		}
+		var err error
 
-		if c.eventCh != nil {
-			c.eventCh <- OAuth2AuthUriEvent{
-				Uri: tokenFlow.GetAuthUri(),
+		if c.config.NoBrowser {
+
+			token, err = DoDeviceFlow()
+			if err != nil {
+				return err
 			}
-		}
 
-		token, err = tokenFlow.GetTokenWithRedirect(redirUriCh)
-		if err != nil {
-			return err
+			go func() {
+				<-redirUriCh
+			}()
+
+		} else {
+			tokenFlow, err := NewTokenFlow()
+			if err != nil {
+				return err
+			}
+
+			if c.eventCh != nil {
+				c.eventCh <- OAuth2AuthUriEvent{
+					Uri: tokenFlow.GetAuthUri(),
+				}
+			}
+
+			token, err = tokenFlow.GetTokenWithRedirect(redirUriCh)
+			if err != nil {
+				return err
+			}
+
 		}
 
 		err = c.db.SetToken(token)

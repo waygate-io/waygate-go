@@ -13,6 +13,7 @@ func main() {
 	serverDomainArg := flag.String("server-domain", waygate.WaygateServerDomain, "Server domain")
 	tokenArg := flag.String("token", "", "Token")
 	userArg := flag.String("user", "", "User")
+	noBrowserArg := flag.Bool("no-browser", false, "Use OAuth2 device flow to get tokens")
 	var forwards arrayFlags
 	flag.Var(&forwards, "forward", "Forwards")
 
@@ -21,6 +22,7 @@ func main() {
 	config := &waygate.ClientConfig{
 		ServerDomain: *serverDomainArg,
 		Token:        *tokenArg,
+		NoBrowser:    *noBrowserArg,
 	}
 
 	if *userArg != "" {
@@ -47,7 +49,12 @@ func main() {
 
 	eventCh := make(chan interface{})
 	client.ListenEvents(eventCh)
-	go client.Run()
+	go func() {
+		err := client.Run()
+		if err != nil {
+			panic(err)
+		}
+	}()
 
 	for {
 		event := <-eventCh
