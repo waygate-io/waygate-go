@@ -89,23 +89,23 @@ func (s *Server) Run() {
 	certmagic.Default.Logger = zap.NewNop()
 	//certmagic.DefaultACME.CA = certmagic.LetsEncryptStagingCA
 
-	//if s.config.DnsProvider != "" {
-	//	dnsProvider, err := getDnsProvider(s.config.DnsProvider, s.config.DnsToken, s.config.DnsUser)
-	//	exitOnError(err)
+	if s.config.DnsProvider != "" {
+		dnsProvider, err := getDnsProvider(s.config.DnsProvider, s.config.DnsToken, s.config.DnsUser)
+		exitOnError(err)
 
-	//	certmagic.DefaultACME.DNS01Solver = &certmagic.DNS01Solver{
-	//		DNSProvider: dnsProvider,
-	//	}
-	//}
-
-	certmagic.Default.OnDemand = &certmagic.OnDemandConfig{
-		DecisionFunc: func(ctx context.Context, name string) error {
-			// TODO: verify domain is in tunnels
-			//if name != tunnelDomain {
-			//	return fmt.Errorf("not allowed")
-			//}
-			return nil
-		},
+		certmagic.DefaultACME.DNS01Solver = &certmagic.DNS01Solver{
+			DNSProvider: dnsProvider,
+		}
+	} else {
+		certmagic.Default.OnDemand = &certmagic.OnDemandConfig{
+			DecisionFunc: func(ctx context.Context, name string) error {
+				// TODO: verify domain is in tunnels
+				//if name != tunnelDomain {
+				//	return fmt.Errorf("not allowed")
+				//}
+				return nil
+			},
+		}
 	}
 
 	//certmagic.Default.Storage = &certmagic.FileStorage{"./certs"}
