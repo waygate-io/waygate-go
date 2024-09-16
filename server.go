@@ -84,6 +84,9 @@ func (s *Server) Run() {
 	certmagic.HTTPSPort, err = randomOpenPort()
 	exitOnError(err)
 
+	if len(s.config.Users) > 0 {
+		certmagic.DefaultACME.Email = s.config.Users[0]
+	}
 	certmagic.DefaultACME.DisableHTTPChallenge = true
 	certmagic.DefaultACME.Agreed = true
 	certmagic.Default.Logger = zap.NewNop()
