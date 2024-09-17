@@ -21,6 +21,7 @@ import (
 	"github.com/libdns/namedotcom"
 	"github.com/libdns/route53"
 	proxyproto "github.com/pires/go-proxyproto"
+	"github.com/takingnames/namedrop-libdns"
 )
 
 type connCloseWriter interface {
@@ -212,6 +213,10 @@ func parseIP(ip string) (net.IP, bool, error) {
 
 func getDnsProvider(provider, token, user string) (certmagic.ACMEDNSProvider, error) {
 	switch provider {
+	case "takingnames":
+		return &namedrop.Provider{
+			Token: token,
+		}, nil
 	case "name.com":
 		return &namedotcom.Provider{
 			Server: "https://api.name.com",
@@ -227,7 +232,14 @@ func getDnsProvider(provider, token, user string) (certmagic.ACMEDNSProvider, er
 			//SecretAccessKey: token,
 		}, nil
 	default:
-		return nil, errors.New("Unsupported DNS provider")
+		if !strings.HasPrefix(provider, "https://") {
+			return nil, fmt.Errorf("Assuming NameDrop DNS provider, but %s is not a valid NameDrop server URI", provider)
+		}
+		// Assume provider is a NameDrop URI if nothing else matches
+		return &namedrop.Provider{
+			ServerUri: provider,
+			Token:     token,
+		}, nil
 	}
 }
 

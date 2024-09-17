@@ -14,6 +14,8 @@ replace github.com/navidys/tvxwidgets => ../tvxwidgets
 
 replace github.com/anderspitman/little-oauth2-go => ../little-oauth2-go
 
+replace github.com/takingnames/namedrop-libdns => ../namedrop-libdns
+
 //replace github.com/gemdrive/gemdrive-go => ../gemdrive-go
 
 require (
@@ -37,6 +39,7 @@ require (
 	github.com/prometheus/client_golang v1.19.0
 	github.com/quic-go/quic-go v0.41.0
 	github.com/quic-go/webtransport-go v0.6.0
+	github.com/takingnames/namedrop-libdns v0.0.0-20240917195538-920bdcac9d39
 	go.uber.org/zap v1.24.0
 	golang.ngrok.com/muxado/v2 v2.0.0
 	nhooyr.io/websocket v1.8.10
