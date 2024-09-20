@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	oauth "github.com/anderspitman/little-oauth2-go"
@@ -101,12 +102,14 @@ func NewOAuth2Handler(db *Database, serverUri, prefix string, jose *josencillo.J
 			return
 		}
 
+		scopeParam := strings.Join(authReq.Scopes, " ")
+
 		issuedAt := time.Now().UTC()
 		jwt, err := jose.NewJWT(map[string]interface{}{
 			"iat":                 issuedAt,
 			"client_id":           authReq.ClientId,
 			"redirect_uri":        authReq.RedirectUri,
-			"scope":               authReq.Scope,
+			"scope":               scopeParam,
 			"state":               authReq.State,
 			"pkce_code_challenge": authReq.CodeChallenge,
 		})
@@ -263,7 +266,7 @@ func NewTokenFlow() (*TokenFlow, error) {
 	flowState, err := oauth.StartAuthCodeFlow(authServerUri+"/authorize", &oauth.AuthRequest{
 		ClientId:    localUri,
 		RedirectUri: fmt.Sprintf("%s/oauth2/callback", localUri),
-		Scope:       "waygate",
+		Scopes:      []string{"waygate"},
 	})
 	if err != nil {
 		return nil, err
@@ -331,7 +334,8 @@ func (f *TokenFlow) GetTokenWithRedirect(redirUriCh chan string) (string, error)
 			CodeVerifier: f.flowState.CodeVerifier,
 		}
 
-		tokenRes, err := oauth.MakeTokenRequest(f.authServerUri, tokenReq)
+		tokenUri := fmt.Sprintf("%s/token", f.authServerUri)
+		tokenRes, err := oauth.MakeTokenRequest(tokenUri, tokenReq)
 		if err != nil {
 			w.WriteHeader(500)
 			io.WriteString(w, err.Error())
@@ -367,7 +371,7 @@ func DoDeviceFlow() (string, error) {
 
 	flow, err := oauth.StartDeviceFlow(authServerUri+"/device", &oauth.AuthRequest{
 		ClientId: localUri,
-		Scope:    "waygate",
+		Scopes:   []string{"waygate"},
 	})
 	if err != nil {
 		return "", err
