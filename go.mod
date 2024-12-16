@@ -2,7 +2,7 @@ module github.com/waygate-io/waygate-go
 
 go 1.22.6
 
-replace github.com/lastlogin-io/obligator => ../obligator
+replace github.com/lastlogin-net/obligator => ../obligator
 
 replace github.com/omnistreams/omnistreams-go => ../omnistreams-go
 
@@ -26,7 +26,7 @@ require (
 	github.com/caddyserver/certmagic v0.20.0
 	github.com/gemdrive/gemdrive-go v0.0.0-20240229172336-f3f7f72ae546
 	github.com/jmoiron/sqlx v1.3.5
-	github.com/lastlogin-io/obligator v0.0.0-20240320141513-ad56a2786bf7
+	github.com/lastlogin-net/obligator v0.0.0-00010101000000-000000000000
 	github.com/lestrrat-go/jwx/v2 v2.0.11
 	github.com/libdns/namedotcom v0.3.3
 	github.com/libdns/route53 v1.3.3

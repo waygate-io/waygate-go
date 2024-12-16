@@ -12,7 +12,7 @@ import (
 
 	"github.com/anderspitman/treemess-go"
 	"github.com/gemdrive/gemdrive-go"
-	"github.com/lastlogin-io/obligator"
+	"github.com/lastlogin-net/obligator"
 )
 
 var WaygateServerDomain string = "waygate.io"

@@ -15,7 +15,7 @@ import (
 	"gioui.org/unit"
 	"gioui.org/widget"
 	"gioui.org/widget/material"
-	"github.com/lastlogin-io/obligator"
+	"github.com/lastlogin-net/obligator"
 	"github.com/pkg/browser"
 	"github.com/waygate-io/waygate-go"
 )

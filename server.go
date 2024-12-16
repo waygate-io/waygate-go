@@ -16,7 +16,7 @@ import (
 
 	"github.com/anderspitman/dashtui"
 	"github.com/caddyserver/certmagic"
-	"github.com/lastlogin-io/obligator"
+	"github.com/lastlogin-net/obligator"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -144,16 +144,17 @@ func (s *Server) Run() {
 			s.config.AdminDomain,
 		},
 		Users: s.config.Users,
+                OAuth2Providers: []*obligator.OAuth2Provider{
+                        &obligator.OAuth2Provider{
+                                ID:            "lastlogin",
+                                Name:          "LastLogin",
+                                URI:           "https://lastlogin.net",
+                                ClientID:      "https://" + authDomain,
+                                OpenIDConnect: true,
+                        },
+                },
 	}
 	authServer := obligator.NewServer(authConfig)
-	err = authServer.SetOAuth2Provider(obligator.OAuth2Provider{
-		ID:            "lastlogin",
-		Name:          "LastLogin",
-		URI:           "https://lastlogin.io",
-		ClientID:      "https://" + authDomain,
-		OpenIDConnect: true,
-	})
-	exitOnError(err)
 
 	jwksJson, err := db.GetJWKS()
 	if err != nil {
