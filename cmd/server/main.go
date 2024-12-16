@@ -18,7 +18,8 @@ func main() {
 	dnsToken := flag.String("dns-token", "", "DNS Token")
 	dnsUser := flag.String("dns-user", "", "DNS User")
 	debug := flag.Bool("debug", false, "Enable debug mode")
-	disableTui := flag.Bool("disable-tui", false, "Disable TUI")
+	//disableTui := flag.Bool("disable-tui", false, "Disable TUI")
+	disableTui := flag.Bool("disable-tui", true, "Disable TUI")
 	tuiDisplayPeriod := flag.Duration("tui-display-period", 100*time.Millisecond, "TUI Display Refresh Period")
 	var tunnelDomains arrayFlags
 	flag.Var(&tunnelDomains, "tunnel-domain", "Tunnel domains")
