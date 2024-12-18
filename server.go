@@ -144,15 +144,15 @@ func (s *Server) Run() {
 			s.config.AdminDomain,
 		},
 		Users: s.config.Users,
-                OAuth2Providers: []*obligator.OAuth2Provider{
-                        &obligator.OAuth2Provider{
-                                ID:            "lastlogin",
-                                Name:          "LastLogin",
-                                URI:           "https://lastlogin.net",
-                                ClientID:      "https://" + authDomain,
-                                OpenIDConnect: true,
-                        },
-                },
+		OAuth2Providers: []*obligator.OAuth2Provider{
+			&obligator.OAuth2Provider{
+				ID:            "lastlogin",
+				Name:          "LastLogin",
+				URI:           "https://lastlogin.net",
+				ClientID:      "https://" + authDomain,
+				OpenIDConnect: true,
+			},
+		},
 	}
 	authServer := obligator.NewServer(authConfig)
 
