@@ -89,6 +89,19 @@ func NewOAuth2Handler(db *Database, serverUri, prefix string, jose *josencillo.J
 			io.WriteString(w, err.Error())
 			return
 		}
+
+		tmplData := struct {
+			Domain string
+		}{
+			Domain: domain,
+		}
+
+		err = tmpl.ExecuteTemplate(w, "user_verify_success.html", tmplData)
+		if err != nil {
+			w.WriteHeader(500)
+			io.WriteString(w, err.Error())
+			return
+		}
 	})
 
 	mux.HandleFunc("/authorize", func(w http.ResponseWriter, r *http.Request) {
