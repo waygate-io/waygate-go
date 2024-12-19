@@ -1,64 +1,64 @@
 {{ template "header.html" . }}
 
-    <h1>Waygate Client Dashboard</h1>
-    
-    {{if .Forwards}}
-    <h2>Tunnels</h2>
+<h1>Waygate Client Dashboard</h1>
 
-    <table>
-      <thead>
-        <tr>
-          <td>Domain</td>
-          <td>Target</td>
-          <td>Protected</td>
-          <td>Actions</td>
-        </tr>
-      </thead>
-      {{range $forward := .Forwards}}
-      <tr>
-        <td>
-          <a href='https://{{$forward.Domain}}' target='_blank'>{{$forward.Domain}}</a>
-        </td>
-        <td>
-          {{$forward.TargetAddress}}
-        </td>
-        <td>
-          {{$forward.Protected}}
-        </td>
-        <td>
-          <form action='/delete-forward' method='POST'>
-            <input type='hidden' name='domain' value='{{$forward.Domain}}' />
-            <button>Delete</button>
-          </form>
-        </td>
-      </tr>
-      {{end}}
-    </table>
+{{if .Forwards}}
+<h2>Tunnels</h2>
+
+<table>
+  <thead>
+    <tr>
+      <td>Domain</td>
+      <td>Target</td>
+      <td>Protected</td>
+      <td>Actions</td>
+    </tr>
+  </thead>
+  {{range $forward := .Forwards}}
+  <tr>
+    <td>
+      <a href='https://{{$forward.Domain}}' target='_blank'>{{$forward.Domain}}</a>
+    </td>
+    <td>
+      {{$forward.TargetAddress}}
+    </td>
+    <td>
+      {{$forward.Protected}}
+    </td>
+    <td>
+      <form action='/delete-forward' method='POST'>
+        <input type='hidden' name='domain' value='{{$forward.Domain}}' />
+        <button>Delete</button>
+      </form>
+    </td>
+  </tr>
+  {{end}}
+</table>
+{{end}}
+
+
+<h2>Add Tunnel</h2>
+
+<form action='/add-forward' method='POST'>
+  <input type='text' name='hostname' />
+  .
+  <select name='domain'>
+    {{range .Domains}}
+    <option>{{.}}</option>
     {{end}}
+  </select>
+  ->
+  <input type='text' name='target-address' />
 
+  <div>
+    <label for='protected-checkbox'>Protected:</label>
+    <input id='protected-checkbox' type='checkbox' name='protected' />
+  </div>
 
-    <h2>Add Tunnel</h2>
-    
-    <form action='/add-forward' method='POST'>
-      <input type='text' name='hostname' />
-      .
-      <select name='domain'>
-        {{range .Domains}}
-        <option>{{.}}</option>
-        {{end}}
-      </select>
-      ->
-      <input type='text' name='target-address' />
-    
-      <div>
-        <label for='protected-checkbox'>Protected:</label>
-        <input id='protected-checkbox' type='checkbox' name='protected' />
-      </div>
-    
-      <div>
-        <button>Submit</button>
-      </div>
+  <div>
+    <button>Submit</button>
+  </div>
 
-    </form>
+</form>
 
 {{ template "footer.html" . }}
