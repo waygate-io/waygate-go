@@ -1,20 +1,4 @@
-<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-
-    <title>Waygate Client Dashboard</title>
-
-  <style>
-    html {
-      font-family: Arial;
-    }
-  </style>
-
-  </head>
-
-  <body>
+{{ template "header.html" . }}
 
     <h1>Waygate Client Dashboard</h1>
     
@@ -52,6 +36,5 @@
       </div>
 
     </form>
-  </body>
-</html>
 
+{{ template "footer.html" . }}
