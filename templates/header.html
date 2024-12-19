@@ -6,9 +6,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   
-  <title>Waygate Server</title>
+  <title>Waygate</title>
 
   <style>
+
+    :root {
+      --width: 800px;
+    }
 
     html {
       font-family: Arial;
@@ -22,7 +26,27 @@
     }
 
     main {
-      width: 800px;
+      width: var(--width);
+    }
+
+    table {
+      border-collapse: collapse;
+      border: 1px solid #000;
+      width: var(--width);
+    }
+
+    thead {
+      font-weight: bold;
+    }
+
+    th,td {
+      padding: 5px;
+      border: 1px solid #000;
+    }
+
+    .forward {
+      display: flex;
+      gap: 10px;
     }
   </style>
 </head>

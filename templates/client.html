@@ -2,18 +2,42 @@
 
     <h1>Waygate Client Dashboard</h1>
     
-    <h2>Forwards</h2>
-    
-    {{range $forward := .Forwards}}
-    <div class='forward'>
-      <a href='https://{{$forward.Domain}}' target='_blank'>{{$forward.Domain}}</a> -> {{$forward.TargetAddress}} (protected: {{$forward.Protected}})
-      <form action='/delete-forward' method='POST'>
-        <input type='hidden' name='domain' value='{{$forward.Domain}}' />
-        <button>Delete</button>
-      </form>
-    </div>
+    {{if .Forwards}}
+    <h2>Tunnels</h2>
+
+    <table>
+      <thead>
+        <tr>
+          <td>Domain</td>
+          <td>Target</td>
+          <td>Protected</td>
+          <td>Actions</td>
+        </tr>
+      </thead>
+      {{range $forward := .Forwards}}
+      <tr>
+        <td>
+          <a href='https://{{$forward.Domain}}' target='_blank'>{{$forward.Domain}}</a>
+        </td>
+        <td>
+          {{$forward.TargetAddress}}
+        </td>
+        <td>
+          {{$forward.Protected}}
+        </td>
+        <td>
+          <form action='/delete-forward' method='POST'>
+            <input type='hidden' name='domain' value='{{$forward.Domain}}' />
+            <button>Delete</button>
+          </form>
+        </td>
+      </tr>
+      {{end}}
+    </table>
     {{end}}
-    <h2>Add Forward</h2>
+
+
+    <h2>Add Tunnel</h2>
     
     <form action='/add-forward' method='POST'>
       <input type='text' name='hostname' />
