@@ -11,7 +11,25 @@
   <style>
 
     :root {
+      --dark-color: #222;
+      --light-color: #fff;
+      --text-color: var(--dark-color);
+      --background-color: var(--light-color);
+      --border: 1px solid var(--text-color);
       --width: 800px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --text-color: var(--light-color);
+        --background-color: var(--dark-color);
+      }
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      background: var(--background-color);
+      color: var(--text-color);
     }
 
     html {
@@ -23,6 +41,8 @@
       display: flex;
       flex-direction: column;
       align-items: center;
+      color: var(--text-color);
+      background: var(--background-color);
     }
 
     main {
@@ -31,7 +51,7 @@
 
     table {
       border-collapse: collapse;
-      border: 1px solid #000;
+      border: var(--border);
       width: var(--width);
     }
 
@@ -41,7 +61,34 @@
 
     th,td {
       padding: 5px;
-      border: 1px solid #000;
+      border: var(--border);
+    }
+
+    button {
+      border: var(--border);
+      border-radius: 5px;
+      padding: 5px 10px;
+      text-decoration: none;
+      user-select: none;
+      cursor: pointer;
+      -webkit-text-fill-color: var(--text-color); 
+    }
+    button:hover {
+      color: var(--background-color);
+      background-color: var(--text-color);
+      -webkit-text-fill-color: var(--background-color); 
+    }
+
+    input {
+      border: var(--border);
+      border-radius: 5px;
+      padding: 5px;
+    }
+
+    select {
+      border: var(--border);
+      border-radius: 5px;
+      padding: 5px;
     }
 
     .forward {
