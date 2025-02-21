@@ -122,7 +122,7 @@ func NewWebTransportServerTunnel(
 
 func NewWebTransportClientTunnel(tunnelReq TunnelRequest) (*WebTransportTunnel, error) {
 
-	return nil, nil
+	return nil, errors.New("NewWebTransportClientTunnel: Not implemented")
 
 	//uri := fmt.Sprintf("https://%s/waygate", WaygateServerDomain)
 
