@@ -262,13 +262,6 @@ func (c *Client) Run() error {
 	mux.HandleFunc("/add-forward", func(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
 
-		hostname := r.Form.Get("hostname")
-		if hostname == "" {
-			w.WriteHeader(400)
-			io.WriteString(w, "Missing hostname")
-			return
-		}
-
 		domain := r.Form.Get("domain")
 		if domain == "" {
 			w.WriteHeader(400)
@@ -286,7 +279,12 @@ func (c *Client) Run() error {
 		protected := r.Form.Get("protected") == "on"
 		fmt.Println(r.Form.Get("protected"))
 
-		subdomain := fmt.Sprintf("%s.%s", hostname, domain)
+		hostname := r.Form.Get("hostname")
+
+		subdomain := domain
+		if hostname != "" {
+			subdomain = fmt.Sprintf("%s.%s", hostname, domain)
+		}
 
 		err := c.db.SetForward(&Forward{
 			Domain:        subdomain,
