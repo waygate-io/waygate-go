@@ -31,6 +31,7 @@ func proxyHttp(w http.ResponseWriter, r *http.Request, httpClient *http.Client, 
 
 	upstreamReq.Header = downstreamReqHeaders
 
+	upstreamReq.Header.Set("X-Forwarded-Proto", "https")
 	upstreamReq.Header["X-Forwarded-Host"] = []string{r.Host}
 
 	remoteHost, _, err := net.SplitHostPort(r.RemoteAddr)
