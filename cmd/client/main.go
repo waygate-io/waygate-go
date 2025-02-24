@@ -13,6 +13,9 @@ func main() {
 	serverDomainArg := flag.String("server-domain", waygate.WaygateServerDomain, "Server domain")
 	tokenArg := flag.String("token", "", "Token")
 	userArg := flag.String("user", "", "User")
+	dnsProviderArg := flag.String("dns-provider", "", "DNS Provider")
+	dnsTokenArg := flag.String("dns-token", "", "DNS Token")
+	dnsUserArg := flag.String("dns-user", "", "DNS User")
 	noBrowserArg := flag.Bool("no-browser", false, "Use OAuth2 device flow to get tokens")
 	var forwards arrayFlags
 	flag.Var(&forwards, "forward", "Forwards")
@@ -23,6 +26,9 @@ func main() {
 		ServerDomain: *serverDomainArg,
 		Token:        *tokenArg,
 		NoBrowser:    *noBrowserArg,
+		DNSProvider:  *dnsProviderArg,
+		DNSUser:      *dnsUserArg,
+		DNSToken:     *dnsTokenArg,
 	}
 
 	if *userArg != "" {

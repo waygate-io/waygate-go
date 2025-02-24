@@ -9,7 +9,6 @@ import (
 	"net"
 	"os"
 	"strconv"
-	"strings"
 	"sync"
 
 	"github.com/caddyserver/certmagic"
@@ -21,6 +20,11 @@ import (
 const PROXY_PROTO_PP2_TYPE_MIN_CUSTOM = 0xe0
 const PROXY_PROTO_SERVER_NAME_OFFSET = PROXY_PROTO_PP2_TYPE_MIN_CUSTOM + 0
 const ListenerDefaultKey = "default-listener"
+
+type ListenOptions struct {
+	Token string
+	Db    *ClientDatabase
+}
 
 type Listener struct {
 	listener *PassthroughListener
@@ -58,8 +62,22 @@ func ListenUDP(network string, udpAddr *net.UDPAddr) (*UDPConn, error) {
 
 	return s.ListenUDP(network, udpAddr)
 }
-func Listen(network, address string) (*Listener, error) {
-	return ListenWithOpts(network, address, DefaultToken, nil)
+func Listen(network, address string, opts ...ListenOptions) (*Listener, error) {
+
+	token := DefaultToken
+	var db *ClientDatabase
+
+	if len(opts) > 0 {
+		token = opts[0].Token
+		db = opts[0].Db
+	}
+
+	s, err := NewClientSession(token, db)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.Listen(network, address)
 }
 func ListenWithOpts(network, address, token string, db *ClientDatabase) (*Listener, error) {
 
@@ -84,38 +102,20 @@ type ClientSession struct {
 
 func NewClientSession(token string, db *ClientDatabase) (*ClientSession, error) {
 
-	// Use random unprivileged port for ACME challenges. This is necessary
-	// because of the way certmagic works, in that if it fails to bind
-	// HTTPSPort (443 by default) and doesn't detect anything else binding
-	// it, it fails. Obviously the waygate client is likely to be
-	// running on a machine where 443 isn't bound, so we need a different
-	// port to hack around this. See here for more details:
-	// https://github.com/caddyserver/certmagic/issues/111
-	var err error
-	certmagic.HTTPSPort, err = randomOpenPort()
-	if err != nil {
-		log.Println("Failed get random port for TLS challenges")
-		return nil, err
-	}
-
-	certmagic.DefaultACME.DisableHTTPChallenge = true
-
-	certmagic.DefaultACME.Agreed = true
-	//certmagic.DefaultACME.CA = certmagic.LetsEncryptStagingCA
-
 	var s *ClientSession
 
-	certmagic.Default.OnDemand = &certmagic.OnDemandConfig{
-		DecisionFunc: func(ctx context.Context, name string) error {
-			if s != nil {
-				if !strings.HasSuffix(name, s.tunnel.GetConfig().Domain) {
-					return fmt.Errorf("not allowed")
-				}
-			}
-			return nil
-		},
-	}
+	//certmagic.Default.OnDemand = &certmagic.OnDemandConfig{
+	//        DecisionFunc: func(ctx context.Context, name string) error {
+	//                if s != nil {
+	//                        if !strings.HasSuffix(name, s.tunnel.GetConfig().Domain) {
+	//                                return fmt.Errorf("not allowed")
+	//                        }
+	//                }
+	//                return nil
+	//        },
+	//}
 
+	var err error
 	certmagic.Default.Storage, err = NewCertmagicSqliteStorage(db.db.DB)
 	exitOnError(err)
 
@@ -158,6 +158,14 @@ func NewClientSession(token string, db *ClientDatabase) (*ClientSession, error) 
 	if err != nil {
 		return nil, err
 	}
+
+	domain := tunnel.GetConfig().Domain
+
+	ctx := context.Background()
+	fmt.Println("Getting certs")
+	err = certConfig.ManageSync(ctx, []string{domain, "*." + domain})
+	fmt.Println("Got certs")
+	exitOnError(err)
 
 	s = &ClientSession{
 		tunnel:         tunnel,
@@ -381,7 +389,7 @@ func (s *ClientSession) ListenUDP(network string, udpAddr *net.UDPAddr) (*UDPCon
 
 func (s *ClientSession) Listen(network, address string) (*Listener, error) {
 
-	if network != "tcp" && network != "tcp4" && network != "udp" {
+	if network != "tls" && network != "tcp" && network != "tcp4" && network != "udp" {
 		return nil, errors.New(fmt.Sprintf("Invalid network type: %s", network))
 	}
 

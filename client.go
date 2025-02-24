@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 
 	"github.com/anderspitman/treemess-go"
+	"github.com/caddyserver/certmagic"
 	"github.com/gemdrive/gemdrive-go"
 	"github.com/lastlogin-net/obligator"
 )
@@ -24,6 +25,9 @@ type ClientConfig struct {
 	Dir          string
 	Public       bool
 	NoBrowser    bool
+	DNSProvider  string
+	DNSUser      string
+	DNSToken     string
 }
 
 type Client struct {
@@ -66,6 +70,30 @@ func NewClient(config *ClientConfig) *Client {
 
 	if dbServerUri != "" {
 		WaygateServerDomain = configCopy.ServerDomain
+	}
+
+	dnsProvider, err := getDnsProvider(configCopy.DNSProvider, configCopy.DNSToken, configCopy.DNSUser)
+	exitOnError(err)
+
+	// Use random unprivileged port for ACME challenges. This is necessary
+	// because of the way certmagic works, in that if it fails to bind
+	// HTTPSPort (443 by default) and doesn't detect anything else binding
+	// it, it fails. Obviously the waygate client is likely to be
+	// running on a machine where 443 isn't bound, so we need a different
+	// port to hack around this. See here for more details:
+	// https://github.com/caddyserver/certmagic/issues/111
+	certmagic.HTTPSPort, err = randomOpenPort()
+	exitOnError(err)
+
+	if len(configCopy.Users) > 0 {
+		certmagic.DefaultACME.Email = configCopy.Users[0]
+	}
+	certmagic.DefaultACME.DisableHTTPChallenge = true
+	certmagic.DefaultACME.Agreed = true
+	//certmagic.DefaultACME.CA = certmagic.LetsEncryptStagingCA
+
+	certmagic.DefaultACME.DNS01Solver = &certmagic.DNS01Solver{
+		DNSProvider: dnsProvider,
 	}
 
 	return &Client{
@@ -150,7 +178,11 @@ func (c *Client) Run() error {
 		fmt.Println(token)
 	}
 
-	listener, err := ListenWithOpts("tcp", "", token, c.db)
+	//listener, err := Listen("tls", "tn7.org", ListenOptions{
+	listener, err := Listen("tcp", "", ListenOptions{
+		Token: token,
+		Db:    c.db,
+	})
 	if err != nil {
 		return err
 	}
