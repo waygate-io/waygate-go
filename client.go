@@ -1,6 +1,7 @@
 package waygate
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"html/template"
@@ -178,11 +179,13 @@ func (c *Client) Run() error {
 		fmt.Println(token)
 	}
 
+	session, err := NewClientSession(token, c.db)
+	if err != nil {
+		return err
+	}
+
 	//listener, err := Listen("tls", "tn7.org", ListenOptions{
-	listener, err := Listen("tcp", "", ListenOptions{
-		Token: token,
-		Db:    c.db,
-	})
+	listener, err := session.Listen("tcp", "")
 	if err != nil {
 		return err
 	}
@@ -274,11 +277,17 @@ func (c *Client) Run() error {
 			return
 		}
 
+		domains, err := c.db.GetDomains()
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
 		tmplData := struct {
 			Domains  []string
 			Forwards []*Forward
 		}{
-			Domains:  []string{tunConfig.Domain},
+			Domains:  domains,
 			Forwards: forwards,
 		}
 
@@ -329,6 +338,22 @@ func (c *Client) Run() error {
 			return
 		}
 
+		listener, err := session.Listen("tls", subdomain)
+		if err != nil {
+			w.WriteHeader(500)
+			io.WriteString(w, err.Error())
+			return
+		}
+
+		// TODO: This feels hacky. see if we can avoid spinning up a
+		// new HTTP server for each forward
+		go func() {
+			err := http.Serve(listener, mux)
+			if err != nil {
+				fmt.Println("listener done", err)
+			}
+		}()
+
 		http.Redirect(w, r, "/", 303)
 	})
 
@@ -343,6 +368,35 @@ func (c *Client) Run() error {
 		}
 
 		err := c.db.DeleteForwardByDomain(domain)
+		if err != nil {
+			w.WriteHeader(500)
+			io.WriteString(w, err.Error())
+			return
+		}
+
+		http.Redirect(w, r, "/", 303)
+	})
+
+	mux.HandleFunc("/add-domain", func(w http.ResponseWriter, r *http.Request) {
+		r.ParseForm()
+
+		domain := r.Form.Get("domain")
+		if domain == "" {
+			w.WriteHeader(400)
+			io.WriteString(w, "Missing domain")
+			return
+		}
+
+		err := c.db.SetDomain(domain)
+		if err != nil {
+			w.WriteHeader(500)
+			io.WriteString(w, err.Error())
+			return
+		}
+
+		certConfig := certmagic.NewDefault()
+		ctx := context.Background()
+		err = certConfig.ManageSync(ctx, []string{domain, "*." + domain})
 		if err != nil {
 			w.WriteHeader(500)
 			io.WriteString(w, err.Error())

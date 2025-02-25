@@ -37,7 +37,7 @@
 {{end}}
 
 
-<h2>Add Tunnel</h2>
+<h3>Add Tunnel</h3>
 
 <form action='/add-forward' method='POST'>
   <input type='text' name='hostname' />
@@ -60,5 +60,23 @@
   </div>
 
 </form>
+
+
+<h2>Domains</h2>
+
+{{range .Domains}}
+<div>{{.}}</div>
+{{end}}
+
+<h3>Add Domain</h3>
+
+<form action='/add-domain' method='POST'>
+  <input type='text' name='domain' />
+
+  <div>
+    <button>Submit</button>
+  </div>
+</form>
+
 
 {{ template "footer.html" . }}

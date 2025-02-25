@@ -136,6 +136,16 @@ func NewClientDatabase(path string) (*ClientDatabase, error) {
 		return nil, err
 	}
 
+	stmt = `
+        CREATE TABLE IF NOT EXISTS domains(
+                domain TEXT UNIQUE NOT NULL
+        );
+        `
+	_, err = db.Exec(stmt)
+	if err != nil {
+		return nil, err
+	}
+
 	s := &ClientDatabase{
 		db: db,
 	}
@@ -237,6 +247,34 @@ func (d *ClientDatabase) SetForward(f *Forward) error {
 func (d *ClientDatabase) DeleteForwardByDomain(domain string) error {
 	stmt := `
         DELETE FROM forwards WHERE domain = ?;
+        `
+	_, err := d.db.Exec(stmt, domain)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (d *ClientDatabase) GetDomains() ([]string, error) {
+
+	stmt := `
+        SELECT domain FROM domains;
+        `
+
+	var domains []string
+
+	err := d.db.Select(&domains, stmt)
+	if err != nil {
+		return nil, err
+	}
+
+	return domains, nil
+}
+
+func (d *ClientDatabase) SetDomain(domain string) error {
+	stmt := `
+        INSERT OR REPLACE INTO domains(domain) VALUES(?);
         `
 	_, err := d.db.Exec(stmt, domain)
 	if err != nil {

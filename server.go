@@ -338,7 +338,13 @@ func (s *Server) Run() {
 				}
 
 			case *ListenRequest:
-				if strings.HasPrefix(r.Network, "tcp") {
+				if strings.HasPrefix(r.Network, "tls") {
+					fmt.Println(r)
+					domain := r.Address
+					s.mut.Lock()
+					tunnels[domain] = tunnel
+					s.mut.Unlock()
+				} else if strings.HasPrefix(r.Network, "tcp") {
 					_, err = handleListenTCP(tunnel, r.Address)
 					if err != nil {
 						return &ListenResponse{
@@ -411,8 +417,8 @@ func (s *Server) handleConn(
 
 		var tunnel Tunnel
 		matched := false
-		for _, tun := range tunnels {
-			if strings.HasSuffix(clientHello.ServerName, tun.GetConfig().Domain) {
+		for domain, tun := range tunnels {
+			if strings.HasSuffix(clientHello.ServerName, domain) {
 				tunnel = tun
 				matched = true
 				break

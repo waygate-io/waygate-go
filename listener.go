@@ -161,10 +161,10 @@ func NewClientSession(token string, db *ClientDatabase) (*ClientSession, error) 
 
 	domain := tunnel.GetConfig().Domain
 
+	db.SetDomain(domain)
+
 	ctx := context.Background()
-	fmt.Println("Getting certs")
 	err = certConfig.ManageSync(ctx, []string{domain, "*." + domain})
-	fmt.Println("Got certs")
 	exitOnError(err)
 
 	s = &ClientSession{
