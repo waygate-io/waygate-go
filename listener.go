@@ -295,6 +295,7 @@ func (s *ClientSession) handleStream(downstreamConn connCloseWriter) {
 		key = fmt.Sprintf(":%d", port)
 	}
 
+	// TODO: mutex on s.listenMap
 	listener, exists := s.listenMap[key]
 	if !exists {
 		listener, exists = s.listenMap[ListenerDefaultKey]
