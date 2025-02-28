@@ -349,21 +349,12 @@ func (c *Client) Run() error {
 			return
 		}
 
-		listener, err := session.Listen("tls", subdomain)
+		err = openTunnel(session, domain, mux)
 		if err != nil {
 			w.WriteHeader(500)
 			io.WriteString(w, err.Error())
 			return
 		}
-
-		// TODO: This feels hacky. see if we can avoid spinning up a
-		// new HTTP server for each forward
-		go func() {
-			err := http.Serve(listener, mux)
-			if err != nil {
-				fmt.Println("listener done", err)
-			}
-		}()
 
 		http.Redirect(w, r, "/", 303)
 	})
@@ -416,6 +407,19 @@ func (c *Client) Run() error {
 
 		http.Redirect(w, r, "/", 303)
 	})
+
+	tunnels, err := c.db.GetForwards()
+	if err != nil {
+		return err
+	}
+
+	for _, tunnel := range tunnels {
+		printJson(tunnel)
+		go func() {
+			err = openTunnel(session, tunnel.Domain, mux)
+			exitOnError(err)
+		}()
+	}
 
 	go func() {
 		err := http.Serve(listener, mux)
@@ -586,4 +590,23 @@ func (m *ClientMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	m.mux.ServeHTTP(w, r)
+}
+
+func openTunnel(session *ClientSession, domain string, mux *ClientMux) error {
+
+	listener, err := session.Listen("tls", domain)
+	if err != nil {
+		return err
+	}
+
+	// TODO: This feels hacky. see if we can avoid spinning up a
+	// new HTTP server for each forward
+	go func() {
+		err := http.Serve(listener, mux)
+		if err != nil {
+			fmt.Println("listener done", err)
+		}
+	}()
+
+	return nil
 }
