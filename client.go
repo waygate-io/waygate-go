@@ -97,6 +97,17 @@ func NewClient(config *ClientConfig) *Client {
 		DNSProvider: dnsProvider,
 	}
 
+	domains, err := db.GetDomains()
+	exitOnError(err)
+
+	certConfig := certmagic.NewDefault()
+
+	for _, domain := range domains {
+		ctx := context.Background()
+		err := certConfig.ManageAsync(ctx, []string{domain, "*." + domain})
+		exitOnError(err)
+	}
+
 	return &Client{
 		db:      db,
 		config:  &configCopy,
