@@ -491,7 +491,7 @@ func handleListenTCP(wtTun Tunnel, addr string) (net.Listener, error) {
 				continue
 			}
 
-			ConnectConns(tcpConn, stream)
+			go ConnectConns(tcpConn, stream)
 		}
 	}()
 

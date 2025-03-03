@@ -292,7 +292,7 @@ func (s *ClientSession) handleStream(downstreamConn connCloseWriter) {
 
 	key := serverName
 	if key == "" {
-		key = fmt.Sprintf(":%d", port)
+		key = fmt.Sprintf("0.0.0.0:%d", port)
 	}
 
 	// TODO: mutex on s.listenMap

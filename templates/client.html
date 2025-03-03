@@ -40,13 +40,16 @@
 <h3>Add Tunnel</h3>
 
 <form action='/add-forward' method='POST'>
+  <input type='text' name='domain' />
+  <!--
   <input type='text' name='hostname' />
   .
   <select name='domain'>
-    {{range .Domains}}
+    {{/*range .Domains*/}}
     <option>{{.}}</option>
-    {{end}}
+    {{/*end*/}}
   </select>
+  -->
   ->
   <input type='text' name='target-address' />
 

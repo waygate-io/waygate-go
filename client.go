@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/anderspitman/treemess-go"
 	"github.com/caddyserver/certmagic"
@@ -349,7 +351,8 @@ func (c *Client) Run() error {
 			return
 		}
 
-		err = openTunnel(session, domain, mux)
+		addr := domain
+		err = openTunnel(session, mux, addr, targetAddr)
 		if err != nil {
 			w.WriteHeader(500)
 			io.WriteString(w, err.Error())
@@ -416,7 +419,8 @@ func (c *Client) Run() error {
 	for _, tunnel := range tunnels {
 		printJson(tunnel)
 		go func() {
-			err = openTunnel(session, tunnel.Domain, mux)
+			addr := tunnel.Domain
+			err = openTunnel(session, mux, addr, tunnel.TargetAddress)
 			exitOnError(err)
 		}()
 	}
@@ -592,21 +596,58 @@ func (m *ClientMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	m.mux.ServeHTTP(w, r)
 }
 
-func openTunnel(session *ClientSession, domain string, mux *ClientMux) error {
+func openTunnel(session *ClientSession, mux *ClientMux, addr, target string) error {
 
-	listener, err := session.Listen("tls", domain)
-	if err != nil {
-		return err
-	}
+	var network string
 
-	// TODO: This feels hacky. see if we can avoid spinning up a
-	// new HTTP server for each forward
-	go func() {
-		err := http.Serve(listener, mux)
+        // TODO: handle IPv6
+	addrParts := strings.Split(addr, ":")
+	if len(addrParts) == 2 {
+		fmt.Println("listen tcp")
+		network = "tcp"
+		listener, err := session.Listen(network, addr)
 		if err != nil {
-			fmt.Println("listener done", err)
+			return err
 		}
-	}()
+
+		go func() {
+			for {
+				conn, err := listener.Accept()
+                                if err != nil {
+                                        fmt.Println(err)
+                                        continue
+                                }
+				go func() {
+					upstreamConn, err := net.Dial("tcp", target)
+					if err != nil {
+						fmt.Println(err)
+						return
+					}
+
+					cwConn := conn.(connCloseWriter)
+					cwUpstreamConn := upstreamConn.(connCloseWriter)
+
+					ConnectConns(cwConn, cwUpstreamConn)
+				}()
+			}
+		}()
+	} else {
+		fmt.Println("listen tls")
+		network = "tls"
+		listener, err := session.Listen(network, addr)
+		if err != nil {
+			return err
+		}
+
+		// TODO: This feels hacky. see if we can avoid spinning up a
+		// new HTTP server for each forward
+		go func() {
+			err := http.Serve(listener, mux)
+			if err != nil {
+				fmt.Println("listener done", err)
+			}
+		}()
+	}
 
 	return nil
 }
