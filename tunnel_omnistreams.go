@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/anderspitman/dashtui"
@@ -20,8 +21,10 @@ import (
 )
 
 type OmnistreamsTunnel struct {
-	conn      *omnistreams.Connection
-	tunConfig *TunnelConfig
+	conn       *omnistreams.Connection
+	tunConfig  *TunnelConfig
+	eventChans []chan TunnelEvent
+	mut        *sync.Mutex
 }
 
 func (t *OmnistreamsTunnel) OpenStream() (connCloseWriter, error) {
@@ -136,6 +139,26 @@ func (t *OmnistreamsTunnel) HandleRequests(callback func(interface{}) interface{
 	return handleRequests(t, callback)
 }
 
+func (t *OmnistreamsTunnel) Events() chan TunnelEvent {
+	eventCh := make(chan TunnelEvent, 1)
+
+	t.mut.Lock()
+	defer t.mut.Unlock()
+
+	t.eventChans = append(t.eventChans, eventCh)
+	return eventCh
+}
+
+func (t *OmnistreamsTunnel) emit(evt interface{}) {
+	t.mut.Lock()
+	chans := t.eventChans
+	t.mut.Unlock()
+
+	for _, ch := range chans {
+		ch <- evt
+	}
+}
+
 func NewOmnistreamsServerTunnel(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -164,6 +187,13 @@ func NewOmnistreamsServerTunnel(
 
 	conn := omnistreams.NewConnection(wr, false)
 
+	t := &OmnistreamsTunnel{
+		conn:       conn,
+		tunConfig:  tunConfig,
+		mut:        &sync.Mutex{},
+		eventChans: []chan TunnelEvent{},
+	}
+
 	eventCh := conn.Events()
 	go func() {
 		numStreams := 0
@@ -186,12 +216,9 @@ func NewOmnistreamsServerTunnel(
 				fmt.Println("Unknown omnistreams event", evt)
 			}
 		}
-	}()
 
-	t := &OmnistreamsTunnel{
-		conn:      conn,
-		tunConfig: tunConfig,
-	}
+		t.emit(TunnelEventClose{})
+	}()
 
 	_, err = request(t, tunConfig)
 	if err != nil {
@@ -264,8 +291,10 @@ func NewOmnistreamsClientTunnel(tunReq TunnelRequest) (*OmnistreamsTunnel, error
 	}
 
 	t := &OmnistreamsTunnel{
-		conn:      conn,
-		tunConfig: &tunConfig,
+		conn:       conn,
+		tunConfig:  &tunConfig,
+		mut:        &sync.Mutex{},
+		eventChans: []chan TunnelEvent{},
 	}
 
 	return t, nil

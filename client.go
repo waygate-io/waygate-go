@@ -600,7 +600,7 @@ func openTunnel(session *ClientSession, mux *ClientMux, addr, target string) err
 
 	var network string
 
-        // TODO: handle IPv6
+	// TODO: handle IPv6
 	addrParts := strings.Split(addr, ":")
 	if len(addrParts) == 2 {
 		fmt.Println("listen tcp")
@@ -613,10 +613,10 @@ func openTunnel(session *ClientSession, mux *ClientMux, addr, target string) err
 		go func() {
 			for {
 				conn, err := listener.Accept()
-                                if err != nil {
-                                        fmt.Println(err)
-                                        continue
-                                }
+				if err != nil {
+					fmt.Println(err)
+					continue
+				}
 				go func() {
 					upstreamConn, err := net.Dial("tcp", target)
 					if err != nil {

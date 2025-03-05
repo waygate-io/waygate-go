@@ -21,7 +21,12 @@ type Tunnel interface {
 	HandleRequests(callback func(interface{}) interface{}) error
 	SendDatagram(msg []byte, srcAddr, dstAddr net.Addr) error
 	ReceiveDatagram() ([]byte, net.Addr, net.Addr, error)
+	Events() chan TunnelEvent
 }
+
+type TunnelEvent interface{}
+
+type TunnelEventClose struct{}
 
 type DialRequest struct {
 	Network string `json:"network"`

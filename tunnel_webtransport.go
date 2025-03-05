@@ -81,6 +81,10 @@ func (t *WebTransportTunnel) AcceptStreamType() (connCloseWriter, MessageType, e
 	}, msgType, nil
 }
 
+func (t *WebTransportTunnel) Events() chan TunnelEvent {
+	return nil
+}
+
 func NewWebTransportServerTunnel(
 	w http.ResponseWriter,
 	r *http.Request,

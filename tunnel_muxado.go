@@ -88,6 +88,10 @@ func (t *MuxadoTunnel) GetConfig() TunnelConfig {
 	return t.tunConfig
 }
 
+func (t *MuxadoTunnel) Events() chan TunnelEvent {
+	return nil
+}
+
 func NewWebSocketMuxadoServerTunnel(
 	w http.ResponseWriter,
 	r *http.Request,

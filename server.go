@@ -241,6 +241,8 @@ func (s *Server) Run() {
 
 	mux.HandleFunc("/waygate", func(w http.ResponseWriter, r *http.Request) {
 
+		fmt.Println("/waygate")
+
 		var tunnel Tunnel
 		if r.ProtoMajor == 3 {
 			wtTun, err := NewWebTransportServerTunnel(w, r, wtServer, s.jose, s.config.Public, s.config.TunnelDomains)
@@ -468,7 +470,7 @@ func handleListenTCP(wtTun Tunnel, addr string) (net.Listener, error) {
 			conn, err := ln.Accept()
 			if err != nil {
 				fmt.Println("Failed to forward")
-				continue
+				break
 			}
 
 			stream, err := wtTun.OpenStream()
@@ -492,6 +494,18 @@ func handleListenTCP(wtTun Tunnel, addr string) (net.Listener, error) {
 			}
 
 			go ConnectConns(tcpConn, stream)
+		}
+	}()
+
+	go func() {
+		events := wtTun.Events()
+		evt := <-events
+		switch evt.(type) {
+		case TunnelEventClose:
+			err := ln.Close()
+			if err != nil {
+				fmt.Println("handleListenTCP close listener", err)
+			}
 		}
 	}()
 
