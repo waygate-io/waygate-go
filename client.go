@@ -198,7 +198,7 @@ func (c *Client) Run() error {
 	}
 
 	//listener, err := Listen("tls", "tn7.org", ListenOptions{
-	listener, err := session.Listen("tcp", "")
+	listener, err := session.Listen("tls", "")
 	if err != nil {
 		return err
 	}
@@ -331,28 +331,30 @@ func (c *Client) Run() error {
 		}
 
 		protected := r.Form.Get("protected") == "on"
-		fmt.Println(r.Form.Get("protected"))
+		tlsPassthrough := r.Form.Get("tls_passthrough") == "on"
 
-		hostname := r.Form.Get("hostname")
+		//hostname := r.Form.Get("hostname")
 
-		subdomain := domain
-		if hostname != "" {
-			subdomain = fmt.Sprintf("%s.%s", hostname, domain)
+		//subdomain := domain
+		//if hostname != "" {
+		//	subdomain = fmt.Sprintf("%s.%s", hostname, domain)
+		//}
+
+		tunnel := &Forward{
+			Domain:         domain,
+			TargetAddress:  targetAddr,
+			Protected:      protected,
+			TLSPassthrough: tlsPassthrough,
 		}
 
-		err := c.db.SetForward(&Forward{
-			Domain:        subdomain,
-			TargetAddress: targetAddr,
-			Protected:     protected,
-		})
+		err := c.db.SetForward(tunnel)
 		if err != nil {
 			w.WriteHeader(500)
 			io.WriteString(w, err.Error())
 			return
 		}
 
-		addr := domain
-		err = openTunnel(session, mux, addr, targetAddr)
+		err = openTunnel(session, mux, tunnel)
 		if err != nil {
 			w.WriteHeader(500)
 			io.WriteString(w, err.Error())
@@ -419,8 +421,7 @@ func (c *Client) Run() error {
 	for _, tunnel := range tunnels {
 		printJson(tunnel)
 		go func() {
-			addr := tunnel.Domain
-			err = openTunnel(session, mux, addr, tunnel.TargetAddress)
+			err = openTunnel(session, mux, tunnel)
 			exitOnError(err)
 		}()
 	}
@@ -596,16 +597,15 @@ func (m *ClientMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	m.mux.ServeHTTP(w, r)
 }
 
-func openTunnel(session *ClientSession, mux *ClientMux, addr, target string) error {
+func openTunnel(session *ClientSession, mux *ClientMux, tunnel *Forward) error {
 
-	var network string
+	addr := tunnel.Domain
 
 	// TODO: handle IPv6
 	addrParts := strings.Split(addr, ":")
 	if len(addrParts) == 2 {
 		fmt.Println("listen tcp")
-		network = "tcp"
-		listener, err := session.Listen(network, addr)
+		listener, err := session.Listen("tcp", addr)
 		if err != nil {
 			return err
 		}
@@ -618,7 +618,7 @@ func openTunnel(session *ClientSession, mux *ClientMux, addr, target string) err
 					continue
 				}
 				go func() {
-					upstreamConn, err := net.Dial("tcp", target)
+					upstreamConn, err := net.Dial("tcp", tunnel.TargetAddress)
 					if err != nil {
 						fmt.Println(err)
 						return
@@ -633,21 +633,53 @@ func openTunnel(session *ClientSession, mux *ClientMux, addr, target string) err
 		}()
 	} else {
 		fmt.Println("listen tls")
-		network = "tls"
-		listener, err := session.Listen(network, addr)
-		if err != nil {
-			return err
-		}
 
-		// TODO: This feels hacky. see if we can avoid spinning up a
-		// new HTTP server for each forward
-		go func() {
-			err := http.Serve(listener, mux)
+		if tunnel.TLSPassthrough {
+			listener, err := session.Listen("tcp", addr)
 			if err != nil {
-				fmt.Println("listener done", err)
+				return err
 			}
-		}()
+
+			go func() {
+				for {
+					conn, err := listener.Accept()
+					if err != nil {
+						fmt.Println(err)
+						break
+					}
+
+					proxyTcp(conn, tunnel.TargetAddress)
+				}
+			}()
+		} else {
+			listener, err := session.Listen("tls", addr)
+			if err != nil {
+				return err
+			}
+
+			// TODO: This feels hacky. see if we can avoid spinning up a
+			// new HTTP server for each forward
+			go func() {
+				err := http.Serve(listener, mux)
+				if err != nil {
+					fmt.Println("listener done", err)
+				}
+			}()
+		}
 	}
 
 	return nil
+}
+
+func proxyTcp(downstreamConn net.Conn, upstreamAddr string) {
+	upstreamConn, err := net.Dial("tcp", upstreamAddr)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	cwConn := downstreamConn.(connCloseWriter)
+	cwUpstreamConn := upstreamConn.(connCloseWriter)
+
+	ConnectConns(cwConn, cwUpstreamConn)
 }

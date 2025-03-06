@@ -11,6 +11,7 @@
       <td>Domain</td>
       <td>Target</td>
       <td>Protected</td>
+      <td>TLS Passthrough</td>
       <td>Actions</td>
     </tr>
   </thead>
@@ -24,6 +25,9 @@
     </td>
     <td>
       {{$forward.Protected}}
+    </td>
+    <td>
+      {{$forward.TLSPassthrough}}
     </td>
     <td>
       <form action='/delete-forward' method='POST'>
@@ -56,6 +60,8 @@
   <div>
     <label for='protected-checkbox'>Protected:</label>
     <input id='protected-checkbox' type='checkbox' name='protected' />
+    <label for='tls-passthrough-checkbox'>TLS Passthrough:</label>
+    <input id='tls-passthrough-checkbox' type='checkbox' name='tls_passthrough' />
   </div>
 
   <div>

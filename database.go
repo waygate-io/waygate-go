@@ -6,9 +6,10 @@ import (
 )
 
 type Forward struct {
-	Domain        string `db:"domain"`
-	Protected     bool   `db:"protected"`
-	TargetAddress string `db:"target_address"`
+	Domain         string `db:"domain"`
+	Protected      bool   `db:"protected"`
+	TargetAddress  string `db:"target_address"`
+	TLSPassthrough bool   `db:"tls_passthrough"`
 }
 
 type Database struct {
@@ -128,7 +129,8 @@ func NewClientDatabase(path string) (*ClientDatabase, error) {
         CREATE TABLE IF NOT EXISTS forwards(
                 domain TEXT UNIQUE NOT NULL,
                 target_address TEXT NOT NULL,
-                protected BOOLEAN
+                protected BOOLEAN,
+                tls_passthrough BOOLEAN
         );
         `
 	_, err = db.Exec(stmt)
@@ -234,9 +236,9 @@ func (s *ClientDatabase) GetForward(domain string) (*Forward, error) {
 
 func (d *ClientDatabase) SetForward(f *Forward) error {
 	stmt := `
-        INSERT OR REPLACE INTO forwards(domain,target_address,protected) VALUES(?,?,?);
+        INSERT OR REPLACE INTO forwards(domain,target_address,protected,tls_passthrough) VALUES(?,?,?,?);
         `
-	_, err := d.db.Exec(stmt, f.Domain, f.TargetAddress, f.Protected)
+	_, err := d.db.Exec(stmt, f.Domain, f.TargetAddress, f.Protected, f.TLSPassthrough)
 	if err != nil {
 		return err
 	}

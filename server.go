@@ -92,6 +92,7 @@ func (s *Server) Run() {
 	certmagic.Default.Logger = zap.NewNop()
 	//certmagic.DefaultACME.CA = certmagic.LetsEncryptStagingCA
 
+	// TODO: maybe perform this check on listen and use a separate certmagic object for each tunnel
 	if s.config.DnsProvider != "" {
 		dnsProvider, err := getDnsProvider(s.config.DnsProvider, s.config.DnsToken, s.config.DnsUser)
 		exitOnError(err)

@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/caddyserver/certmagic"
@@ -27,8 +28,9 @@ type ListenOptions struct {
 }
 
 type Listener struct {
-	listener *PassthroughListener
-	tunnel   Tunnel
+	listener       *PassthroughListener
+	tunnel         Tunnel
+	tlsPassthrough bool
 }
 
 func (l *Listener) Accept() (net.Conn, error) {
@@ -94,7 +96,7 @@ type ClientSession struct {
 	//tunnel         *WebTransportTunnel
 	tlsConfig      *tls.Config
 	tlsTermination string
-	listenMap      map[string]*PassthroughListener
+	listenMap      map[string]*Listener
 	udpMap         map[string]*UDPConn
 	mut            *sync.Mutex
 	logger         *zap.Logger
@@ -171,7 +173,7 @@ func NewClientSession(token string, db *ClientDatabase) (*ClientSession, error) 
 		tunnel:         tunnel,
 		tlsConfig:      tlsConfig,
 		tlsTermination: tunnel.GetConfig().TerminationType,
-		listenMap:      make(map[string]*PassthroughListener),
+		listenMap:      make(map[string]*Listener),
 		udpMap:         make(map[string]*UDPConn),
 		mut:            &sync.Mutex{},
 		logger:         logger,
@@ -250,10 +252,41 @@ func (s *ClientSession) handleStream(downstreamConn connCloseWriter) {
 		serverName = string(tlvs[PROXY_PROTO_SERVER_NAME_OFFSET])
 	}
 
+	_, portStr, err := net.SplitHostPort(localAddress)
+	if err != nil {
+		log.Println("Error splitting address")
+		return
+	}
+
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		log.Println("Error parsing port")
+		return
+	}
+
+	key := serverName
+	if key == "" {
+		key = fmt.Sprintf("0.0.0.0:%d", port)
+	}
+
+	s.mut.Lock()
+	defer s.mut.Unlock()
+
+	// TODO: mutex on s.listenMap
+	listener, exists := s.listenMap[key]
+	if !exists {
+		listener, exists = s.listenMap[ListenerDefaultKey]
+		if !exists {
+			fmt.Println("No such listener", key)
+			conn.Close()
+			return
+		}
+	}
+
 	// TODO: figure out a cleaner way to disable TLS for raw TCP.
 	// TerminationType should probably be a per-listen setting, instead
 	// of per-tunnel
-	if s.tlsTermination == "client" && serverName != "" {
+	if s.tlsTermination == "client" && !listener.tlsPassthrough && serverName != "" {
 		tlsConn := tls.Server(conn, s.tlsConfig)
 		err := tlsConn.Handshake()
 		if err != nil {
@@ -275,38 +308,7 @@ func (s *ClientSession) handleStream(downstreamConn connCloseWriter) {
 		},
 	}
 
-	s.mut.Lock()
-	defer s.mut.Unlock()
-
-	_, portStr, err := net.SplitHostPort(localAddress)
-	if err != nil {
-		log.Println("Error splitting address")
-		return
-	}
-
-	port, err := strconv.Atoi(portStr)
-	if err != nil {
-		log.Println("Error parsing port")
-		return
-	}
-
-	key := serverName
-	if key == "" {
-		key = fmt.Sprintf("0.0.0.0:%d", port)
-	}
-
-	// TODO: mutex on s.listenMap
-	listener, exists := s.listenMap[key]
-	if !exists {
-		listener, exists = s.listenMap[ListenerDefaultKey]
-		if !exists {
-			fmt.Println("No such listener", key)
-			conn.Close()
-			return
-		}
-	}
-
-	listener.PassConn(conn)
+	listener.listener.PassConn(conn)
 }
 
 func (s *ClientSession) GetTunnelConfig() TunnelConfig {
@@ -394,6 +396,17 @@ func (s *ClientSession) Listen(network, address string) (*Listener, error) {
 		return nil, errors.New(fmt.Sprintf("Invalid network type: %s", network))
 	}
 
+	tlsPassthrough := false
+	// TODO: handle IPv6
+	addrParts := strings.Split(address, ":")
+	// If a TCP tunnel is requested but no port is provided, assume it's
+	// a TLS connection but we should not decrypt, ie we should pass
+	// through the raw TCP stream.
+	if network == "tcp" && len(addrParts) != 2 && address != ListenerDefaultKey {
+		tlsPassthrough = true
+		network = "tls"
+	}
+
 	if address == "" {
 		address = ListenerDefaultKey
 	} else {
@@ -419,12 +432,13 @@ func (s *ClientSession) Listen(network, address string) (*Listener, error) {
 
 	listener := NewPassthroughListener()
 
-	s.listenMap[address] = listener
-
 	l := &Listener{
-		listener: listener,
-		tunnel:   s.tunnel,
+		listener:       listener,
+		tunnel:         s.tunnel,
+		tlsPassthrough: tlsPassthrough,
 	}
+
+	s.listenMap[address] = l
 
 	return l, nil
 }
