@@ -610,27 +610,7 @@ func openTunnel(session *ClientSession, mux *ClientMux, tunnel *Forward) error {
 			return err
 		}
 
-		go func() {
-			for {
-				conn, err := listener.Accept()
-				if err != nil {
-					fmt.Println(err)
-					continue
-				}
-				go func() {
-					upstreamConn, err := net.Dial("tcp", tunnel.TargetAddress)
-					if err != nil {
-						fmt.Println(err)
-						return
-					}
-
-					cwConn := conn.(connCloseWriter)
-					cwUpstreamConn := upstreamConn.(connCloseWriter)
-
-					ConnectConns(cwConn, cwUpstreamConn)
-				}()
-			}
-		}()
+		go proxyTcpConns(listener, tunnel)
 	} else {
 		fmt.Println("listen tls")
 
@@ -640,17 +620,7 @@ func openTunnel(session *ClientSession, mux *ClientMux, tunnel *Forward) error {
 				return err
 			}
 
-			go func() {
-				for {
-					conn, err := listener.Accept()
-					if err != nil {
-						fmt.Println(err)
-						break
-					}
-
-					proxyTcp(conn, tunnel.TargetAddress)
-				}
-			}()
+			go proxyTcpConns(listener, tunnel)
 		} else {
 			listener, err := session.Listen("tls", addr)
 			if err != nil {
@@ -669,6 +639,18 @@ func openTunnel(session *ClientSession, mux *ClientMux, tunnel *Forward) error {
 	}
 
 	return nil
+}
+
+func proxyTcpConns(listener net.Listener, tunnel *Forward) {
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			fmt.Println(err)
+			break
+		}
+
+		go proxyTcp(conn, tunnel.TargetAddress)
+	}
 }
 
 func proxyTcp(downstreamConn net.Conn, upstreamAddr string) {
