@@ -520,7 +520,7 @@ func handleListenUDP(tunnel Tunnel, listenAddr string) (net.Conn, error) {
 		return nil, err
 	}
 
-	conn, err := net.ListenUDP("udp", udpAddr)
+	conn, err := net.ListenUDP("udp4", udpAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -538,7 +538,22 @@ func handleListenUDP(tunnel Tunnel, listenAddr string) (net.Conn, error) {
 
 			dstAddr := conn.LocalAddr()
 
-			tunnel.SendDatagram(buf[:n], srcAddr, dstAddr)
+			err = tunnel.SendDatagram(buf[:n], srcAddr, dstAddr)
+			if err != nil {
+				fmt.Println(err)
+			}
+		}
+	}()
+
+	go func() {
+		events := tunnel.Events()
+		evt := <-events
+		switch evt.(type) {
+		case TunnelEventClose:
+			err := conn.Close()
+			if err != nil {
+				fmt.Println("handleListenUDP close conn", err)
+			}
 		}
 	}()
 

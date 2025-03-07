@@ -11,6 +11,7 @@
       <td>Domain</td>
       <td>Target</td>
       <td>Protected</td>
+      <td>Type</td>
       <td>TLS Passthrough</td>
       <td>Actions</td>
     </tr>
@@ -25,6 +26,9 @@
     </td>
     <td>
       {{$forward.Protected}}
+    </td>
+    <td>
+      {{$forward.Type}}
     </td>
     <td>
       {{$forward.TLSPassthrough}}
@@ -62,6 +66,13 @@
     <input id='protected-checkbox' type='checkbox' name='protected' />
     <label for='tls-passthrough-checkbox'>TLS Passthrough:</label>
     <input id='tls-passthrough-checkbox' type='checkbox' name='tls_passthrough' />
+    <label for='tunnel-type-dropdown'>Tunnel Type:</label>
+    <select id='tunnel-type-dropdown' name='type'>
+      <option>HTTPS</option>
+      <option>TLS</option>
+      <option>TCP</option>
+      <option>UDP</option>
+    </select>
   </div>
 
   <div>

@@ -19,6 +19,11 @@ import (
 	"github.com/lastlogin-net/obligator"
 )
 
+const TunnelTypeHTTPS = "HTTPS"
+const TunnelTypeTLS = "TLS"
+const TunnelTypeTCP = "TCP"
+const TunnelTypeUDP = "UDP"
+
 var WaygateServerDomain string = "waygate.io"
 
 type ClientConfig struct {
@@ -332,6 +337,13 @@ func (c *Client) Run() error {
 
 		protected := r.Form.Get("protected") == "on"
 		tlsPassthrough := r.Form.Get("tls_passthrough") == "on"
+		tunnelType := r.Form.Get("type")
+
+		if tunnelType != TunnelTypeHTTPS && tunnelType != TunnelTypeTLS && tunnelType != TunnelTypeTCP && tunnelType != TunnelTypeUDP {
+			w.WriteHeader(400)
+			io.WriteString(w, "Invalid 'type' parameter")
+			return
+		}
 
 		//hostname := r.Form.Get("hostname")
 
@@ -344,6 +356,7 @@ func (c *Client) Run() error {
 			Domain:         domain,
 			TargetAddress:  targetAddr,
 			Protected:      protected,
+			Type:           tunnelType,
 			TLSPassthrough: tlsPassthrough,
 		}
 
@@ -603,7 +616,33 @@ func openTunnel(session *ClientSession, mux *ClientMux, tunnel *Forward) error {
 
 	// TODO: handle IPv6
 	addrParts := strings.Split(addr, ":")
-	if len(addrParts) == 2 {
+
+	if tunnel.Type == TunnelTypeUDP {
+		udpAddr, err := net.ResolveUDPAddr("udp", addr)
+		if err != nil {
+			return err
+		}
+
+		go func() {
+			conn, err := session.ListenUDP("udp", udpAddr)
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+
+			for {
+				buf := make([]byte, 512)
+				_, _, err = conn.ReadFromUDP(buf)
+				if err != nil {
+					fmt.Println(err)
+					return
+				}
+
+				fmt.Println(string(buf))
+			}
+		}()
+
+	} else if len(addrParts) == 2 {
 		fmt.Println("listen tcp")
 		listener, err := session.Listen("tcp", addr)
 		if err != nil {
