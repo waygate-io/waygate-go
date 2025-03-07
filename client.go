@@ -11,7 +11,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/anderspitman/treemess-go"
 	"github.com/caddyserver/certmagic"
@@ -614,10 +613,8 @@ func openTunnel(session *ClientSession, mux *ClientMux, tunnel *Forward) error {
 
 	addr := tunnel.Domain
 
-	// TODO: handle IPv6
-	addrParts := strings.Split(addr, ":")
-
-	if tunnel.Type == TunnelTypeUDP {
+	switch tunnel.Type {
+	case TunnelTypeUDP:
 		udpAddr, err := net.ResolveUDPAddr("udp", addr)
 		if err != nil {
 			return err
@@ -642,7 +639,7 @@ func openTunnel(session *ClientSession, mux *ClientMux, tunnel *Forward) error {
 			}
 		}()
 
-	} else if len(addrParts) == 2 {
+	case TunnelTypeTCP:
 		fmt.Println("listen tcp")
 		listener, err := session.Listen("tcp", addr)
 		if err != nil {
@@ -650,7 +647,9 @@ func openTunnel(session *ClientSession, mux *ClientMux, tunnel *Forward) error {
 		}
 
 		go proxyTcpConns(listener, tunnel)
-	} else {
+	case TunnelTypeTLS:
+		fallthrough
+	case TunnelTypeHTTPS:
 		fmt.Println("listen tls")
 
 		if tunnel.TLSPassthrough {
