@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/anderspitman/treemess-go"
 	"github.com/caddyserver/certmagic"
@@ -615,32 +616,11 @@ func openTunnel(session *ClientSession, mux *ClientMux, tunnel *Forward) error {
 
 	switch tunnel.Type {
 	case TunnelTypeUDP:
-		udpAddr, err := net.ResolveUDPAddr("udp", addr)
-		if err != nil {
-			return err
-		}
-
-		go func() {
-			conn, err := session.ListenUDP("udp", udpAddr)
-			if err != nil {
-				fmt.Println(err)
-				return
-			}
-
-			for {
-				buf := make([]byte, 512)
-				_, _, err = conn.ReadFromUDP(buf)
-				if err != nil {
-					fmt.Println(err)
-					return
-				}
-
-				fmt.Println(string(buf))
-			}
-		}()
+		go proxyUdp(session, tunnel)
 
 	case TunnelTypeTCP:
 		fmt.Println("listen tcp")
+		// TODO: this should probably be called in a goroutine
 		listener, err := session.Listen("tcp", addr)
 		if err != nil {
 			return err
@@ -653,6 +633,7 @@ func openTunnel(session *ClientSession, mux *ClientMux, tunnel *Forward) error {
 		fmt.Println("listen tls")
 
 		if tunnel.TLSPassthrough {
+			// TODO: this should probably be called in a goroutine
 			listener, err := session.Listen("tcp", addr)
 			if err != nil {
 				return err
@@ -702,4 +683,89 @@ func proxyTcp(downstreamConn net.Conn, upstreamAddr string) {
 	cwUpstreamConn := upstreamConn.(connCloseWriter)
 
 	ConnectConns(cwConn, cwUpstreamConn)
+}
+
+func proxyUdp(session *ClientSession, tunnel *Forward) {
+
+	downstreamAddr := tunnel.Domain
+
+	udpAddr, err := net.ResolveUDPAddr("udp", downstreamAddr)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	downstreamConn, err := session.ListenUDP("udp", udpAddr)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	upstreamUDPAddr, err := net.ResolveUDPAddr("udp", tunnel.TargetAddress)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	upbuf := make([]byte, 64*1024)
+	downbuf := make([]byte, 64*1024)
+
+	connMap := make(map[string]*net.UDPConn)
+	mut := &sync.Mutex{}
+
+	go func() {
+		for {
+			n, srcAddr, err := downstreamConn.ReadFromUDP(upbuf)
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+
+			mut.Lock()
+			upstreamConn, exists := connMap[srcAddr.String()]
+			mut.Unlock()
+
+			if !exists {
+				upstreamConn, err = net.DialUDP("udp", nil, upstreamUDPAddr)
+				if err != nil {
+					fmt.Println(err)
+					return
+				}
+
+				mut.Lock()
+				connMap[srcAddr.String()] = upstreamConn
+				mut.Unlock()
+
+				// TODO: clean up this nesting
+				go func() {
+
+					srcUDPAddr, err := net.ResolveUDPAddr("udp", srcAddr.String())
+					if err != nil {
+						fmt.Println(err)
+						return
+					}
+
+					for {
+						n, _, err := upstreamConn.ReadFromUDP(downbuf)
+						if err != nil {
+							fmt.Println(err)
+							return
+						}
+
+						_, err = downstreamConn.WriteToUDP(downbuf[:n], srcUDPAddr)
+						if err != nil {
+							fmt.Println(err)
+							return
+						}
+					}
+				}()
+			}
+
+			_, err = upstreamConn.Write(upbuf[:n])
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+		}
+	}()
 }

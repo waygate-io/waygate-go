@@ -282,7 +282,13 @@ func (s *Server) Run() {
 				conn := udpMap[dstAddr.String()]
 				mut.Unlock()
 
-				n, err := conn.Write(dgram)
+				dstUDPAddr, err := net.ResolveUDPAddr("udp", dstAddr.String())
+				if err != nil {
+					fmt.Println("ResolveUDPAddr:", err)
+					break
+				}
+
+				n, err := conn.WriteToUDP(dgram, dstUDPAddr)
 				if err != nil {
 					fmt.Println(err)
 					break
@@ -356,7 +362,7 @@ func (s *Server) Run() {
 						}
 					}
 				} else {
-					_, err = handleListenUDP(tunnel, r.Address)
+					_, err = handleListenUDP(tunnel, r.Address, udpMap, s.mut)
 					if err != nil {
 						return &ListenResponse{
 							Success: false,
@@ -513,14 +519,14 @@ func handleListenTCP(wtTun Tunnel, addr string) (net.Listener, error) {
 	return ln, nil
 }
 
-func handleListenUDP(tunnel Tunnel, listenAddr string) (net.Conn, error) {
+func handleListenUDP(tunnel Tunnel, listenAddr string, udpMap map[string]*net.UDPConn, mut *sync.Mutex) (*net.UDPConn, error) {
 
 	udpAddr, err := net.ResolveUDPAddr("udp", listenAddr)
 	if err != nil {
 		return nil, err
 	}
 
-	conn, err := net.ListenUDP("udp4", udpAddr)
+	downstreamConn, err := net.ListenUDP("udp4", udpAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -530,13 +536,20 @@ func handleListenUDP(tunnel Tunnel, listenAddr string) (net.Conn, error) {
 		buf := make([]byte, 64*1024)
 
 		for {
-			n, srcAddr, err := conn.ReadFromUDP(buf)
+			n, srcAddr, err := downstreamConn.ReadFromUDP(buf)
 			if err != nil {
 				fmt.Println("Failed to forward")
-				continue
+				break
 			}
 
-			dstAddr := conn.LocalAddr()
+			_, exists := udpMap[srcAddr.String()]
+			if !exists {
+				mut.Lock()
+				udpMap[srcAddr.String()] = downstreamConn
+				mut.Unlock()
+			}
+
+			dstAddr := downstreamConn.LocalAddr()
 
 			err = tunnel.SendDatagram(buf[:n], srcAddr, dstAddr)
 			if err != nil {
@@ -550,14 +563,14 @@ func handleListenUDP(tunnel Tunnel, listenAddr string) (net.Conn, error) {
 		evt := <-events
 		switch evt.(type) {
 		case TunnelEventClose:
-			err := conn.Close()
+			err := downstreamConn.Close()
 			if err != nil {
-				fmt.Println("handleListenUDP close conn", err)
+				fmt.Println("handleListenUDP close downstreamConn", err)
 			}
 		}
 	}()
 
-	return conn, nil
+	return downstreamConn, nil
 }
 
 type ServerMux struct {

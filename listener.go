@@ -189,7 +189,7 @@ func (s *ClientSession) start() {
 	go func() {
 
 		for {
-			dgram, _, dstAddr, err := s.tunnel.ReceiveDatagram()
+			msg, srcAddr, dstAddr, err := s.tunnel.ReceiveDatagram()
 			if err != nil {
 				fmt.Println("ClientSession.start ReceiveDatagram:", err)
 				break
@@ -203,7 +203,23 @@ func (s *ClientSession) start() {
 				break
 			}
 
-			udpConn.recvCh <- dgram
+			srcUDPAddr, err := net.ResolveUDPAddr("udp", srcAddr.String())
+			if err != nil {
+				fmt.Println("ClientSession.start ResolveUDPAddr:", err)
+				break
+			}
+
+			dstUDPAddr, err := net.ResolveUDPAddr("udp", dstAddr.String())
+			if err != nil {
+				fmt.Println("ClientSession.start ResolveUDPAddr:", err)
+				break
+			}
+
+			udpConn.recvCh <- datagram{
+				msg:     msg,
+				srcAddr: srcUDPAddr,
+				dstAddr: dstUDPAddr,
+			}
 		}
 
 	}()
@@ -341,14 +357,14 @@ func (s *ClientSession) DialUDP(network string, dstAddr *net.UDPAddr) (*UDPConn,
 	}
 
 	conn := &UDPConn{
-		recvCh: make(chan []byte),
-		sendCh: make(chan []byte),
+		recvCh: make(chan datagram),
+		sendCh: make(chan datagram),
 	}
 
 	go func() {
 		for {
-			msg := <-conn.sendCh
-			s.tunnel.SendDatagram(msg, srcAddr, dstAddr)
+			datagram := <-conn.sendCh
+			s.tunnel.SendDatagram(datagram.msg, srcAddr, dstAddr)
 		}
 	}()
 
@@ -379,13 +395,32 @@ func (s *ClientSession) ListenUDP(network string, udpAddr *net.UDPAddr) (*UDPCon
 
 	printJson(lres)
 
+	localAddr, err := net.ResolveUDPAddr("udp", address)
+	if err != nil {
+		return nil, err
+	}
+
 	c := &UDPConn{
-		recvCh: make(chan []byte),
+		recvCh:    make(chan datagram),
+		sendCh:    make(chan datagram),
+		localAddr: localAddr,
 	}
 
 	s.mut.Lock()
 	s.udpMap[address] = c
 	s.mut.Unlock()
+
+	go func() {
+		for {
+			dgram := <-c.sendCh
+			// TODO: should probably use the conn localAddr here
+			err := s.tunnel.SendDatagram(dgram.msg, dgram.srcAddr, dgram.dstAddr)
+			if err != nil {
+				fmt.Println(err)
+				continue
+			}
+		}
+	}()
 
 	return c, nil
 }
@@ -444,19 +479,20 @@ func (s *ClientSession) Listen(network, address string) (*Listener, error) {
 }
 
 type UDPConn struct {
-	recvCh chan []byte
-	sendCh chan []byte
+	recvCh    chan datagram
+	sendCh    chan datagram
+	localAddr *net.UDPAddr
 }
 
 func (c *UDPConn) ReadFromUDP(buf []byte) (int, *net.UDPAddr, error) {
-	msg := <-c.recvCh
-	if len(msg) > len(buf) {
+	dgram := <-c.recvCh
+	if len(dgram.msg) > len(buf) {
 		return 0, nil, errors.New("UDPConn.ReadFromUDP: buf not big enough")
 	}
 
-	n := copy(buf, msg)
+	n := copy(buf, dgram.msg)
 
-	return n, nil, nil
+	return n, dgram.srcAddr, nil
 }
 
 func (c *UDPConn) WriteToUDP(p []byte, addr *net.UDPAddr) (int, error) {
@@ -465,7 +501,17 @@ func (c *UDPConn) WriteToUDP(p []byte, addr *net.UDPAddr) (int, error) {
 
 	copy(buf, p)
 
-	c.sendCh <- buf
+	c.sendCh <- datagram{
+		msg:     buf,
+		srcAddr: c.localAddr,
+		dstAddr: addr,
+	}
 
 	return len(p), nil
+}
+
+type datagram struct {
+	msg     []byte
+	srcAddr *net.UDPAddr
+	dstAddr *net.UDPAddr
 }
