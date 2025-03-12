@@ -19,6 +19,8 @@ import (
 	"github.com/lastlogin-net/obligator"
 )
 
+type TunnelType string
+
 const TunnelTypeHTTPS = "HTTPS"
 const TunnelTypeTLS = "TLS"
 const TunnelTypeTCP = "TCP"
@@ -283,13 +285,13 @@ func (c *Client) Run() error {
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 
-		forward, err := c.db.GetForward(r.Host)
+		tunnel, err := c.db.GetTunnel(r.Host)
 		if err == nil {
-			proxyHttp(w, r, httpClient, forward.TargetAddress, false)
+			proxyHttp(w, r, httpClient, tunnel.ClientAddress, false)
 			return
 		}
 
-		forwards, err := c.db.GetForwards()
+		tunnels, err := c.db.GetTunnels()
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -302,11 +304,11 @@ func (c *Client) Run() error {
 		}
 
 		tmplData := struct {
-			Domains  []string
-			Forwards []*Forward
+			Domains []string
+			Tunnels []*ClientTunnel
 		}{
-			Domains:  domains,
-			Forwards: forwards,
+			Domains: domains,
+			Tunnels: tunnels,
 		}
 
 		err = c.tmpl.ExecuteTemplate(w, "client.html", tmplData)
@@ -318,20 +320,20 @@ func (c *Client) Run() error {
 
 	})
 
-	mux.HandleFunc("/add-forward", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/add-tunnel", func(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
 
-		domain := r.Form.Get("domain")
-		if domain == "" {
+		serverAddress := r.Form.Get("server_address")
+		if serverAddress == "" {
 			w.WriteHeader(400)
-			io.WriteString(w, "Missing domain")
+			io.WriteString(w, "Missing server_address")
 			return
 		}
 
-		targetAddr := r.Form.Get("target-address")
-		if targetAddr == "" {
+		clientAddress := r.Form.Get("client_address")
+		if clientAddress == "" {
 			w.WriteHeader(400)
-			io.WriteString(w, "Missing target-address")
+			io.WriteString(w, "Missing client_address")
 			return
 		}
 
@@ -352,15 +354,15 @@ func (c *Client) Run() error {
 		//	subdomain = fmt.Sprintf("%s.%s", hostname, domain)
 		//}
 
-		tunnel := &Forward{
-			Domain:         domain,
-			TargetAddress:  targetAddr,
+		tunnel := &ClientTunnel{
+			ServerAddress:  serverAddress,
+			ClientAddress:  clientAddress,
 			Protected:      protected,
 			Type:           tunnelType,
 			TLSPassthrough: tlsPassthrough,
 		}
 
-		err := c.db.SetForward(tunnel)
+		err := c.db.SetTunnel(tunnel)
 		if err != nil {
 			w.WriteHeader(500)
 			io.WriteString(w, err.Error())
@@ -377,17 +379,24 @@ func (c *Client) Run() error {
 		http.Redirect(w, r, "/", 303)
 	})
 
-	mux.HandleFunc("/delete-forward", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/delete-tunnel", func(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
 
-		domain := r.Form.Get("domain")
-		if domain == "" {
+		tunnelType := TunnelType(r.Form.Get("type"))
+		if tunnelType == "" {
 			w.WriteHeader(400)
-			io.WriteString(w, "Missing domain")
+			io.WriteString(w, "Missing type")
 			return
 		}
 
-		err := c.db.DeleteForwardByDomain(domain)
+		address := r.Form.Get("address")
+		if address == "" {
+			w.WriteHeader(400)
+			io.WriteString(w, "Missing address")
+			return
+		}
+
+		err := c.db.DeleteTunnel(tunnelType, address)
 		if err != nil {
 			w.WriteHeader(500)
 			io.WriteString(w, err.Error())
@@ -426,7 +435,7 @@ func (c *Client) Run() error {
 		http.Redirect(w, r, "/", 303)
 	})
 
-	tunnels, err := c.db.GetForwards()
+	tunnels, err := c.db.GetTunnels()
 	if err != nil {
 		return err
 	}
@@ -464,8 +473,8 @@ func (c *Client) Run() error {
 	return nil
 }
 
-func (c *Client) SetForward(forward *Forward) error {
-	return c.db.SetForward(forward)
+func (c *Client) SetTunnel(tunnel *ClientTunnel) error {
+	return c.db.SetTunnel(tunnel)
 }
 
 func (c *Client) GetUsers() ([]*obligator.User, error) {
@@ -550,8 +559,8 @@ func (m *ClientMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	} else if host != authDomain {
 
-		forward, err := m.db.GetForward(host)
-		if err == nil && !forward.Protected {
+		tunnel, err := m.db.GetTunnel(host)
+		if err == nil && !tunnel.Protected {
 			m.mux.ServeHTTP(w, r)
 			return
 		}
@@ -610,9 +619,9 @@ func (m *ClientMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	m.mux.ServeHTTP(w, r)
 }
 
-func openTunnel(session *ClientSession, mux *ClientMux, tunnel *Forward) error {
+func openTunnel(session *ClientSession, mux *ClientMux, tunnel *ClientTunnel) error {
 
-	addr := tunnel.Domain
+	addr := tunnel.ServerAddress
 
 	switch tunnel.Type {
 	case TunnelTypeUDP:
@@ -647,7 +656,7 @@ func openTunnel(session *ClientSession, mux *ClientMux, tunnel *Forward) error {
 			}
 
 			// TODO: This feels hacky. see if we can avoid spinning up a
-			// new HTTP server for each forward
+			// new HTTP server for each client
 			go func() {
 				err := http.Serve(listener, mux)
 				if err != nil {
@@ -660,7 +669,7 @@ func openTunnel(session *ClientSession, mux *ClientMux, tunnel *Forward) error {
 	return nil
 }
 
-func proxyTcpConns(listener net.Listener, tunnel *Forward) {
+func proxyTcpConns(listener net.Listener, tunnel *ClientTunnel) {
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
@@ -668,7 +677,7 @@ func proxyTcpConns(listener net.Listener, tunnel *Forward) {
 			break
 		}
 
-		go proxyTcp(conn, tunnel.TargetAddress)
+		go proxyTcp(conn, tunnel.ClientAddress)
 	}
 }
 
@@ -685,9 +694,9 @@ func proxyTcp(downstreamConn net.Conn, upstreamAddr string) {
 	ConnectConns(cwConn, cwUpstreamConn)
 }
 
-func proxyUdp(session *ClientSession, tunnel *Forward) {
+func proxyUdp(session *ClientSession, tunnel *ClientTunnel) {
 
-	downstreamAddr := tunnel.Domain
+	downstreamAddr := tunnel.ServerAddress
 
 	udpAddr, err := net.ResolveUDPAddr("udp", downstreamAddr)
 	if err != nil {
@@ -701,7 +710,7 @@ func proxyUdp(session *ClientSession, tunnel *Forward) {
 		return
 	}
 
-	upstreamUDPAddr, err := net.ResolveUDPAddr("udp", tunnel.TargetAddress)
+	upstreamUDPAddr, err := net.ResolveUDPAddr("udp", tunnel.ClientAddress)
 	if err != nil {
 		fmt.Println(err)
 		return

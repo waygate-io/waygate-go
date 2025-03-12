@@ -17,8 +17,8 @@ func main() {
 	dnsTokenArg := flag.String("dns-token", "", "DNS Token")
 	dnsUserArg := flag.String("dns-user", "", "DNS User")
 	noBrowserArg := flag.Bool("no-browser", false, "Use OAuth2 device flow to get tokens")
-	var forwards arrayFlags
-	flag.Var(&forwards, "forward", "Forwards")
+	var tunnels arrayFlags
+	flag.Var(&tunnels, "tunnel", "Tunnels")
 
 	flag.Parse()
 
@@ -37,17 +37,17 @@ func main() {
 
 	client := waygate.NewClient(config)
 
-	for _, forward := range forwards {
+	for _, tunnel := range tunnels {
 
-		fmt.Println(forward)
-		parts := strings.Split(forward, "->")
+		fmt.Println(tunnel)
+		parts := strings.Split(tunnel, "->")
 
 		domain := parts[0]
 		target := parts[1]
 
-		client.SetForward(&waygate.Forward{
-			Domain:        domain,
-			TargetAddress: target,
+		client.SetTunnel(&waygate.ClientTunnel{
+			ServerAddress: domain,
+			ClientAddress: target,
 			Protected:     true,
 		})
 

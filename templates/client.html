@@ -2,40 +2,41 @@
 
 <h1>Waygate Client Dashboard</h1>
 
-{{if .Forwards}}
+{{if .Tunnels}}
 <h2>Tunnels</h2>
 
 <table>
   <thead>
     <tr>
-      <td>Domain</td>
-      <td>Target</td>
-      <td>Protected</td>
       <td>Type</td>
+      <td>Server Address</td>
+      <td>Client Address</td>
+      <td>Protected</td>
       <td>TLS Passthrough</td>
       <td>Actions</td>
     </tr>
   </thead>
-  {{range $forward := .Forwards}}
+  {{range $tunnel := .Tunnels}}
   <tr>
     <td>
-      <a href='https://{{$forward.Domain}}' target='_blank'>{{$forward.Domain}}</a>
+      {{$tunnel.Type}}
     </td>
     <td>
-      {{$forward.TargetAddress}}
+      <a href='https://{{$tunnel.ServerAddress}}' target='_blank'>{{$tunnel.ServerAddress}}</a>
     </td>
     <td>
-      {{$forward.Protected}}
+      {{$tunnel.ClientAddress}}
     </td>
     <td>
-      {{$forward.Type}}
+      {{$tunnel.Protected}}
     </td>
     <td>
-      {{$forward.TLSPassthrough}}
+      {{$tunnel.TLSPassthrough}}
     </td>
     <td>
-      <form action='/delete-forward' method='POST'>
-        <input type='hidden' name='domain' value='{{$forward.Domain}}' />
+      <form action='/delete-tunnel' method='POST'>
+        <input type='hidden' name='type' value='{{$tunnel.Type}}' />
+        <input type='hidden' name='address' value='{{$tunnel.ServerAddress}}' />
         <button>Delete</button>
       </form>
     </td>
@@ -47,8 +48,8 @@
 
 <h3>Add Tunnel</h3>
 
-<form action='/add-forward' method='POST'>
-  <input type='text' name='domain' />
+<form action='/add-tunnel' method='POST'>
+  <input type='text' name='server_address' />
   <!--
   <input type='text' name='hostname' />
   .
@@ -59,7 +60,7 @@
   </select>
   -->
   ->
-  <input type='text' name='target-address' />
+  <input type='text' name='client_address' />
 
   <div>
     <label for='protected-checkbox'>Protected:</label>

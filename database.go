@@ -5,10 +5,10 @@ import (
 	//"github.com/mattn/go-sqlite3"
 )
 
-type Forward struct {
-	Domain         string `db:"domain"`
+type ClientTunnel struct {
+	ServerAddress  string `db:"server_address"`
+	ClientAddress  string `db:"client_address"`
 	Protected      bool   `db:"protected"`
-	TargetAddress  string `db:"target_address"`
 	Type           string `db:"type"`
 	TLSPassthrough bool   `db:"tls_passthrough"`
 }
@@ -127,9 +127,9 @@ func NewClientDatabase(path string) (*ClientDatabase, error) {
 	}
 
 	stmt = `
-        CREATE TABLE IF NOT EXISTS forwards(
-                domain TEXT UNIQUE NOT NULL,
-                target_address TEXT NOT NULL,
+        CREATE TABLE IF NOT EXISTS tunnels(
+                server_address TEXT NOT NULL,
+                client_address TEXT NOT NULL,
                 protected BOOLEAN,
                 type TEXT NOT NULL,
                 tls_passthrough BOOLEAN
@@ -207,40 +207,43 @@ func (d *ClientDatabase) SetToken(value string) error {
 	return nil
 }
 
-func (d *ClientDatabase) GetForwards() ([]*Forward, error) {
+func (d *ClientDatabase) GetTunnels() ([]*ClientTunnel, error) {
 
 	stmt := `
-        SELECT * FROM forwards;
+        SELECT * FROM tunnels;
         `
 
-	var forwards []*Forward
+	var tunnels []*ClientTunnel
 
-	err := d.db.Select(&forwards, stmt)
+	err := d.db.Select(&tunnels, stmt)
 	if err != nil {
 		return nil, err
 	}
 
-	return forwards, nil
+	return tunnels, nil
 }
 
-func (s *ClientDatabase) GetForward(domain string) (*Forward, error) {
+func (s *ClientDatabase) GetTunnel(serverAddr string) (*ClientTunnel, error) {
 
-	var forward Forward
+	var tunnel ClientTunnel
 
-	stmt := "SELECT * FROM forwards WHERE domain = ?"
-	err := s.db.Get(&forward, stmt, domain)
+	stmt := "SELECT * FROM tunnels WHERE server_address = ?"
+	err := s.db.Get(&tunnel, stmt, serverAddr)
 	if err != nil {
 		return nil, err
 	}
 
-	return &forward, nil
+	return &tunnel, nil
 }
 
-func (d *ClientDatabase) SetForward(f *Forward) error {
+func (d *ClientDatabase) SetTunnel(f *ClientTunnel) error {
+	//stmt := `
+	//INSERT OR REPLACE INTO tunnels(server_address,client_address,protected,type,tls_passthrough) VALUES(?,?,?,?,?);
+	//`
 	stmt := `
-        INSERT OR REPLACE INTO forwards(domain,target_address,protected,type,tls_passthrough) VALUES(?,?,?,?,?);
+        INSERT INTO tunnels(server_address,client_address,protected,type,tls_passthrough) VALUES(?,?,?,?,?);
         `
-	_, err := d.db.Exec(stmt, f.Domain, f.TargetAddress, f.Protected, f.Type, f.TLSPassthrough)
+	_, err := d.db.Exec(stmt, f.ServerAddress, f.ClientAddress, f.Protected, f.Type, f.TLSPassthrough)
 	if err != nil {
 		return err
 	}
@@ -248,11 +251,11 @@ func (d *ClientDatabase) SetForward(f *Forward) error {
 	return nil
 }
 
-func (d *ClientDatabase) DeleteForwardByDomain(domain string) error {
+func (d *ClientDatabase) DeleteTunnel(tunnelType TunnelType, address string) error {
 	stmt := `
-        DELETE FROM forwards WHERE domain = ?;
+        DELETE FROM tunnels WHERE type = ? AND server_address = ?;
         `
-	_, err := d.db.Exec(stmt, domain)
+	_, err := d.db.Exec(stmt, tunnelType, address)
 	if err != nil {
 		return err
 	}
