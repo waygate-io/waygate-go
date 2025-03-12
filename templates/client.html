@@ -46,38 +46,48 @@
 {{end}}
 
 
-<h3>Add Tunnel</h3>
+<h3>Create Tunnel</h3>
 
 <form action='/add-tunnel' method='POST'>
-  <input type='text' name='server_address' />
-  <!--
-  <input type='text' name='hostname' />
-  .
-  <select name='domain'>
-    {{/*range .Domains*/}}
-    <option>{{.}}</option>
-    {{/*end*/}}
-  </select>
-  -->
-  ->
-  <input type='text' name='client_address' />
-
-  <div>
-    <label for='protected-checkbox'>Protected:</label>
-    <input id='protected-checkbox' type='checkbox' name='protected' />
-    <label for='tls-passthrough-checkbox'>TLS Passthrough:</label>
-    <input id='tls-passthrough-checkbox' type='checkbox' name='tls_passthrough' />
-    <label for='tunnel-type-dropdown'>Tunnel Type:</label>
-    <select id='tunnel-type-dropdown' name='type'>
-      <option>HTTPS</option>
-      <option>TLS</option>
-      <option>TCP</option>
-      <option>UDP</option>
+  <div class='input-list'>
+    <div>
+      <label for='tunnel-type-dropdown'>Tunnel Type:</label>
+      <select id='tunnel-type-dropdown' name='type'>
+        <option>HTTPS</option>
+        <option>TLS</option>
+        <option>TCP</option>
+        <option>UDP</option>
+      </select>
+    </div>
+    <div>
+      <label for='server-address-text'>Server Address:</label>
+      <input id='server-address-text' type='text' name='server_address' />
+    </div>
+    <!--
+    <input type='text' name='hostname' />
+    .
+    <select name='domain'>
+      {{/*range .Domains*/}}
+      <option>{{.}}</option>
+      {{/*end*/}}
     </select>
-  </div>
-
-  <div>
-    <button>Submit</button>
+    ->
+    -->
+    <div>
+      <label for='client-address-text'>Client Address:</label>
+      <input id='client-address-text' type='text' name='client_address' />
+    </div>
+    <div>
+      <label for='protected-checkbox'>Protected (HTTPS only):</label>
+      <input id='protected-checkbox' type='checkbox' name='protected' />
+    </div>
+    <div>
+      <label for='tls-passthrough-checkbox'>TLS Passthrough (TLS/HTTPS only):</label>
+      <input id='tls-passthrough-checkbox' type='checkbox' name='tls_passthrough' />
+    </div>
+    <div>
+      <button>Submit</button>
+    </div>
   </div>
 
 </form>
