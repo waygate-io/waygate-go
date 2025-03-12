@@ -132,7 +132,8 @@ func NewClientDatabase(path string) (*ClientDatabase, error) {
                 client_address TEXT NOT NULL,
                 protected BOOLEAN,
                 type TEXT NOT NULL,
-                tls_passthrough BOOLEAN
+                tls_passthrough BOOLEAN,
+                UNIQUE(server_address, type) ON CONFLICT REPLACE
         );
         `
 	_, err = db.Exec(stmt)
