@@ -22,7 +22,6 @@ const PROXY_PROTO_PP2_TYPE_MIN_CUSTOM = 0xe0
 const PROXY_PROTO_SERVER_NAME_OFFSET = PROXY_PROTO_PP2_TYPE_MIN_CUSTOM + 0
 const ListenerDefaultKey = "default-listener"
 
-
 type ClientSession struct {
 	tunnel Tunnel
 	//tunnel         *WebTransportTunnel
