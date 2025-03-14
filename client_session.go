@@ -22,74 +22,6 @@ const PROXY_PROTO_PP2_TYPE_MIN_CUSTOM = 0xe0
 const PROXY_PROTO_SERVER_NAME_OFFSET = PROXY_PROTO_PP2_TYPE_MIN_CUSTOM + 0
 const ListenerDefaultKey = "default-listener"
 
-type ListenOptions struct {
-	Token string
-	Db    *ClientDatabase
-}
-
-type Listener struct {
-	listener       *PassthroughListener
-	tunnel         Tunnel
-	tlsPassthrough bool
-}
-
-func (l *Listener) Accept() (net.Conn, error) {
-	return l.listener.Accept()
-}
-func (l *Listener) Addr() net.Addr {
-	return l.listener.Addr()
-}
-func (l *Listener) Close() error {
-	return l.listener.Close()
-}
-func (l *Listener) GetTunnelConfig() TunnelConfig {
-	return l.tunnel.GetConfig()
-}
-func DialUDP(network string, udpAddr *net.UDPAddr) (*UDPConn, error) {
-	s, err := NewClientSession(DefaultToken, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return s.DialUDP(network, udpAddr)
-}
-func ListenUDP(network string, udpAddr *net.UDPAddr) (*UDPConn, error) {
-
-	//address := fmt.Sprintf("%s:%d", udpAddr.IP, udpAddr.Port)
-
-	s, err := NewClientSession(DefaultToken, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return s.ListenUDP(network, udpAddr)
-}
-func Listen(network, address string, opts ...ListenOptions) (*Listener, error) {
-
-	token := DefaultToken
-	var db *ClientDatabase
-
-	if len(opts) > 0 {
-		token = opts[0].Token
-		db = opts[0].Db
-	}
-
-	s, err := NewClientSession(token, db)
-	if err != nil {
-		return nil, err
-	}
-
-	return s.Listen(network, address)
-}
-func ListenWithOpts(network, address, token string, db *ClientDatabase) (*Listener, error) {
-
-	s, err := NewClientSession(token, db)
-	if err != nil {
-		return nil, err
-	}
-
-	return s.Listen(network, address)
-}
 
 type ClientSession struct {
 	tunnel Tunnel
@@ -476,6 +408,75 @@ func (s *ClientSession) Listen(network, address string) (*Listener, error) {
 	s.listenMap[address] = l
 
 	return l, nil
+}
+
+type ListenOptions struct {
+	Token string
+	Db    *ClientDatabase
+}
+
+type Listener struct {
+	listener       *PassthroughListener
+	tunnel         Tunnel
+	tlsPassthrough bool
+}
+
+func (l *Listener) Accept() (net.Conn, error) {
+	return l.listener.Accept()
+}
+func (l *Listener) Addr() net.Addr {
+	return l.listener.Addr()
+}
+func (l *Listener) Close() error {
+	return l.listener.Close()
+}
+func (l *Listener) GetTunnelConfig() TunnelConfig {
+	return l.tunnel.GetConfig()
+}
+func DialUDP(network string, udpAddr *net.UDPAddr) (*UDPConn, error) {
+	s, err := NewClientSession(DefaultToken, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.DialUDP(network, udpAddr)
+}
+func ListenUDP(network string, udpAddr *net.UDPAddr) (*UDPConn, error) {
+
+	//address := fmt.Sprintf("%s:%d", udpAddr.IP, udpAddr.Port)
+
+	s, err := NewClientSession(DefaultToken, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.ListenUDP(network, udpAddr)
+}
+func Listen(network, address string, opts ...ListenOptions) (*Listener, error) {
+
+	token := DefaultToken
+	var db *ClientDatabase
+
+	if len(opts) > 0 {
+		token = opts[0].Token
+		db = opts[0].Db
+	}
+
+	s, err := NewClientSession(token, db)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.Listen(network, address)
+}
+func ListenWithOpts(network, address, token string, db *ClientDatabase) (*Listener, error) {
+
+	s, err := NewClientSession(token, db)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.Listen(network, address)
 }
 
 type UDPConn struct {
