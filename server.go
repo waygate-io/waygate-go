@@ -98,7 +98,9 @@ func (s *Server) Run() {
 		exitOnError(err)
 
 		certmagic.DefaultACME.DNS01Solver = &certmagic.DNS01Solver{
-			DNSProvider: dnsProvider,
+			DNSManager: certmagic.DNSManager{
+				DNSProvider: dnsProvider,
+			},
 		}
 	} else {
 		certmagic.Default.OnDemand = &certmagic.OnDemandConfig{

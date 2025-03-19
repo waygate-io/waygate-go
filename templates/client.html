@@ -46,6 +46,39 @@
 {{end}}
 
 
+<h3>Create HTTPS Tunnel</h3>
+
+<form action='/add-tunnel' method='POST'>
+  <input type='hidden' name='type' value='HTTPS' />
+  <div class='list'>
+    <div>
+      <label>Server Address:</label>
+      <input type='text' name='host' placeholder='host' />
+      .
+      <select name='domain'>
+        {{range .Domains}}
+        <option>{{.}}</option>
+        {{end}}
+      </select>
+    </div>
+    <div>
+      <label for='client-address-text'>Client Address:</label>
+      <input id='client-address-text' type='text' name='client_address' />
+    </div>
+    <div>
+      <label for='protected-checkbox'>Protected:</label>
+      <input id='protected-checkbox' type='checkbox' name='protected' />
+    </div>
+    <div>
+      <label for='tls-passthrough-checkbox'>TLS Passthrough:</label>
+      <input id='tls-passthrough-checkbox' type='checkbox' name='tls_passthrough' />
+    </div>
+    <div>
+      <button>Submit</button>
+    </div>
+  </div>
+</form>
+
 <h3>Create Tunnel</h3>
 
 <form action='/add-tunnel' method='POST'>
@@ -53,7 +86,6 @@
     <div>
       <label for='tunnel-type-dropdown'>Tunnel Type:</label>
       <select id='tunnel-type-dropdown' name='type'>
-        <option>HTTPS</option>
         <option>TLS</option>
         <option>TCP</option>
         <option>UDP</option>
@@ -63,39 +95,25 @@
       <label for='server-address-text'>Server Address:</label>
       <input id='server-address-text' type='text' name='server_address' />
     </div>
-    <!--
-    <input type='text' name='hostname' />
-    .
-    <select name='domain'>
-      {{/*range .Domains*/}}
-      <option>{{.}}</option>
-      {{/*end*/}}
-    </select>
-    ->
-    -->
     <div>
       <label for='client-address-text'>Client Address:</label>
       <input id='client-address-text' type='text' name='client_address' />
     </div>
     <div>
-      <label for='protected-checkbox'>Protected (HTTPS only):</label>
-      <input id='protected-checkbox' type='checkbox' name='protected' />
-    </div>
-    <div>
-      <label for='tls-passthrough-checkbox'>TLS Passthrough (TLS/HTTPS only):</label>
+      <label for='tls-passthrough-checkbox'>TLS Passthrough (TLS only):</label>
       <input id='tls-passthrough-checkbox' type='checkbox' name='tls_passthrough' />
     </div>
     <div>
       <button>Submit</button>
     </div>
   </div>
-
 </form>
 
 
+<!--
 <h2>Domains</h2>
 
-{{range .Domains}}
+{{/*range .Domains*/}}
 <div class='row'>
   <span>{{.}}</span>
   <form action='/delete-domain' method='POST'>
@@ -103,7 +121,7 @@
     <button>Delete</button>
   </form>
 </div>
-{{end}}
+{{/*end*/}}
 
 <h3>Add Domain</h3>
 
@@ -114,6 +132,7 @@
     <button>Submit</button>
   </div>
 </form>
+-->
 
 
 {{ template "footer.html" . }}

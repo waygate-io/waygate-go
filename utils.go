@@ -17,12 +17,20 @@ import (
 	"sync"
 	"time"
 
-	"github.com/caddyserver/certmagic"
 	"github.com/libdns/namedotcom"
-	"github.com/libdns/route53"
+	//"github.com/libdns/route53"
+	"github.com/libdns/libdns"
 	proxyproto "github.com/pires/go-proxyproto"
-	"github.com/takingnames/namedrop-libdns"
+	//"github.com/takingnames/namedrop-libdns"
 )
+
+type DNSProvider interface {
+	libdns.ZoneLister
+	libdns.RecordGetter
+	libdns.RecordSetter
+	libdns.RecordAppender
+	libdns.RecordDeleter
+}
 
 type connCloseWriter interface {
 	net.Conn
@@ -211,35 +219,36 @@ func parseIP(ip string) (net.IP, bool, error) {
 	}
 }
 
-func getDnsProvider(provider, token, user string) (certmagic.ACMEDNSProvider, error) {
+func getDnsProvider(provider, token, user string) (DNSProvider, error) {
 	switch provider {
-	case "takingnames":
-		return &namedrop.Provider{
-			Token: token,
-		}, nil
+	//case "takingnames":
+	//	return &namedrop.Provider{
+	//		Token: token,
+	//	}, nil
 	case "name.com":
 		return &namedotcom.Provider{
 			Server: "https://api.name.com",
 			Token:  token,
 			User:   user,
 		}, nil
-	case "route53":
-		return &route53.Provider{
-			WaitForPropagation: true,
-			MaxWaitDur:         5 * time.Minute,
-			// AccessKeyId and SecretAccessKey are grabbed from the environment
-			//AccessKeyId:     user,
-			//SecretAccessKey: token,
-		}, nil
+	//case "route53":
+	//	return &route53.Provider{
+	//		WaitForPropagation: true,
+	//		MaxWaitDur:         5 * time.Minute,
+	//		// AccessKeyId and SecretAccessKey are grabbed from the environment
+	//		//AccessKeyId:     user,
+	//		//SecretAccessKey: token,
+	//	}, nil
 	default:
-		if !strings.HasPrefix(provider, "https://") {
-			return nil, fmt.Errorf("Assuming NameDrop DNS provider, but %s is not a valid NameDrop server URI", provider)
-		}
-		// Assume provider is a NameDrop URI if nothing else matches
-		return &namedrop.Provider{
-			ServerUri: provider,
-			Token:     token,
-		}, nil
+		return nil, errors.New("Invalid DNS provider")
+		//if !strings.HasPrefix(provider, "https://") {
+		//	return nil, fmt.Errorf("Assuming NameDrop DNS provider, but %s is not a valid NameDrop server URI", provider)
+		//}
+		//// Assume provider is a NameDrop URI if nothing else matches
+		//return &namedrop.Provider{
+		//	ServerUri: provider,
+		//	Token:     token,
+		//}, nil
 	}
 }
 

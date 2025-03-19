@@ -17,6 +17,7 @@ import (
 	"github.com/caddyserver/certmagic"
 	"github.com/gemdrive/gemdrive-go"
 	"github.com/lastlogin-net/obligator"
+	"github.com/libdns/libdns"
 )
 
 type TunnelType string
@@ -41,11 +42,12 @@ type ClientConfig struct {
 }
 
 type Client struct {
-	db         *ClientDatabase
-	config     *ClientConfig
-	eventCh    chan interface{}
-	authServer *obligator.Server
-	tmpl       *template.Template
+	db          *ClientDatabase
+	config      *ClientConfig
+	eventCh     chan interface{}
+	authServer  *obligator.Server
+	tmpl        *template.Template
+	dnsProvider DNSProvider
 }
 
 func NewClient(config *ClientConfig) *Client {
@@ -103,25 +105,28 @@ func NewClient(config *ClientConfig) *Client {
 	//certmagic.DefaultACME.CA = certmagic.LetsEncryptStagingCA
 
 	certmagic.DefaultACME.DNS01Solver = &certmagic.DNS01Solver{
-		DNSProvider: dnsProvider,
+		DNSManager: certmagic.DNSManager{
+			DNSProvider: dnsProvider,
+		},
 	}
 
-	domains, err := db.GetDomains()
-	exitOnError(err)
+	//domains, err := db.GetDomains()
+	//exitOnError(err)
 
-	certConfig := certmagic.NewDefault()
+	//certConfig := certmagic.NewDefault()
 
-	for _, domain := range domains {
-		ctx := context.Background()
-		err := certConfig.ManageAsync(ctx, []string{domain, "*." + domain})
-		exitOnError(err)
-	}
+	//for _, domain := range domains {
+	//	ctx := context.Background()
+	//	err := certConfig.ManageAsync(ctx, []string{domain, "*." + domain})
+	//	exitOnError(err)
+	//}
 
 	return &Client{
-		db:      db,
-		config:  &configCopy,
-		eventCh: nil,
-		tmpl:    tmpl,
+		db:          db,
+		config:      &configCopy,
+		eventCh:     nil,
+		tmpl:        tmpl,
+		dnsProvider: dnsProvider,
 	}
 }
 
@@ -297,11 +302,22 @@ func (c *Client) Run() error {
 			return
 		}
 
-		domains, err := c.db.GetDomains()
+		var domains []string
+		zones, err := c.dnsProvider.ListZones(r.Context())
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
+
+		for _, zone := range zones {
+			domains = append(domains, zone.Name)
+		}
+
+		//domains, err := c.db.GetDomains()
+		//if err != nil {
+		//	fmt.Println(err)
+		//	return
+		//}
 
 		tmplData := struct {
 			Domains []string
@@ -323,13 +339,6 @@ func (c *Client) Run() error {
 	mux.HandleFunc("/add-tunnel", func(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
 
-		serverAddress := r.Form.Get("server_address")
-		if serverAddress == "" {
-			w.WriteHeader(400)
-			io.WriteString(w, "Missing server_address")
-			return
-		}
-
 		clientAddress := r.Form.Get("client_address")
 		if clientAddress == "" {
 			w.WriteHeader(400)
@@ -347,12 +356,36 @@ func (c *Client) Run() error {
 			return
 		}
 
-		//hostname := r.Form.Get("hostname")
+		var serverAddress string
+		var tunDomain string
+		var tunHost string
+		if tunnelType == TunnelTypeHTTPS {
+			tunDomain = r.Form.Get("domain")
+			fqdn := tunDomain
 
-		//subdomain := domain
-		//if hostname != "" {
-		//	subdomain = fmt.Sprintf("%s.%s", hostname, domain)
-		//}
+			tunHost = r.Form.Get("host")
+			if tunHost != "" {
+				fqdn = fmt.Sprintf("%s.%s", tunHost, tunDomain)
+			}
+
+			// TODO: probably share a single certConfig
+			certConfig := certmagic.NewDefault()
+			err := certConfig.ManageAsync(context.Background(), []string{fqdn, "*." + fqdn})
+			if err != nil {
+				w.WriteHeader(500)
+				io.WriteString(w, err.Error())
+				return
+			}
+
+			serverAddress = fqdn
+		} else {
+			serverAddress = r.Form.Get("server_address")
+			if serverAddress == "" {
+				w.WriteHeader(400)
+				io.WriteString(w, "Missing server_address")
+				return
+			}
+		}
 
 		tunnel := &ClientTunnel{
 			ServerAddress:  serverAddress,
@@ -369,11 +402,68 @@ func (c *Client) Run() error {
 			return
 		}
 
-		err = openTunnel(session, mux, tunnel)
+		cnameDomain, err := openTunnel(session, mux, tunnel)
 		if err != nil {
 			w.WriteHeader(500)
 			io.WriteString(w, err.Error())
 			return
+		}
+
+		if cnameDomain != "" {
+
+			// TODO: ANAME records won't work for all providers
+			recordType := "ANAME"
+			wildcardHost := "*"
+			if tunHost != "" {
+				wildcardHost = "*." + tunHost
+				recordType = "CNAME"
+			}
+
+			existingRecs, err := c.dnsProvider.GetRecords(r.Context(), tunDomain)
+			if err != nil {
+				w.WriteHeader(500)
+				io.WriteString(w, err.Error())
+				return
+			}
+
+			deleteList := []libdns.Record{}
+			for _, rec := range existingRecs {
+				if rec.Type == "A" || rec.Type == "AAAA" || rec.Type == "CNAME" || rec.Type == "ANAME" {
+					if rec.Name == tunHost || rec.Name == wildcardHost {
+						delRec := libdns.Record{
+							ID: rec.ID,
+						}
+						deleteList = append(deleteList, delRec)
+					}
+				}
+			}
+
+			if len(deleteList) > 0 {
+				_, err = c.dnsProvider.DeleteRecords(r.Context(), tunDomain, deleteList)
+				if err != nil {
+					w.WriteHeader(500)
+					io.WriteString(w, err.Error())
+					return
+				}
+			}
+
+			_, err = c.dnsProvider.SetRecords(r.Context(), tunDomain, []libdns.Record{
+				libdns.Record{
+					Type:  recordType,
+					Name:  tunHost,
+					Value: cnameDomain,
+				},
+				libdns.Record{
+					Type:  "CNAME",
+					Name:  wildcardHost,
+					Value: cnameDomain,
+				},
+			})
+			if err != nil {
+				w.WriteHeader(500)
+				io.WriteString(w, err.Error())
+				return
+			}
 		}
 
 		http.Redirect(w, r, "/", 303)
@@ -463,7 +553,7 @@ func (c *Client) Run() error {
 	for _, tunnel := range tunnels {
 		printJson(tunnel)
 		go func() {
-			err = openTunnel(session, mux, tunnel)
+			_, err = openTunnel(session, mux, tunnel)
 			exitOnError(err)
 		}()
 	}
@@ -639,9 +729,10 @@ func (m *ClientMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	m.mux.ServeHTTP(w, r)
 }
 
-func openTunnel(session *ClientSession, mux *ClientMux, tunnel *ClientTunnel) error {
+func openTunnel(session *ClientSession, mux *ClientMux, tunnel *ClientTunnel) (domain string, err error) {
 
 	addr := tunnel.ServerAddress
+	var listener *Listener
 
 	switch tunnel.Type {
 	case TunnelTypeUDP:
@@ -650,9 +741,9 @@ func openTunnel(session *ClientSession, mux *ClientMux, tunnel *ClientTunnel) er
 	case TunnelTypeTCP:
 		fmt.Println("listen tcp")
 		// TODO: this should probably be called in a goroutine
-		listener, err := session.Listen("tcp", addr)
+		listener, err = session.Listen("tcp", addr)
 		if err != nil {
-			return err
+			return
 		}
 
 		go proxyTcpConns(listener, tunnel)
@@ -663,16 +754,16 @@ func openTunnel(session *ClientSession, mux *ClientMux, tunnel *ClientTunnel) er
 
 		if tunnel.TLSPassthrough {
 			// TODO: this should probably be called in a goroutine
-			listener, err := session.Listen("tcp", addr)
+			listener, err = session.Listen("tcp", addr)
 			if err != nil {
-				return err
+				return
 			}
 
 			go proxyTcpConns(listener, tunnel)
 		} else {
-			listener, err := session.Listen("tls", addr)
+			listener, err = session.Listen("tls", addr)
 			if err != nil {
-				return err
+				return
 			}
 
 			// TODO: This feels hacky. see if we can avoid spinning up a
@@ -686,7 +777,12 @@ func openTunnel(session *ClientSession, mux *ClientMux, tunnel *ClientTunnel) er
 		}
 	}
 
-	return nil
+	if listener != nil {
+		tunConfig := listener.GetTunnelConfig()
+		domain = tunConfig.Domain
+	}
+
+	return
 }
 
 func proxyTcpConns(listener net.Listener, tunnel *ClientTunnel) {
