@@ -291,3 +291,15 @@ func (d *ClientDatabase) SetDomain(domain string) error {
 
 	return nil
 }
+
+func (d *ClientDatabase) DeleteDomain(domain string) error {
+	stmt := `
+        DELETE FROM domains WHERE domain = ?;
+        `
+	_, err := d.db.Exec(stmt, domain)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

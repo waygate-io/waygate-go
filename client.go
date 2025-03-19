@@ -435,6 +435,26 @@ func (c *Client) Run() error {
 		http.Redirect(w, r, "/", 303)
 	})
 
+	mux.HandleFunc("/delete-domain", func(w http.ResponseWriter, r *http.Request) {
+		r.ParseForm()
+
+		domain := r.Form.Get("domain")
+		if domain == "" {
+			w.WriteHeader(400)
+			io.WriteString(w, "Missing domain")
+			return
+		}
+
+		err := c.db.DeleteDomain(domain)
+		if err != nil {
+			w.WriteHeader(500)
+			io.WriteString(w, err.Error())
+			return
+		}
+
+		http.Redirect(w, r, "/", 303)
+	})
+
 	tunnels, err := c.db.GetTunnels()
 	if err != nil {
 		return err

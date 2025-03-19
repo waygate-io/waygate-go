@@ -49,7 +49,7 @@
 <h3>Create Tunnel</h3>
 
 <form action='/add-tunnel' method='POST'>
-  <div class='input-list'>
+  <div class='list'>
     <div>
       <label for='tunnel-type-dropdown'>Tunnel Type:</label>
       <select id='tunnel-type-dropdown' name='type'>
@@ -96,7 +96,13 @@
 <h2>Domains</h2>
 
 {{range .Domains}}
-<div>{{.}}</div>
+<div class='row'>
+  <span>{{.}}</span>
+  <form action='/delete-domain' method='POST'>
+    <input type='hidden' name='domain' value='{{.}}' />
+    <button>Delete</button>
+  </form>
+</div>
 {{end}}
 
 <h3>Add Domain</h3>
