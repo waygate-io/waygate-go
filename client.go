@@ -110,16 +110,16 @@ func NewClient(config *ClientConfig) *Client {
 		},
 	}
 
-	//domains, err := db.GetDomains()
-	//exitOnError(err)
+	certConfig := certmagic.NewDefault()
 
-	//certConfig := certmagic.NewDefault()
+	tunnels, err := db.GetTunnels()
+	exitOnError(err)
 
-	//for _, domain := range domains {
-	//	ctx := context.Background()
-	//	err := certConfig.ManageAsync(ctx, []string{domain, "*." + domain})
-	//	exitOnError(err)
-	//}
+	ctx := context.Background()
+	for _, tun := range tunnels {
+		err := certConfig.ManageAsync(ctx, []string{tun.ServerAddress, "*." + tun.ServerAddress})
+		exitOnError(err)
+	}
 
 	return &Client{
 		db:          db,
