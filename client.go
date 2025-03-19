@@ -402,68 +402,15 @@ func (c *Client) Run() error {
 			return
 		}
 
-		cnameDomain, err := openTunnel(session, mux, tunnel)
+		serverTunnelDomain, err := openTunnel(session, mux, tunnel)
 		if err != nil {
 			w.WriteHeader(500)
 			io.WriteString(w, err.Error())
 			return
 		}
 
-		if cnameDomain != "" {
-
-			// TODO: ANAME records won't work for all providers
-			recordType := "ANAME"
-			wildcardHost := "*"
-			if tunHost != "" {
-				wildcardHost = "*." + tunHost
-				recordType = "CNAME"
-			}
-
-			existingRecs, err := c.dnsProvider.GetRecords(r.Context(), tunDomain)
-			if err != nil {
-				w.WriteHeader(500)
-				io.WriteString(w, err.Error())
-				return
-			}
-
-			deleteList := []libdns.Record{}
-			for _, rec := range existingRecs {
-				if rec.Type == "A" || rec.Type == "AAAA" || rec.Type == "CNAME" || rec.Type == "ANAME" {
-					if rec.Name == tunHost || rec.Name == wildcardHost {
-						delRec := libdns.Record{
-							ID: rec.ID,
-						}
-						deleteList = append(deleteList, delRec)
-					}
-				}
-			}
-
-			if len(deleteList) > 0 {
-				_, err = c.dnsProvider.DeleteRecords(r.Context(), tunDomain, deleteList)
-				if err != nil {
-					w.WriteHeader(500)
-					io.WriteString(w, err.Error())
-					return
-				}
-			}
-
-			_, err = c.dnsProvider.SetRecords(r.Context(), tunDomain, []libdns.Record{
-				libdns.Record{
-					Type:  recordType,
-					Name:  tunHost,
-					Value: cnameDomain,
-				},
-				libdns.Record{
-					Type:  "CNAME",
-					Name:  wildcardHost,
-					Value: cnameDomain,
-				},
-			})
-			if err != nil {
-				w.WriteHeader(500)
-				io.WriteString(w, err.Error())
-				return
-			}
+		if serverTunnelDomain != "" {
+			setDNSRecords(r.Context(), tunHost, tunDomain, serverTunnelDomain, c.dnsProvider)
 		}
 
 		http.Redirect(w, r, "/", 303)
@@ -893,4 +840,56 @@ func proxyUdp(session *ClientSession, tunnel *ClientTunnel) {
 			}
 		}
 	}()
+}
+
+func setDNSRecords(ctx context.Context, tunHost, tunDomain, serverTunnelDomain string, dnsProvider DNSProvider) (err error) {
+	// TODO: ANAME records won't work for all providers
+	recordType := "ANAME"
+	wildcardHost := "*"
+	if tunHost != "" {
+		wildcardHost = "*." + tunHost
+		recordType = "CNAME"
+	}
+
+	existingRecs, err := dnsProvider.GetRecords(ctx, tunDomain)
+	if err != nil {
+		return
+	}
+
+	deleteList := []libdns.Record{}
+	for _, rec := range existingRecs {
+		if rec.Type == "A" || rec.Type == "AAAA" || rec.Type == "CNAME" || rec.Type == "ANAME" {
+			if rec.Name == tunHost || rec.Name == wildcardHost {
+				delRec := libdns.Record{
+					ID: rec.ID,
+				}
+				deleteList = append(deleteList, delRec)
+			}
+		}
+	}
+
+	if len(deleteList) > 0 {
+		_, err = dnsProvider.DeleteRecords(ctx, tunDomain, deleteList)
+		if err != nil {
+			return
+		}
+	}
+
+	_, err = dnsProvider.SetRecords(ctx, tunDomain, []libdns.Record{
+		libdns.Record{
+			Type:  recordType,
+			Name:  tunHost,
+			Value: serverTunnelDomain,
+		},
+		libdns.Record{
+			Type:  "CNAME",
+			Name:  wildcardHost,
+			Value: serverTunnelDomain,
+		},
+	})
+	if err != nil {
+		return
+	}
+
+	return
 }
