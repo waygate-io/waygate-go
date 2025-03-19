@@ -18,6 +18,7 @@ require (
 	github.com/caddyserver/certmagic v0.20.0
 	github.com/gemdrive/gemdrive-go v0.0.0-20240229172336-f3f7f72ae546
 	github.com/jmoiron/sqlx v1.3.5
+	github.com/lastlogin-net/obligator v0.0.0-20250319153436-bf303823472c
 	github.com/lestrrat-go/jwx/v2 v2.1.4
 	github.com/libdns/namedotcom v0.3.3
 	github.com/libdns/route53 v1.3.3
@@ -68,7 +69,6 @@ require (
 	github.com/ip2location/ip2location-go/v9 v9.6.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.5 // indirect
-	github.com/lastlogin-net/obligator v0.0.0-20250319153436-bf303823472c // indirect
 	github.com/lestrrat-go/blackmagic v1.0.2 // indirect
 	github.com/lestrrat-go/httpcc v1.0.1 // indirect
 	github.com/lestrrat-go/httprc v1.0.6 // indirect
