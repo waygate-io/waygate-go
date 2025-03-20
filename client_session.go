@@ -72,7 +72,10 @@ func NewClientSession(token string, db *ClientDatabase) (*ClientSession, error) 
 	//ctx := context.Background()
 
 	tlsConfig := &tls.Config{
-		GetCertificate: certConfig.GetCertificate,
+		GetCertificate: func(ch *tls.ClientHelloInfo) (*tls.Certificate, error) {
+			//fmt.Println("GetCertificate")
+			return certConfig.GetCertificate(ch)
+		},
 		//NextProtos:     []string{"h2", "acme-tls/1"},
 		// TODO: re-enable h2 support, probably by proxying at the HTTP level
 		NextProtos: []string{"http/1.1", "acme-tls/1"},
@@ -218,12 +221,12 @@ func (s *ClientSession) handleStream(downstreamConn connCloseWriter) {
 	}
 
 	s.mut.Lock()
-	defer s.mut.Unlock()
-
-	// TODO: mutex on s.listenMap
 	listener, exists := s.listenMap[key]
+	s.mut.Unlock()
 	if !exists {
+		s.mut.Lock()
 		listener, exists = s.listenMap[ListenerDefaultKey]
+		s.mut.Unlock()
 		if !exists {
 			fmt.Println("No such listener", key)
 			conn.Close()
@@ -234,6 +237,7 @@ func (s *ClientSession) handleStream(downstreamConn connCloseWriter) {
 	// TODO: figure out a cleaner way to disable TLS for raw TCP.
 	// TerminationType should probably be a per-listen setting, instead
 	// of per-tunnel
+	// TODO: still some stuff here that might should be mutexed
 	if s.tlsTermination == "client" && !listener.tlsPassthrough && serverName != "" {
 		tlsConn := tls.Server(conn, s.tlsConfig)
 		err := tlsConn.Handshake()

@@ -10,7 +10,7 @@ toolchain go1.24.1
 //replace github.com/anderspitman/dashtui => ../dashtui
 //replace github.com/anderspitman/little-oauth2-go => ../little-oauth2-go
 //replace github.com/takingnames/namedrop-libdns => ../namedrop-libdns
-replace github.com/takingnames/namedrop-go => ../namedrop-go
+//replace github.com/takingnames/namedrop-go => ../namedrop-go
 
 //replace github.com/gemdrive/gemdrive-go => ../gemdrive-go
 
@@ -35,7 +35,8 @@ require (
 	github.com/prometheus/client_golang v1.19.0
 	github.com/quic-go/quic-go v0.41.0
 	github.com/quic-go/webtransport-go v0.6.0
-	github.com/takingnames/namedrop-go v0.8.0
+	github.com/takingnames/namedrop-go v0.8.1-0.20250320164145-26a0fc69b8df
+	github.com/takingnames/namedrop-libdns v0.0.0-20250320164110-b69dafff8ce3
 	go.uber.org/zap v1.27.0
 	golang.ngrok.com/muxado/v2 v2.0.0
 	nhooyr.io/websocket v1.8.10

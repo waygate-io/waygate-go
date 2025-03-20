@@ -21,6 +21,7 @@ import (
 	"github.com/lastlogin-net/obligator"
 	"github.com/libdns/libdns"
 	"github.com/takingnames/namedrop-go"
+	namedropdns "github.com/takingnames/namedrop-libdns"
 )
 
 type TunnelType string
@@ -87,9 +88,6 @@ func NewClient(config *ClientConfig) *Client {
 		WaygateServerDomain = configCopy.ServerDomain
 	}
 
-	dnsProvider, err := getDnsProvider(configCopy.DNSProvider, configCopy.DNSToken, configCopy.DNSUser)
-	exitOnError(err)
-
 	// Use random unprivileged port for ACME challenges. This is necessary
 	// because of the way certmagic works, in that if it fails to bind
 	// HTTPSPort (443 by default) and doesn't detect anything else binding
@@ -107,10 +105,26 @@ func NewClient(config *ClientConfig) *Client {
 	certmagic.DefaultACME.Agreed = true
 	//certmagic.DefaultACME.CA = certmagic.LetsEncryptStagingCA
 
-	certmagic.DefaultACME.DNS01Solver = &certmagic.DNS01Solver{
-		DNSManager: certmagic.DNSManager{
-			DNSProvider: dnsProvider,
-		},
+	var dnsProvider DNSProvider
+	if configCopy.DNSProvider != "" {
+
+		dnsProvider, err = getDnsProvider(configCopy.DNSProvider, configCopy.DNSToken, configCopy.DNSUser)
+		exitOnError(err)
+		certmagic.DefaultACME.DNS01Solver = &certmagic.DNS01Solver{
+			DNSManager: certmagic.DNSManager{
+				DNSProvider: dnsProvider,
+			},
+		}
+	} else {
+		certmagic.Default.OnDemand = &certmagic.OnDemandConfig{
+			DecisionFunc: func(ctx context.Context, name string) error {
+				// TODO: verify domain is in tunnels
+				//if name != tunnelDomain {
+				//	return fmt.Errorf("not allowed")
+				//}
+				return nil
+			},
+		}
 	}
 
 	certmagic.Default.Storage = &certmagic.FileStorage{"./certs"}
@@ -125,7 +139,8 @@ func NewClient(config *ClientConfig) *Client {
 	ctx := context.Background()
 	for _, tun := range tunnels {
 		if tun.Type == TunnelTypeHTTPS || tun.Type == TunnelTypeTLS {
-			err := certConfig.ManageAsync(ctx, []string{tun.ServerAddress, "*." + tun.ServerAddress})
+			//err := certConfig.ManageAsync(ctx, []string{tun.ServerAddress, "*." + tun.ServerAddress})
+			err := certConfig.ManageSync(ctx, []string{tun.ServerAddress, "*." + tun.ServerAddress})
 			exitOnError(err)
 		}
 	}
@@ -312,14 +327,16 @@ func (c *Client) Run() error {
 		}
 
 		var domains []string
-		zones, err := c.dnsProvider.ListZones(r.Context())
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
+		if c.dnsProvider != nil {
+			zones, err := c.dnsProvider.ListZones(r.Context())
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
 
-		for _, zone := range zones {
-			domains = append(domains, zone.Name)
+			for _, zone := range zones {
+				domains = append(domains, zone.Name)
+			}
 		}
 
 		//domains, err := c.db.GetDomains()
@@ -355,7 +372,7 @@ func (c *Client) Run() error {
 		authReq := &oauth.AuthRequest{
 			ClientId:    clientId,
 			RedirectUri: redirUri,
-			Scopes:      []string{"namedrop-hosts"},
+			Scopes:      []string{namedrop.ScopeHosts, namedrop.ScopeAcme},
 		}
 
 		authUri := "https://takingnames.io/namedrop/authorize"
@@ -398,7 +415,30 @@ func (c *Client) Run() error {
 			return
 		}
 
-		printJson(tokenRes)
+		dnsProvider := &namedropdns.Provider{
+			TokenData: tokenRes,
+		}
+
+		c.dnsProvider = dnsProvider
+
+		certmagic.Default.OnDemand = nil
+		certmagic.DefaultACME.DNS01Solver = &certmagic.DNS01Solver{
+			DNSManager: certmagic.DNSManager{
+				DNSProvider: dnsProvider,
+			},
+		}
+
+		domain := tokenRes.Permissions[0].Domain
+		certConfig := certmagic.NewDefault()
+		ctx := context.Background()
+		err = certConfig.ManageSync(ctx, []string{domain, "*." + domain})
+		if err != nil {
+			w.WriteHeader(500)
+			io.WriteString(w, err.Error())
+			return
+		}
+
+		http.Redirect(w, r, "/", 303)
 	})
 
 	mux.HandleFunc("/add-tunnel", func(w http.ResponseWriter, r *http.Request) {
@@ -474,7 +514,7 @@ func (c *Client) Run() error {
 			return
 		}
 
-		if serverTunnelDomain != "" {
+		if serverTunnelDomain != "" && c.dnsProvider != nil {
 			setDNSRecords(r.Context(), tunHost, tunDomain, serverTunnelDomain, c.dnsProvider)
 		}
 
