@@ -168,14 +168,12 @@ github.com/stretchr/testify v1.6.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/
 github.com/stretchr/testify v1.7.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/stretchr/testify v1.10.0 h1:Xv5erBjTwe/5IxqUQTdXv5kgmIvbHo3QQyRwhJsOfJA=
 github.com/stretchr/testify v1.10.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=
-github.com/takingnames/namedrop-go v0.8.0 h1:lLltsu5NA0WlgjZ65AFP+AAb+maP/Xb5uCsfKVQwEGg=
-github.com/takingnames/namedrop-go v0.8.0/go.mod h1:E3nx6fxAMfestthd1O3VhbaPesLaiYSGkWXRD1nIc88=
 github.com/takingnames/namedrop-go v0.8.1-0.20250320164145-26a0fc69b8df h1:WtvT6GfK9uIAln/lZA6Py0oBlTGuV7oqiGCavO9HRQc=
 github.com/takingnames/namedrop-go v0.8.1-0.20250320164145-26a0fc69b8df/go.mod h1:Tisisu7Uiv8f6uaf/i6lZPGDUVhpcJPozbO4FCR6als=
-github.com/takingnames/namedrop-libdns v0.0.0-20250319171300-e4a77b86dc9b h1:JInt3ITINj/v1l+DiEC1vMmoYE3Cva60JwmcQlfUgb8=
-github.com/takingnames/namedrop-libdns v0.0.0-20250319171300-e4a77b86dc9b/go.mod h1:0QiZFLWLuZ83HcmKHQL+wG8hLsX3A6Lk+NUuQJjtbug=
 github.com/takingnames/namedrop-libdns v0.0.0-20250320164110-b69dafff8ce3 h1:b4+xWxisUfVumqX9ZXXSXFG1twv7V4P9n4IPDEIMoKA=
 github.com/takingnames/namedrop-libdns v0.0.0-20250320164110-b69dafff8ce3/go.mod h1:0QiZFLWLuZ83HcmKHQL+wG8hLsX3A6Lk+NUuQJjtbug=
+github.com/takingnames/namedrop-libdns v0.0.0-20250320174906-a09f3809efd2 h1:z3d9w8W8L1hef4ZWWE6JltBytUZlYH/nWe9lLte6Qe8=
+github.com/takingnames/namedrop-libdns v0.0.0-20250320174906-a09f3809efd2/go.mod h1:0QiZFLWLuZ83HcmKHQL+wG8hLsX3A6Lk+NUuQJjtbug=
 github.com/thrawn01/args v0.3.0/go.mod h1:TnRiOFjyh7Wa6oC8ACFPc7KIvbzCiluphA3mJUiPIEo=
 github.com/yuin/goldmark v1.4.13/go.mod h1:6yULJ656Px+3vBD8DxQVa3kxgyrAnzto9xy5taEt/CY=
 github.com/zeebo/assert v1.1.0 h1:hU1L1vLTHsnO8x8c9KAR5GmM5QscxHg5RNU5z5qbUWY=

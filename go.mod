@@ -36,7 +36,7 @@ require (
 	github.com/quic-go/quic-go v0.41.0
 	github.com/quic-go/webtransport-go v0.6.0
 	github.com/takingnames/namedrop-go v0.8.1-0.20250320164145-26a0fc69b8df
-	github.com/takingnames/namedrop-libdns v0.0.0-20250320164110-b69dafff8ce3
+	github.com/takingnames/namedrop-libdns v0.0.0-20250320174906-a09f3809efd2
 	go.uber.org/zap v1.27.0
 	golang.ngrok.com/muxado/v2 v2.0.0
 	nhooyr.io/websocket v1.8.10
