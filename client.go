@@ -2,6 +2,7 @@ package waygate
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"html/template"
@@ -13,11 +14,13 @@ import (
 	"path/filepath"
 	"sync"
 
+	oauth "github.com/anderspitman/little-oauth2-go"
 	"github.com/anderspitman/treemess-go"
 	"github.com/caddyserver/certmagic"
 	"github.com/gemdrive/gemdrive-go"
 	"github.com/lastlogin-net/obligator"
 	"github.com/libdns/libdns"
+	"github.com/takingnames/namedrop-go"
 )
 
 type TunnelType string
@@ -110,6 +113,10 @@ func NewClient(config *ClientConfig) *Client {
 		},
 	}
 
+	certmagic.Default.Storage = &certmagic.FileStorage{"./certs"}
+	//certmagic.Default.Storage, err = NewCertmagicSqliteStorage(db.db.DB)
+	//exitOnError(err)
+
 	certConfig := certmagic.NewDefault()
 
 	tunnels, err := db.GetTunnels()
@@ -117,8 +124,10 @@ func NewClient(config *ClientConfig) *Client {
 
 	ctx := context.Background()
 	for _, tun := range tunnels {
-		err := certConfig.ManageAsync(ctx, []string{tun.ServerAddress, "*." + tun.ServerAddress})
-		exitOnError(err)
+		if tun.Type == TunnelTypeHTTPS || tun.Type == TunnelTypeTLS {
+			err := certConfig.ManageAsync(ctx, []string{tun.ServerAddress, "*." + tun.ServerAddress})
+			exitOnError(err)
+		}
 	}
 
 	return &Client{
@@ -217,7 +226,7 @@ func (c *Client) Run() error {
 
 	tunConfig := listener.GetTunnelConfig()
 
-	dashUri := "https://dash." + tunConfig.Domain
+	dashUri := "https://" + tunConfig.Domain
 	redirUriCh <- dashUri
 
 	dbPrefix := "auth_"
@@ -334,6 +343,62 @@ func (c *Client) Run() error {
 			return
 		}
 
+	})
+
+	var flowState *oauth.AuthCodeFlowState
+	flowStateMut := &sync.Mutex{}
+
+	mux.HandleFunc("/add-domain-takingnames", func(w http.ResponseWriter, r *http.Request) {
+
+		clientId := "https://" + r.Host
+		redirUri := fmt.Sprintf("%s/add-domain-takingnames/callback", clientId)
+		authReq := &oauth.AuthRequest{
+			ClientId:    clientId,
+			RedirectUri: redirUri,
+			Scopes:      []string{"namedrop-hosts"},
+		}
+
+		authUri := "https://takingnames.io/namedrop/authorize"
+		fs, err := oauth.StartAuthCodeFlow(authUri, authReq)
+		if err != nil {
+			w.WriteHeader(500)
+			io.WriteString(w, err.Error())
+			return
+		}
+
+		flowStateMut.Lock()
+		flowState = fs
+		flowStateMut.Unlock()
+
+		http.Redirect(w, r, flowState.AuthUri, 303)
+	})
+
+	mux.HandleFunc("/add-domain-takingnames/callback", func(w http.ResponseWriter, r *http.Request) {
+		flowStateMut.Lock()
+		fs := flowState
+		flowStateMut.Unlock()
+
+		code := r.URL.Query().Get("code")
+		state := r.URL.Query().Get("state")
+
+		tokenUri := "https://takingnames.io/namedrop/token"
+		resBytes, err := oauth.CompleteAuthCodeFlow(tokenUri, code, state, fs)
+		if err != nil {
+			w.WriteHeader(500)
+			io.WriteString(w, err.Error())
+			return
+		}
+
+		var tokenRes *namedrop.TokenResponse
+
+		err = json.Unmarshal(resBytes, &tokenRes)
+		if err != nil {
+			w.WriteHeader(500)
+			io.WriteString(w, err.Error())
+			return
+		}
+
+		printJson(tokenRes)
 	})
 
 	mux.HandleFunc("/add-tunnel", func(w http.ResponseWriter, r *http.Request) {

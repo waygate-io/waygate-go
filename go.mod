@@ -1,6 +1,6 @@
 module github.com/waygate-io/waygate-go
 
-go 1.23.0
+go 1.23.1
 
 toolchain go1.24.1
 
@@ -10,6 +10,7 @@ toolchain go1.24.1
 //replace github.com/anderspitman/dashtui => ../dashtui
 //replace github.com/anderspitman/little-oauth2-go => ../little-oauth2-go
 //replace github.com/takingnames/namedrop-libdns => ../namedrop-libdns
+replace github.com/takingnames/namedrop-go => ../namedrop-go
 
 //replace github.com/gemdrive/gemdrive-go => ../gemdrive-go
 
@@ -34,6 +35,7 @@ require (
 	github.com/prometheus/client_golang v1.19.0
 	github.com/quic-go/quic-go v0.41.0
 	github.com/quic-go/webtransport-go v0.6.0
+	github.com/takingnames/namedrop-go v0.8.0
 	go.uber.org/zap v1.27.0
 	golang.ngrok.com/muxado/v2 v2.0.0
 	nhooyr.io/websocket v1.8.10
@@ -65,7 +67,7 @@ require (
 	github.com/lestrrat-go/option v1.0.1 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
-	github.com/mattn/go-sqlite3 v1.14.18 // indirect
+	github.com/mattn/go-sqlite3 v1.14.24 // indirect
 	github.com/mholt/acmez/v3 v3.1.0 // indirect
 	github.com/miekg/dns v1.1.63 // indirect
 	github.com/navidys/tvxwidgets v0.10.0 // indirect
@@ -90,6 +92,7 @@ require (
 	golang.org/x/image v0.11.0 // indirect
 	golang.org/x/mod v0.24.0 // indirect
 	golang.org/x/net v0.37.0 // indirect
+	golang.org/x/oauth2 v0.23.0 // indirect
 	golang.org/x/sync v0.12.0 // indirect
 	golang.org/x/sys v0.31.0 // indirect
 	golang.org/x/term v0.30.0 // indirect

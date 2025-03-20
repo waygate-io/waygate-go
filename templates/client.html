@@ -110,19 +110,25 @@
 </form>
 
 
-<!--
 <h2>Domains</h2>
 
-{{/*range .Domains*/}}
-<div class='row'>
-  <span>{{.}}</span>
-  <form action='/delete-domain' method='POST'>
-    <input type='hidden' name='domain' value='{{.}}' />
-    <button>Delete</button>
-  </form>
-</div>
-{{/*end*/}}
+<a href='/add-domain-takingnames'>Add domain with TakingNames</a>
 
+<div class='domain-list'>
+  {{range .Domains}}
+  <div class='row'>
+    <span>{{.}}</span>
+    <!--
+    <form action='/delete-domain' method='POST'>
+      <input type='hidden' name='domain' value='{{.}}' />
+      <button>Delete</button>
+    </form>
+    -->
+  </div>
+  {{end}}
+</div>
+
+<!--
 <h3>Add Domain</h3>
 
 <form action='/add-domain' method='POST'>
