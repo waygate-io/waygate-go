@@ -99,19 +99,21 @@ func (s *CertmagicSqliteStorage) Delete(ctx context.Context, key string) error {
 	stmt := `
         DELETE FROM kv WHERE key GLOB ? || '*';
         `
-	result, err := s.db.ExecContext(ctx, stmt, key)
+	_, err := s.db.ExecContext(ctx, stmt, key)
 	if err != nil {
 		return err
 	}
 
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
+	// TODO: revisit error conditions. See:
+	// https://github.com/caddyserver/certmagic/issues/310#issuecomment-2349275212
+	//rowsAffected, err := result.RowsAffected()
+	//if err != nil {
+	//	return err
+	//}
 
-	if rowsAffected == 0 {
-		return iofs.ErrNotExist
-	}
+	//if rowsAffected == 0 {
+	//	return iofs.ErrNotExist
+	//}
 
 	return nil
 }
