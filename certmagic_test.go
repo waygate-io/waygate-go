@@ -154,7 +154,7 @@ func setup(t *testing.T) (context.Context, *CertmagicSqliteStorage) {
 	ctx := context.Background()
 
 	err := os.Remove("test_db.sqlite")
-	checkErr(err, t)
+	//checkErr(err, t)
 
 	db, err := sqlx.Open("sqlite3", "test_db.sqlite")
 	checkErr(err, t)

@@ -4,6 +4,7 @@ package waygate
 import (
 	"context"
 	"database/sql"
+	"errors"
 	iofs "io/fs"
 	"path/filepath"
 	"sync"
@@ -13,8 +14,9 @@ import (
 )
 
 type CertmagicSqliteStorage struct {
-	db *sqlx.DB
-	mu *sync.Mutex
+	db    *sqlx.DB
+	mu    *sync.Mutex
+	locks map[string]*sync.Mutex
 }
 
 type kv struct {
@@ -27,8 +29,9 @@ func NewCertmagicSqliteStorage(sqlDb *sql.DB) (*CertmagicSqliteStorage, error) {
 	db := sqlx.NewDb(sqlDb, "sqlite3")
 
 	s := &CertmagicSqliteStorage{
-		db: db,
-		mu: &sync.Mutex{},
+		db:    db,
+		mu:    &sync.Mutex{},
+		locks: make(map[string]*sync.Mutex),
 	}
 
 	stmt := `
@@ -169,13 +172,30 @@ func (s *CertmagicSqliteStorage) Stat(ctx context.Context, key string) (certmagi
 func (s *CertmagicSqliteStorage) Lock(ctx context.Context, name string) error {
 
 	s.mu.Lock()
+	lock, exists := s.locks[name]
+	s.mu.Unlock()
+	if !exists {
+		lock = &sync.Mutex{}
+		s.mu.Lock()
+		s.locks[name] = lock
+		s.mu.Unlock()
+	}
+
+	lock.Lock()
 
 	return nil
 }
 
 func (s *CertmagicSqliteStorage) Unlock(ctx context.Context, name string) error {
 
+	s.mu.Lock()
+	lock, exists := s.locks[name]
 	s.mu.Unlock()
+	if !exists {
+		return errors.New("No lock for " + name)
+	}
+
+	lock.Unlock()
 
 	return nil
 }

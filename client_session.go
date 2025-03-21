@@ -49,8 +49,8 @@ func NewClientSession(token string, db *ClientDatabase) (*ClientSession, error) 
 	//}
 
 	var err error
-	certmagic.Default.Storage = &certmagic.FileStorage{"./certs"}
-	//certmagic.Default.Storage, err = NewCertmagicSqliteStorage(db.db.DB)
+	//certmagic.Default.Storage = &certmagic.FileStorage{"./certs"}
+	certmagic.Default.Storage, err = NewCertmagicSqliteStorage(db.db.DB)
 	//exitOnError(err)
 
 	var output zapcore.WriteSyncer = os.Stdout
