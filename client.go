@@ -436,12 +436,12 @@ func (c *Client) Run() error {
 
 		c.dnsProvider = dnsProvider
 
-		certmagic.Default.OnDemand = nil
-		certmagic.DefaultACME.DNS01Solver = &certmagic.DNS01Solver{
-			DNSManager: certmagic.DNSManager{
-				DNSProvider: dnsProvider,
-			},
-		}
+		//certmagic.Default.OnDemand = nil
+		//certmagic.DefaultACME.DNS01Solver = &certmagic.DNS01Solver{
+		//	DNSManager: certmagic.DNSManager{
+		//		DNSProvider: dnsProvider,
+		//	},
+		//}
 
 		domain := tokenRes.Permissions[0].Domain
 		certConfig := certmagic.NewDefault()
