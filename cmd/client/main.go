@@ -6,10 +6,13 @@ import (
 	"os"
 	"strings"
 
+	"github.com/anderspitman/symbiote-go"
 	"github.com/waygate-io/waygate-go"
 )
 
 func main() {
+	symbiote.Supervise()
+
 	serverDomainArg := flag.String("server-domain", waygate.WaygateServerDomain, "Server domain")
 	tokenArg := flag.String("token", "", "Token")
 	userArg := flag.String("user", "", "User")

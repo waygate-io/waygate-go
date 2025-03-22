@@ -174,6 +174,8 @@ func (s *ClientSession) start() {
 				s.handleStream(downstreamConn)
 			}()
 		}
+
+		os.Exit(1)
 	}()
 }
 
