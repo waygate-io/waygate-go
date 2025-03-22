@@ -63,7 +63,11 @@
     </div>
     <div>
       <label for='client-address-text'>Client Address:</label>
-      <input id='client-address-text' type='text' name='client_address' />
+      <input id='client-address-text' type='text' name='client_address' value='localhost' />
+    </div>
+    <div>
+      <label for='client-port-text'>Client Port:</label>
+      <input id='client-port-text' type='text' name='client_port' value='8000' />
     </div>
     <div>
       <label for='protected-checkbox'>Protected:</label>
@@ -112,10 +116,6 @@
 
 <h2>Domains</h2>
 
-<a href='/add-domain-takingnames'>
-  <button>Add domain with TakingNames</button>
-</a>
-
 <div class='domain-list'>
   {{range .Domains}}
   <div class='row'>
@@ -129,6 +129,22 @@
   </div>
   {{end}}
 </div>
+
+<h3>Add domain with TakingNames.io</h3>
+
+<a href='/add-domain-takingnames'>
+  <button>Go to TakingNames.io</button>
+</a>
+
+<h3>Add domain with custom NameDrop provider</h3>
+
+<form action='/add-domain-takingnames' method='POST'>
+  <label for='namedrop-provider-uri-text'>Provider URL:</label>
+  <input id='namedrop-provider-uri-text' type='text' name='namedrop_provider_uri' />
+  <div>
+    <button>Go to custom provider</button>
+  </div>
+</form>
 
 <!--
 <h3>Add Domain</h3>

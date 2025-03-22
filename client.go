@@ -362,10 +362,20 @@ func (c *Client) Run() error {
 
 	})
 
+	// TODO: handle concurrent requests
 	var flowState *oauth.AuthCodeFlowState
+	var providerUri string
 	flowStateMut := &sync.Mutex{}
 
 	mux.HandleFunc("/add-domain-takingnames", func(w http.ResponseWriter, r *http.Request) {
+
+		r.ParseForm()
+
+		puri := "https://takingnames.io/namedrop"
+		puriParam := r.Form.Get("namedrop_provider_uri")
+		if puriParam != "" {
+			puri = puriParam
+		}
 
 		clientId := "https://" + r.Host
 		redirUri := fmt.Sprintf("%s/add-domain-takingnames/callback", clientId)
@@ -375,7 +385,7 @@ func (c *Client) Run() error {
 			Scopes:      []string{namedrop.ScopeHosts, namedrop.ScopeAcme},
 		}
 
-		authUri := "https://takingnames.io/namedrop/authorize"
+		authUri := puri + "/authorize"
 		fs, err := oauth.StartAuthCodeFlow(authUri, authReq)
 		if err != nil {
 			w.WriteHeader(500)
@@ -385,6 +395,7 @@ func (c *Client) Run() error {
 
 		flowStateMut.Lock()
 		flowState = fs
+		providerUri = puri
 		flowStateMut.Unlock()
 
 		http.Redirect(w, r, flowState.AuthUri, 303)
@@ -393,12 +404,15 @@ func (c *Client) Run() error {
 	mux.HandleFunc("/add-domain-takingnames/callback", func(w http.ResponseWriter, r *http.Request) {
 		flowStateMut.Lock()
 		fs := flowState
+		puri := providerUri
+		flowState = nil
+		providerUri = ""
 		flowStateMut.Unlock()
 
 		code := r.URL.Query().Get("code")
 		state := r.URL.Query().Get("state")
 
-		tokenUri := "https://takingnames.io/namedrop/token"
+		tokenUri := puri + "/token"
 		resBytes, err := oauth.CompleteAuthCodeFlow(tokenUri, code, state, fs)
 		if err != nil {
 			w.WriteHeader(500)
@@ -416,6 +430,7 @@ func (c *Client) Run() error {
 		}
 
 		dnsProvider := &namedropdns.Provider{
+			ServerUri: puri,
 			TokenData: tokenRes,
 		}
 
@@ -444,12 +459,21 @@ func (c *Client) Run() error {
 	mux.HandleFunc("/add-tunnel", func(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
 
-		clientAddress := r.Form.Get("client_address")
-		if clientAddress == "" {
+		clientAddressArg := r.Form.Get("client_address")
+		if clientAddressArg == "" {
 			w.WriteHeader(400)
 			io.WriteString(w, "Missing client_address")
 			return
 		}
+
+		clientPort := r.Form.Get("client_port")
+		if clientPort == "" {
+			w.WriteHeader(400)
+			io.WriteString(w, "Missing client_port")
+			return
+		}
+
+		clientAddress := fmt.Sprintf("%s:%s", clientAddressArg, clientPort)
 
 		protected := r.Form.Get("protected") == "on"
 		tlsPassthrough := r.Form.Get("tls_passthrough") == "on"
@@ -465,7 +489,14 @@ func (c *Client) Run() error {
 		var tunDomain string
 		var tunHost string
 		if tunnelType == TunnelTypeHTTPS {
+
 			tunDomain = r.Form.Get("domain")
+			if tunDomain == "" {
+				w.WriteHeader(400)
+				io.WriteString(w, "Missing domain param")
+				return
+			}
+
 			fqdn := tunDomain
 
 			tunHost = r.Form.Get("host")
@@ -515,7 +546,12 @@ func (c *Client) Run() error {
 		}
 
 		if serverTunnelDomain != "" && c.dnsProvider != nil {
-			setDNSRecords(r.Context(), tunHost, tunDomain, serverTunnelDomain, c.dnsProvider)
+			err := setDNSRecords(r.Context(), tunHost, tunDomain, serverTunnelDomain, c.dnsProvider)
+			if err != nil {
+				w.WriteHeader(500)
+				io.WriteString(w, err.Error())
+				return
+			}
 		}
 
 		http.Redirect(w, r, "/", 303)
@@ -966,7 +1002,10 @@ func setDNSRecords(ctx context.Context, tunHost, tunDomain, serverTunnelDomain s
 		if rec.Type == "A" || rec.Type == "AAAA" || rec.Type == "CNAME" || rec.Type == "ANAME" {
 			if rec.Name == tunHost || rec.Name == wildcardHost {
 				delRec := libdns.Record{
-					ID: rec.ID,
+					ID:    rec.ID,
+					Type:  rec.Type,
+					Name:  rec.Name,
+					Value: rec.Value,
 				}
 				deleteList = append(deleteList, delRec)
 			}
