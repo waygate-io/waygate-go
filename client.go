@@ -368,6 +368,22 @@ func (c *Client) Run() error {
 	var providerUri string
 	flowStateMut := &sync.Mutex{}
 
+	httpServer := &http.Server{
+		Handler: mux,
+	}
+
+	exitReason := "normal"
+
+	mux.HandleFunc("/shutdown", func(w http.ResponseWriter, r *http.Request) {
+		exitReason = "shutdown"
+		exit(w, r, c.tmpl, httpServer)
+	})
+
+	mux.HandleFunc("/restart", func(w http.ResponseWriter, r *http.Request) {
+		exitReason = "restart"
+		exit(w, r, c.tmpl, httpServer)
+	})
+
 	mux.HandleFunc("/add-domain-takingnames", func(w http.ResponseWriter, r *http.Request) {
 
 		r.ParseForm()
@@ -648,9 +664,18 @@ func (c *Client) Run() error {
 	}
 
 	go func() {
-		err := http.Serve(listener, mux)
+		err = httpServer.Serve(listener)
 		if err != nil {
 			fmt.Println("listener done", err)
+		}
+
+		switch exitReason {
+		case "restart":
+			os.Exit(64)
+		case "shutdown":
+			os.Exit(0)
+		default:
+			os.Exit(0)
 		}
 	}()
 

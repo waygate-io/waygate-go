@@ -2,6 +2,17 @@
 
 <h1>Waygate Client Dashboard</h1>
 
+<div class='row'>
+  <form action='/restart' method='POST'>
+    <button type='submit'>Restart Client</button>
+  </form>
+
+  <form action='/shutdown' method='POST'>
+    <button type='submit'>Shutdown Client</button>
+  </form>
+</div>
+
+
 {{if .Tunnels}}
 <h2>Tunnels</h2>
 

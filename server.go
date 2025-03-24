@@ -262,32 +262,14 @@ func (s *Server) Run() int {
 		}
 	})
 
-	exit := func(w http.ResponseWriter, r *http.Request, reason string) {
-
-		exitReason = reason
-
-		tmplData := struct {
-		}{}
-
-		err = tmpl.ExecuteTemplate(w, "shutdown.html", tmplData)
-		if err != nil {
-			w.WriteHeader(500)
-			io.WriteString(w, err.Error())
-			return
-		}
-
-		go func() {
-			err = httpServer.Shutdown(r.Context())
-			fmt.Println(err)
-		}()
-	}
-
 	mux.HandleFunc("/shutdown", func(w http.ResponseWriter, r *http.Request) {
-		exit(w, r, "shutdown")
+		exitReason = "shutdown"
+		exit(w, r, tmpl, httpServer)
 	})
 
 	mux.HandleFunc("/restart", func(w http.ResponseWriter, r *http.Request) {
-		exit(w, r, "restart")
+		exitReason = "restart"
+		exit(w, r, tmpl, httpServer)
 	})
 
 	mux.HandleFunc("/waygate", func(w http.ResponseWriter, r *http.Request) {

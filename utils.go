@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html/template"
 	"io"
 	"log"
 	"math/big"
@@ -310,4 +311,22 @@ func buildProxyProtoHeader(conn net.Conn, serverName string) (*proxyproto.Header
 	}
 
 	return proxyHeader, nil
+}
+
+func exit(w http.ResponseWriter, r *http.Request, tmpl *template.Template, httpServer *http.Server) {
+
+	tmplData := struct {
+	}{}
+
+	err := tmpl.ExecuteTemplate(w, "shutdown.html", tmplData)
+	if err != nil {
+		w.WriteHeader(500)
+		io.WriteString(w, err.Error())
+		return
+	}
+
+	go func() {
+		err = httpServer.Shutdown(r.Context())
+		fmt.Println(err)
+	}()
 }
