@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/waygate-io/waygate-go"
@@ -45,7 +46,7 @@ func main() {
 	server := waygate.NewServer(config)
 
 	fmt.Printf("Running Waygate Server Version: %s\n", Version)
-	server.Run()
+	os.Exit(server.Run())
 }
 
 // Taken from https://stackoverflow.com/a/28323276/943814

@@ -1,0 +1,13 @@
+{{ template "header.html" . }}
+
+<h1>Waygate Server Dashboard</h1>
+
+<form action='/restart' method='POST'>
+  <button type='submit'>Restart</button>
+</form>
+
+<form action='/shutdown' method='POST'>
+  <button type='submit'>Shutdown</button>
+</form>
+
+{{ template "footer.html" . }}

@@ -5,6 +5,8 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"html/template"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -59,7 +61,7 @@ func NewServer(config *ServerConfig) *Server {
 var count int = 0
 var dash *dashtui.DashTUI
 
-func (s *Server) Run() {
+func (s *Server) Run() int {
 
 	var err error
 	dash, err = dashtui.NewBuilder().
@@ -174,9 +176,12 @@ func (s *Server) Run() {
 		exitOnError(err)
 	}
 
+	tmpl, err := template.ParseFS(fs, "templates/*")
+	exitOnError(err)
+
 	serverUri := "https://" + s.config.AdminDomain
 	oauth2Prefix := "/oauth2"
-	oauth2Handler := NewOAuth2Handler(db, serverUri, oauth2Prefix, s.jose)
+	oauth2Handler := NewOAuth2Handler(db, serverUri, oauth2Prefix, s.jose, tmpl)
 
 	//mux := http.NewServeMux()
 	mux := NewServerMux(authServer, s.config.AdminDomain)
@@ -215,6 +220,12 @@ func (s *Server) Run() {
 
 	tunnels := make(map[string]Tunnel)
 
+	httpServer := &http.Server{
+		Handler: mux,
+	}
+
+	exitReason := "normal"
+
 	go func() {
 		for {
 			tcpConn, err := tcpListener.Accept()
@@ -239,7 +250,44 @@ func (s *Server) Run() {
 	tlsListener := tls.NewListener(waygateListener, tlsConfig)
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("<h1>Hi there</h1>"))
+
+		tmplData := struct {
+		}{}
+
+		err = tmpl.ExecuteTemplate(w, "server.html", tmplData)
+		if err != nil {
+			w.WriteHeader(500)
+			io.WriteString(w, err.Error())
+			return
+		}
+	})
+
+	exit := func(w http.ResponseWriter, r *http.Request, reason string) {
+
+		exitReason = reason
+
+		tmplData := struct {
+		}{}
+
+		err = tmpl.ExecuteTemplate(w, "shutdown.html", tmplData)
+		if err != nil {
+			w.WriteHeader(500)
+			io.WriteString(w, err.Error())
+			return
+		}
+
+		go func() {
+			err = httpServer.Shutdown(r.Context())
+			fmt.Println(err)
+		}()
+	}
+
+	mux.HandleFunc("/shutdown", func(w http.ResponseWriter, r *http.Request) {
+		exit(w, r, "shutdown")
+	})
+
+	mux.HandleFunc("/restart", func(w http.ResponseWriter, r *http.Request) {
+		exit(w, r, "restart")
 	})
 
 	mux.HandleFunc("/waygate", func(w http.ResponseWriter, r *http.Request) {
@@ -390,7 +438,16 @@ func (s *Server) Run() {
 		tunnels[domain] = tunnel
 	})
 
-	http.Serve(tlsListener, mux)
+	err = httpServer.Serve(tlsListener)
+
+	switch exitReason {
+	case "restart":
+		return 64
+	case "shutdown":
+		return 0
+	default:
+		return 0
+	}
 }
 
 func (s *Server) handleConn(

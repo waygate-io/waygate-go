@@ -6,6 +6,8 @@ package waygate
 import (
 	"bytes"
 	"crypto/tls"
+	"errors"
+	"fmt"
 	"io"
 	"net"
 	"time"
@@ -61,10 +63,14 @@ func NewPassthroughListener() *PassthroughListener {
 	}
 }
 func (f *PassthroughListener) Accept() (net.Conn, error) {
-	conn := <-f.ch
+	conn, ok := <-f.ch
+	if !ok {
+		return nil, errors.New("PassthroughListener closed")
+	}
 	return conn, nil
 }
 func (f *PassthroughListener) Close() error {
+	close(f.ch)
 	return nil
 }
 func (f *PassthroughListener) Addr() net.Addr {

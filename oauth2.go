@@ -24,10 +24,7 @@ type OAuth2Handler struct {
 	mux *http.ServeMux
 }
 
-func NewOAuth2Handler(db *Database, serverUri, prefix string, jose *josencillo.JOSE) *OAuth2Handler {
-
-	tmpl, err := template.ParseFS(fs, "templates/*")
-	exitOnError(err)
+func NewOAuth2Handler(db *Database, serverUri, prefix string, jose *josencillo.JOSE, tmpl *template.Template) *OAuth2Handler {
 
 	mux := http.NewServeMux()
 
