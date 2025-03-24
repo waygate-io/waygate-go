@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	oauth "github.com/anderspitman/little-oauth2-go"
 	"github.com/anderspitman/treemess-go"
@@ -668,6 +669,24 @@ func (c *Client) Run() error {
 		}
 	}
 
+	go func() {
+		httpClient := http.Client{
+			Timeout: 5 * time.Second,
+		}
+		for {
+			res, err := httpClient.Get(dashUri + "/check")
+			if err != nil {
+				os.Exit(64)
+			}
+
+			if res.StatusCode != 200 {
+				os.Exit(65)
+			}
+
+			time.Sleep(30 * time.Second)
+		}
+	}()
+
 	return nil
 }
 
@@ -756,6 +775,10 @@ func (m *ClientMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		m.fileServer.ServeHTTP(w, r)
 		return
 	} else if host != authDomain {
+
+		if r.URL.Path == "/check" {
+			return
+		}
 
 		tunnel, err := m.db.GetTunnel(host)
 		if err == nil && !tunnel.Protected {
