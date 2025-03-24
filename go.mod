@@ -9,7 +9,7 @@ go 1.24.1
 //replace github.com/anderspitman/little-oauth2-go => ../little-oauth2-go
 //replace github.com/takingnames/namedrop-libdns => ../namedrop-libdns
 //replace github.com/takingnames/namedrop-go => ../namedrop-go
-replace github.com/anderspitman/symbiote-go => ../symbiote-go
+//replace github.com/anderspitman/symbiote-go => ../symbiote-go
 
 //replace github.com/gemdrive/gemdrive-go => ../gemdrive-go
 
@@ -17,7 +17,7 @@ require (
 	gioui.org v0.5.0
 	github.com/anderspitman/dashtui v0.0.0-20240514182850-c3a359159ce1
 	github.com/anderspitman/little-oauth2-go v0.0.0-20241114224916-42fd761b6e86
-	github.com/anderspitman/symbiote-go v0.0.0-20250322224437-16d930ded70e
+	github.com/anderspitman/symbiote-go v0.0.0-20250324155604-6f55749e4e8c
 	github.com/anderspitman/treemess-go v0.0.0-20210313015619-ba255d9f1e0f
 	github.com/caddyserver/certmagic v0.22.0
 	github.com/gemdrive/gemdrive-go v0.0.0-20240229172336-f3f7f72ae546
