@@ -9,7 +9,7 @@ go 1.24.1
 //replace github.com/anderspitman/little-oauth2-go => ../little-oauth2-go
 //replace github.com/takingnames/namedrop-libdns => ../namedrop-libdns
 //replace github.com/takingnames/namedrop-go => ../namedrop-go
-//replace github.com/anderspitman/symbiote-go => ../symbiote-go
+replace github.com/anderspitman/symbiote-go => ../symbiote-go
 
 //replace github.com/gemdrive/gemdrive-go => ../gemdrive-go
 

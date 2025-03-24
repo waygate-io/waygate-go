@@ -6,12 +6,15 @@ import (
 	"os"
 	"time"
 
+	"github.com/anderspitman/symbiote-go"
 	"github.com/waygate-io/waygate-go"
 )
 
 var Version string
 
 func main() {
+	symbiote.Supervise()
+
 	adminDomainArg := flag.String("admin-domain", "", "Admin domain")
 	portArg := flag.Int("port", 443, "Port")
 	public := flag.Bool("public", false, "Create tunnels for unauthenticated clients")
