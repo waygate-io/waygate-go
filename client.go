@@ -489,7 +489,7 @@ func (c *Client) Run() error {
 		var serverAddress string
 		var tunDomain string
 		var tunHost string
-		if tunnelType == TunnelTypeHTTPS {
+		if tunnelType == TunnelTypeHTTPS || tunnelType == TunnelTypeTLS {
 
 			tunDomain = r.Form.Get("domain")
 			if tunDomain == "" {

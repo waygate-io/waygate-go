@@ -83,14 +83,46 @@
   </div>
 </form>
 
-<h3>Create Tunnel</h3>
+<h3>Create TLS Tunnel</h3>
+
+<form action='/add-tunnel' method='POST'>
+  <input type='hidden' name='type' value='TLS' />
+  <div class='list'>
+    <div>
+      <label>Server Address:</label>
+      <input type='text' name='host' placeholder='host' />
+      .
+      <select name='domain'>
+        {{range .Domains}}
+        <option>{{.}}</option>
+        {{end}}
+      </select>
+    </div>
+    <div>
+      <label for='client-address-text'>Client Address:</label>
+      <input id='client-address-text' type='text' name='client_address' value='localhost' />
+    </div>
+    <div>
+      <label for='client-port-text'>Client Port:</label>
+      <input id='client-port-text' type='text' name='client_port' value='8000' />
+    </div>
+    <div>
+      <label for='tls-passthrough-checkbox'>TLS Passthrough (TLS only):</label>
+      <input id='tls-passthrough-checkbox' type='checkbox' name='tls_passthrough' />
+    </div>
+    <div>
+      <button>Submit</button>
+    </div>
+  </div>
+</form>
+
+<h3>Create Socket Tunnel</h3>
 
 <form action='/add-tunnel' method='POST'>
   <div class='list'>
     <div>
       <label for='tunnel-type-dropdown'>Tunnel Type:</label>
       <select id='tunnel-type-dropdown' name='type'>
-        <option>TLS</option>
         <option>TCP</option>
         <option>UDP</option>
       </select>
@@ -101,11 +133,11 @@
     </div>
     <div>
       <label for='client-address-text'>Client Address:</label>
-      <input id='client-address-text' type='text' name='client_address' />
+      <input id='client-address-text' type='text' name='client_address' value='localhost' />
     </div>
     <div>
-      <label for='tls-passthrough-checkbox'>TLS Passthrough (TLS only):</label>
-      <input id='tls-passthrough-checkbox' type='checkbox' name='tls_passthrough' />
+      <label for='client-port-text'>Client Port:</label>
+      <input id='client-port-text' type='text' name='client_port' value='8000' />
     </div>
     <div>
       <button>Submit</button>
