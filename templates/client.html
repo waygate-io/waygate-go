@@ -24,8 +24,10 @@
       <td>Type</td>
       <td>Server Address</td>
       <td>Client Address</td>
+      <!--
       <td>Protected</td>
       <td>TLS Passthrough</td>
+      -->
       <td>Actions</td>
     </tr>
   </thead>
@@ -40,12 +42,14 @@
     <td>
       {{$tunnel.ClientAddress}}
     </td>
+    <!--
     <td>
       {{$tunnel.Protected}}
     </td>
     <td>
       {{$tunnel.TLSPassthrough}}
     </td>
+    -->
     <td>
       <form action='/delete-tunnel' method='POST'>
         <input type='hidden' name='type' value='{{$tunnel.Type}}' />
