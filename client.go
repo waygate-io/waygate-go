@@ -699,6 +699,8 @@ func (c *Client) Run() error {
 			Timeout: 5 * time.Second,
 		}
 		for {
+			time.Sleep(30 * time.Second)
+
 			res, err := httpClient.Get(dashUri + "/check")
 			if err != nil {
 				os.Exit(64)
@@ -707,8 +709,6 @@ func (c *Client) Run() error {
 			if res.StatusCode != 200 {
 				os.Exit(65)
 			}
-
-			time.Sleep(30 * time.Second)
 		}
 	}()
 
