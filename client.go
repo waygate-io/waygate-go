@@ -580,12 +580,14 @@ func (c *Client) Run() error {
 
 			serverAddress = fqdn
 		} else {
-			serverAddress = r.Form.Get("server_address")
-			if serverAddress == "" {
+			serverPort := r.Form.Get("server_port")
+			if serverPort == "" {
 				w.WriteHeader(400)
-				io.WriteString(w, "Missing server_address")
+				io.WriteString(w, "Missing server_port")
 				return
 			}
+
+			serverAddress = fmt.Sprintf("0.0.0.0:%s", serverPort)
 		}
 
 		tunnel := &ClientTunnel{
