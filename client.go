@@ -89,69 +89,11 @@ func NewClient(config *ClientConfig) *Client {
 		WaygateServerDomain = configCopy.ServerDomain
 	}
 
-	// Use random unprivileged port for ACME challenges. This is necessary
-	// because of the way certmagic works, in that if it fails to bind
-	// HTTPSPort (443 by default) and doesn't detect anything else binding
-	// it, it fails. Obviously the waygate client is likely to be
-	// running on a machine where 443 isn't bound, so we need a different
-	// port to hack around this. See here for more details:
-	// https://github.com/caddyserver/certmagic/issues/111
-	certmagic.HTTPSPort, err = randomOpenPort()
-	exitOnError(err)
-
-	if len(configCopy.Users) > 0 {
-		certmagic.DefaultACME.Email = configCopy.Users[0]
-	}
-	certmagic.DefaultACME.DisableHTTPChallenge = true
-	certmagic.DefaultACME.Agreed = true
-	//certmagic.DefaultACME.CA = certmagic.LetsEncryptStagingCA
-
-	var dnsProvider DNSProvider
-	if configCopy.DNSProvider != "" {
-
-		dnsProvider, err = getDnsProvider(configCopy.DNSProvider, configCopy.DNSToken, configCopy.DNSUser)
-		exitOnError(err)
-		certmagic.DefaultACME.DNS01Solver = &certmagic.DNS01Solver{
-			DNSManager: certmagic.DNSManager{
-				DNSProvider: dnsProvider,
-			},
-		}
-	} else {
-		certmagic.Default.OnDemand = &certmagic.OnDemandConfig{
-			DecisionFunc: func(ctx context.Context, name string) error {
-				// TODO: verify domain is in tunnels
-				//if name != tunnelDomain {
-				//	return fmt.Errorf("not allowed")
-				//}
-				return nil
-			},
-		}
-	}
-
-	//certmagic.Default.Storage = &certmagic.FileStorage{"./certs"}
-	certmagic.Default.Storage, err = NewCertmagicSqliteStorage(db.db.DB)
-	//exitOnError(err)
-
-	certConfig := certmagic.NewDefault()
-
-	tunnels, err := db.GetTunnels()
-	exitOnError(err)
-
-	ctx := context.Background()
-	for _, tun := range tunnels {
-		if tun.Type == TunnelTypeHTTPS || tun.Type == TunnelTypeTLS {
-			//err := certConfig.ManageAsync(ctx, []string{tun.ServerAddress, "*." + tun.ServerAddress})
-			err := certConfig.ManageSync(ctx, []string{tun.ServerAddress, "*." + tun.ServerAddress})
-			exitOnError(err)
-		}
-	}
-
 	return &Client{
-		db:          db,
-		config:      &configCopy,
-		eventCh:     nil,
-		tmpl:        tmpl,
-		dnsProvider: dnsProvider,
+		db:      db,
+		config:  &configCopy,
+		eventCh: nil,
+		tmpl:    tmpl,
 	}
 }
 
@@ -169,6 +111,103 @@ func (c *Client) Proxy(domain, addr string) {
 }
 
 func (c *Client) Run() error {
+
+	var err error
+	configCopy := c.config
+	db := c.db
+
+	// Use random unprivileged port for ACME challenges. This is necessary
+	// because of the way certmagic works, in that if it fails to bind
+	// HTTPSPort (443 by default) and doesn't detect anything else binding
+	// it, it fails. Obviously the waygate client is likely to be
+	// running on a machine where 443 isn't bound, so we need a different
+	// port to hack around this. See here for more details:
+	// https://github.com/caddyserver/certmagic/issues/111
+	certmagic.HTTPSPort, err = randomOpenPort()
+	exitOnError(err)
+
+	if len(configCopy.Users) < 1 {
+		exitOnError(errors.New("Must provider user"))
+	}
+
+	var certCache *certmagic.Cache
+	// TODO: probably need to be calling certCache.Stop()
+	certCache = certmagic.NewCache(certmagic.CacheOptions{
+		GetConfigForCert: func(cert certmagic.Certificate) (*certmagic.Config, error) {
+			// TODO: this never seems to be called, but I'm worried it might introduce bugs in
+			// the future by returning a different config than defined below.
+			return certmagic.New(certCache, certmagic.Config{}), nil
+		},
+	})
+
+	//certStorage := &certmagic.FileStorage{"./certs"}
+	certStorage, err := NewCertmagicSqliteStorage(db.db.DB)
+	exitOnError(err)
+
+	//acmeCA := certmagic.LetsEncryptStagingCA
+	acmeCA := certmagic.LetsEncryptProductionCA
+
+	createDNSConfig := func(dnsProvider certmagic.DNSProvider) *certmagic.Config {
+		certConfig := certmagic.New(certCache, certmagic.Config{
+			Storage: certStorage,
+		})
+
+		acmeIssuer := certmagic.NewACMEIssuer(certConfig, certmagic.ACMEIssuer{
+			CA:                   acmeCA,
+			Email:                configCopy.Users[0],
+			Agreed:               true,
+			DisableHTTPChallenge: true,
+			DNS01Solver: &certmagic.DNS01Solver{
+				DNSManager: certmagic.DNSManager{
+					DNSProvider: dnsProvider,
+				},
+			},
+		})
+
+		certConfig.Issuers = []certmagic.Issuer{acmeIssuer}
+
+		return certConfig
+	}
+
+	if configCopy.DNSProvider != "" {
+
+		c.dnsProvider, err = getDnsProvider(configCopy.DNSProvider, configCopy.DNSToken, configCopy.DNSUser)
+		exitOnError(err)
+
+		certConfig := createDNSConfig(c.dnsProvider)
+
+		tunnels, err := db.GetTunnels()
+		exitOnError(err)
+
+		ctx := context.Background()
+		for _, tun := range tunnels {
+			if tun.Type == TunnelTypeHTTPS || tun.Type == TunnelTypeTLS {
+				err := certConfig.ManageAsync(ctx, []string{tun.ServerAddress, "*." + tun.ServerAddress})
+				exitOnError(err)
+			}
+		}
+	}
+
+	onDemandConfig := certmagic.New(certCache, certmagic.Config{
+		Storage: certStorage,
+		OnDemand: &certmagic.OnDemandConfig{
+			DecisionFunc: func(ctx context.Context, name string) error {
+				// TODO: verify domain is in tunnels
+				//if name != tunnelDomain {
+				//	return fmt.Errorf("not allowed")
+				//}
+				return nil
+			},
+		},
+	})
+
+	onDemandIssuer := certmagic.NewACMEIssuer(onDemandConfig, certmagic.ACMEIssuer{
+		CA:                   acmeCA,
+		Email:                configCopy.Users[0],
+		Agreed:               true,
+		DisableHTTPChallenge: true,
+	})
+	onDemandConfig.Issuers = []certmagic.Issuer{onDemandIssuer}
 
 	token := c.config.Token
 	redirUriCh := make(chan string)
@@ -229,7 +268,19 @@ func (c *Client) Run() error {
 		fmt.Println(token)
 	}
 
-	session, err := NewClientSession(token, c.db)
+	certConfig := onDemandConfig
+
+	//disableOnDemand := true
+	disableOnDemand := false
+	if disableOnDemand {
+		if c.dnsProvider != nil {
+			certConfig = createDNSConfig(c.dnsProvider)
+		} else {
+			exitOnError(errors.New("Can't use disableOnDemand without DNS settings"))
+		}
+	}
+
+	session, err := NewClientSession(token, c.db, certConfig)
 	if err != nil {
 		return err
 	}
@@ -451,19 +502,15 @@ func (c *Client) Run() error {
 			TokenData: tokenRes,
 		}
 
+		// TODO: hacky. we probably shouldn't completely override DNS
+		// config passed in by user
 		c.dnsProvider = dnsProvider
 
-		//certmagic.Default.OnDemand = nil
-		//certmagic.DefaultACME.DNS01Solver = &certmagic.DNS01Solver{
-		//	DNSManager: certmagic.DNSManager{
-		//		DNSProvider: dnsProvider,
-		//	},
-		//}
+		certConfig := createDNSConfig(c.dnsProvider)
 
 		domain := tokenRes.Permissions[0].Domain
-		certConfig := certmagic.NewDefault()
 		ctx := context.Background()
-		err = certConfig.ManageSync(ctx, []string{domain, "*." + domain})
+		err = certConfig.ManageAsync(ctx, []string{domain, "*." + domain})
 		if err != nil {
 			w.WriteHeader(500)
 			io.WriteString(w, err.Error())
@@ -521,13 +568,14 @@ func (c *Client) Run() error {
 				fqdn = fmt.Sprintf("%s.%s", tunHost, tunDomain)
 			}
 
-			// TODO: probably share a single certConfig
-			certConfig := certmagic.NewDefault()
-			err := certConfig.ManageAsync(context.Background(), []string{fqdn, "*." + fqdn})
-			if err != nil {
-				w.WriteHeader(500)
-				io.WriteString(w, err.Error())
-				return
+			if c.dnsProvider != nil {
+				certConfig := createDNSConfig(c.dnsProvider)
+				err := certConfig.ManageAsync(context.Background(), []string{fqdn, "*." + fqdn})
+				if err != nil {
+					w.WriteHeader(500)
+					io.WriteString(w, err.Error())
+					return
+				}
 			}
 
 			serverAddress = fqdn

@@ -14,8 +14,6 @@ import (
 
 	"github.com/caddyserver/certmagic"
 	"github.com/mailgun/proxyproto"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
 const PROXY_PROTO_PP2_TYPE_MIN_CUSTOM = 0xe0
@@ -30,46 +28,13 @@ type ClientSession struct {
 	listenMap      map[string]*Listener
 	udpMap         map[string]*UDPConn
 	mut            *sync.Mutex
-	logger         *zap.Logger
 }
 
-func NewClientSession(token string, db *ClientDatabase) (*ClientSession, error) {
+func NewClientSession(token string, db *ClientDatabase, certConfig *certmagic.Config) (*ClientSession, error) {
 
 	var s *ClientSession
 
-	//certmagic.Default.OnDemand = &certmagic.OnDemandConfig{
-	//        DecisionFunc: func(ctx context.Context, name string) error {
-	//                if s != nil {
-	//                        if !strings.HasSuffix(name, s.tunnel.GetConfig().Domain) {
-	//                                return fmt.Errorf("not allowed")
-	//                        }
-	//                }
-	//                return nil
-	//        },
-	//}
-
 	var err error
-	//certmagic.Default.Storage = &certmagic.FileStorage{"./certs"}
-	certmagic.Default.Storage, err = NewCertmagicSqliteStorage(db.db.DB)
-	//exitOnError(err)
-
-	var output zapcore.WriteSyncer = os.Stdout
-	logOutput := zapcore.Lock(output)
-	logEncoder := zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig())
-	logPriority := zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
-		return lvl >= zapcore.InfoLevel
-	})
-
-	logCore := zapcore.NewCore(logEncoder, logOutput, logPriority)
-
-	logger := zap.New(logCore)
-
-	certmagic.Default.Logger = logger
-	certmagic.DefaultACME.Logger = logger
-
-	certConfig := certmagic.NewDefault()
-
-	//ctx := context.Background()
 
 	tlsConfig := &tls.Config{
 		GetCertificate: func(ch *tls.ClientHelloInfo) (*tls.Certificate, error) {
@@ -111,7 +76,6 @@ func NewClientSession(token string, db *ClientDatabase) (*ClientSession, error) 
 		listenMap:      make(map[string]*Listener),
 		udpMap:         make(map[string]*UDPConn),
 		mut:            &sync.Mutex{},
-		logger:         logger,
 	}
 
 	s.start()
@@ -160,8 +124,6 @@ func (s *ClientSession) start() {
 	}()
 
 	go func() {
-
-		defer s.logger.Sync()
 
 		for {
 			downstreamConn, err := s.tunnel.AcceptStream()
@@ -440,7 +402,7 @@ func (l *Listener) GetTunnelConfig() TunnelConfig {
 	return l.tunnel.GetConfig()
 }
 func DialUDP(network string, udpAddr *net.UDPAddr) (*UDPConn, error) {
-	s, err := NewClientSession(DefaultToken, nil)
+	s, err := NewClientSession(DefaultToken, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -451,7 +413,7 @@ func ListenUDP(network string, udpAddr *net.UDPAddr) (*UDPConn, error) {
 
 	//address := fmt.Sprintf("%s:%d", udpAddr.IP, udpAddr.Port)
 
-	s, err := NewClientSession(DefaultToken, nil)
+	s, err := NewClientSession(DefaultToken, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -468,7 +430,7 @@ func Listen(network, address string, opts ...ListenOptions) (*Listener, error) {
 		db = opts[0].Db
 	}
 
-	s, err := NewClientSession(token, db)
+	s, err := NewClientSession(token, db, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -477,7 +439,7 @@ func Listen(network, address string, opts ...ListenOptions) (*Listener, error) {
 }
 func ListenWithOpts(network, address, token string, db *ClientDatabase) (*Listener, error) {
 
-	s, err := NewClientSession(token, db)
+	s, err := NewClientSession(token, db, nil)
 	if err != nil {
 		return nil, err
 	}
