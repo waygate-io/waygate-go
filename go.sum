@@ -11,10 +11,8 @@ github.com/anderspitman/dashtui v0.0.0-20240514182850-c3a359159ce1 h1:TDyENvvcP9
 github.com/anderspitman/dashtui v0.0.0-20240514182850-c3a359159ce1/go.mod h1:EYsRkMq9qcwI7z6zRJwZghqcK1lnMcJq4j2741L3BGs=
 github.com/anderspitman/little-oauth2-go v0.0.0-20241114224916-42fd761b6e86 h1:2jgOxgFtrkuk33ZtUW9/6kc8lQNQeTTl2IorqN2lIpQ=
 github.com/anderspitman/little-oauth2-go v0.0.0-20241114224916-42fd761b6e86/go.mod h1:w3NvRJ2XEy/SJpE7VmX0R6WPoaKW93SRD+mLoCPiT7E=
-github.com/anderspitman/symbiote-go v0.0.0-20250322224437-16d930ded70e h1:JiTbAVEbkxtQAn3sU5UF9NoJXjEo7ua/FhdBNYl1AFY=
-github.com/anderspitman/symbiote-go v0.0.0-20250322224437-16d930ded70e/go.mod h1:DoWhWpAd61Md/DfFuex5KAmKTUGWP0WcdjEYscpsLz8=
-github.com/anderspitman/symbiote-go v0.0.0-20250324155604-6f55749e4e8c h1:pPKleNv92i5nkIVCoJLGdLs+JILPAolftdysrKYSXJg=
-github.com/anderspitman/symbiote-go v0.0.0-20250324155604-6f55749e4e8c/go.mod h1:DoWhWpAd61Md/DfFuex5KAmKTUGWP0WcdjEYscpsLz8=
+github.com/anderspitman/reanimator-go v0.0.0-20250402160345-943313c242a5 h1:/iXpXDexl27naS7tQKRKtrch3wa53LBJTwEJmDCbxcU=
+github.com/anderspitman/reanimator-go v0.0.0-20250402160345-943313c242a5/go.mod h1:/Pt4YvuGVYDF80OhpRt8Fo9iqsKv5HGVXA4KSTnRRt4=
 github.com/anderspitman/treemess-go v0.0.0-20210313015619-ba255d9f1e0f h1:WoJpnQrkAyFZC11AGy36SvlHTX7c2DLbDiNC46UU2zo=
 github.com/anderspitman/treemess-go v0.0.0-20210313015619-ba255d9f1e0f/go.mod h1:TIQB5pFXqgtUax4YssVoQE3e8aI7Df2G0f5ler9Anws=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=

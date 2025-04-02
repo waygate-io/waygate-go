@@ -6,14 +6,14 @@ import (
 	"os"
 	"time"
 
-	"github.com/anderspitman/symbiote-go"
+	"github.com/anderspitman/reanimator-go"
 	"github.com/waygate-io/waygate-go"
 )
 
 var Version string
 
 func main() {
-	symbiote.Supervise()
+	reanimator.Supervise()
 
 	adminDomainArg := flag.String("admin-domain", "", "Admin domain")
 	portArg := flag.Int("port", 443, "Port")

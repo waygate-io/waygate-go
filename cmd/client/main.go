@@ -6,12 +6,12 @@ import (
 	"os"
 	"strings"
 
-	"github.com/anderspitman/symbiote-go"
+	"github.com/anderspitman/reanimator-go"
 	"github.com/waygate-io/waygate-go"
 )
 
 func main() {
-	symbiote.Supervise()
+	reanimator.Supervise()
 
 	serverDomainArg := flag.String("server-domain", waygate.WaygateServerDomain, "Server domain")
 	tokenArg := flag.String("token", "", "Token")
