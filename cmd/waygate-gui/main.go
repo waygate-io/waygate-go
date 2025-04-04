@@ -15,7 +15,7 @@ import (
 	"gioui.org/unit"
 	"gioui.org/widget"
 	"gioui.org/widget/material"
-	"github.com/lastlogin-net/obligator"
+	//"github.com/lastlogin-net/obligator"
 	"github.com/pkg/browser"
 	"github.com/waygate-io/waygate-go"
 )
@@ -113,9 +113,9 @@ func run(w *app.Window) error {
 			case addUserEvent:
 				if evt.user != "" {
 					fmt.Println("add user", evt.user)
-					waygateClient.AddUser(obligator.User{
-						Email: evt.user,
-					})
+					//waygateClient.AddUser(obligator.User{
+					//	Email: evt.user,
+					//})
 				}
 			case waygate.OAuth2AuthUriEvent:
 				go func() {

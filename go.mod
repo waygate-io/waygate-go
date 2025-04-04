@@ -2,7 +2,6 @@ module github.com/waygate-io/waygate-go
 
 go 1.24.1
 
-//replace github.com/lastlogin-net/obligator => ../obligator
 //replace github.com/lastlogin-net/decent-auth-go => ../decent-auth-go
 //replace github.com/lastlogin-net/decent-auth-build => ../decent-auth-build
 
@@ -23,7 +22,7 @@ require (
 	github.com/anderspitman/reanimator-go v0.0.0-20250402160345-943313c242a5
 	github.com/caddyserver/certmagic v0.22.0
 	github.com/jmoiron/sqlx v1.3.5
-	github.com/lastlogin-net/obligator v0.0.0-20250319153436-bf303823472c
+	github.com/lastlogin-net/decent-auth-go v0.0.0-20250404184117-7ef0d9945161
 	github.com/lestrrat-go/jwx/v2 v2.1.4
 	github.com/libdns/libdns v0.2.3
 	github.com/libdns/namedotcom v0.3.4-0.20241104014758-c641e4a2a4c9
@@ -64,10 +63,8 @@ require (
 	github.com/goccy/go-json v0.10.3 // indirect
 	github.com/google/pprof v0.0.0-20241210010833-40e02aabc2ad // indirect
 	github.com/ianlancetaylor/demangle v0.0.0-20240805132620-81f5be970eca // indirect
-	github.com/ip2location/ip2location-go/v9 v9.6.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.10 // indirect
 	github.com/lastlogin-net/decent-auth-build v0.0.0-20250404183723-46b2c2f50617 // indirect
-	github.com/lastlogin-net/decent-auth-go v0.0.0-20250404184117-7ef0d9945161 // indirect
 	github.com/lestrrat-go/blackmagic v1.0.2 // indirect
 	github.com/lestrrat-go/httpcc v1.0.1 // indirect
 	github.com/lestrrat-go/httprc v1.0.6 // indirect
@@ -80,10 +77,6 @@ require (
 	github.com/miekg/dns v1.1.63 // indirect
 	github.com/navidys/tvxwidgets v0.10.0 // indirect
 	github.com/onsi/ginkgo/v2 v2.22.2 // indirect
-	github.com/philippgille/gokv v0.7.0 // indirect
-	github.com/philippgille/gokv/encoding v0.7.0 // indirect
-	github.com/philippgille/gokv/gomap v0.7.0 // indirect
-	github.com/philippgille/gokv/util v0.7.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/prometheus/client_model v0.5.0 // indirect
 	github.com/prometheus/common v0.48.0 // indirect
@@ -92,7 +85,6 @@ require (
 	github.com/rivo/tview v0.0.0-20240616192244-23476fa0bab2 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/segmentio/asm v1.2.0 // indirect
-	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e // indirect
 	github.com/tetratelabs/wabin v0.0.0-20230304001439-f6f874872834 // indirect
 	github.com/tetratelabs/wazero v1.8.1 // indirect
 	github.com/zeebo/blake3 v0.2.4 // indirect
@@ -113,6 +105,5 @@ require (
 	golang.org/x/text v0.23.0 // indirect
 	golang.org/x/tools v0.31.0 // indirect
 	google.golang.org/protobuf v1.36.1 // indirect
-	lukechampine.com/uint128 v1.2.0 // indirect
 	rsc.io/qr v0.2.0 // indirect
 )

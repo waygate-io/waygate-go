@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -18,7 +19,7 @@ import (
 	//"github.com/anderspitman/treemess-go"
 	"github.com/caddyserver/certmagic"
 	//"github.com/gemdrive/gemdrive-go"
-	"github.com/lastlogin-net/obligator"
+	"github.com/lastlogin-net/decent-auth-go"
 	"github.com/libdns/libdns"
 	"github.com/takingnames/namedrop-go"
 	namedropdns "github.com/takingnames/namedrop-libdns"
@@ -49,7 +50,6 @@ type Client struct {
 	db          *ClientDatabase
 	config      *ClientConfig
 	eventCh     chan interface{}
-	authServer  *obligator.Server
 	tmpl        *template.Template
 	dnsProvider DNSProvider
 }
@@ -295,35 +295,44 @@ func (c *Client) Run() error {
 	dashUri := "https://" + tunConfig.Domain
 	redirUriCh <- dashUri
 
-	dbPrefix := "auth_"
-	authDb, err := obligator.NewSqliteDatabaseWithDb(c.db.db.DB, dbPrefix)
+	authPrefix := "/auth"
+
+	kvStore, err := decentauth.NewSqliteKvStore(&decentauth.SqliteKvOptions{
+		Db:        db.db.DB,
+		TableName: "auth_kv",
+	})
 	exitOnError(err)
 
-	authDomain := "auth." + tunConfig.Domain
-	authConfig := obligator.ServerConfig{
-		Prefix:       "waygate_client_",
-		Database:     authDb,
-		DatabaseDir:  c.config.Dir,
-		ApiSocketDir: c.config.Dir,
-		//Domains: []string{
-		//        authDomain,
-		//},
-		AuthDomains: []string{
-			authDomain,
-		},
-		Users: c.config.Users,
-		OAuth2Providers: []*obligator.OAuth2Provider{
-			&obligator.OAuth2Provider{
-				ID:            "lastlogin",
-				Name:          "LastLogin",
-				URI:           "https://lastlogin.io",
-				ClientID:      "https://" + authDomain,
-				OpenIDConnect: true,
+	adminID := c.config.Users[0]
+
+	authHandler, err := decentauth.NewHandler(&decentauth.HandlerOptions{
+		KvStore: kvStore,
+		Config: decentauth.Config{
+			PathPrefix:  authPrefix,
+			AdminID:     adminID,
+			BehindProxy: false,
+			LoginMethods: []decentauth.LoginMethod{
+				decentauth.LoginMethod{
+					Name: "LastLogin",
+					URI:  "https://lastlogin.net",
+					Type: decentauth.LoginMethodOIDC,
+				},
+				decentauth.LoginMethod{
+					Type: decentauth.LoginMethodAdminCode,
+				},
+				decentauth.LoginMethod{
+					Type: decentauth.LoginMethodQRCode,
+				},
+				decentauth.LoginMethod{
+					Type: decentauth.LoginMethodATProto,
+				},
+				decentauth.LoginMethod{
+					Type: decentauth.LoginMethodFediverse,
+				},
 			},
 		},
-	}
-	authServer := obligator.NewServer(authConfig)
-	c.authServer = authServer
+	})
+	exitOnError(err)
 
 	//filesDomain := "files." + tunConfig.Domain
 
@@ -354,7 +363,7 @@ func (c *Client) Run() error {
 	//	}
 	//}()
 
-	mux := NewClientMux(authServer /*gdServer,*/, c.db)
+	mux := NewClientMux(authHandler /*gdServer,*/, c.db, adminID)
 
 	httpClient := &http.Client{
 		// Don't follow redirects
@@ -412,6 +421,8 @@ func (c *Client) Run() error {
 		}
 
 	})
+
+	mux.Handle(authPrefix+"/", authHandler)
 
 	// TODO: handle concurrent requests
 	var flowState *oauth.AuthCodeFlowState
@@ -728,18 +739,9 @@ func (c *Client) Run() error {
 		}
 	}()
 
-	users, err := c.authServer.GetUsers()
-	if err != nil {
-		return err
-	}
-
 	if c.eventCh != nil {
 		c.eventCh <- TunnelConnectedEvent{
 			TunnelConfig: tunConfig,
-		}
-
-		c.eventCh <- UsersUpdatedEvent{
-			Users: users,
 		}
 	}
 
@@ -768,41 +770,9 @@ func (c *Client) SetTunnel(tunnel *ClientTunnel) error {
 	return c.db.SetTunnel(tunnel)
 }
 
-func (c *Client) GetUsers() ([]*obligator.User, error) {
-	if c.authServer == nil {
-		return nil, errors.New("No auth server")
-	}
-
-	return c.authServer.GetUsers()
-}
-
-func (c *Client) AddUser(user obligator.User) error {
-	if c.authServer == nil {
-		return errors.New("No auth server")
-	}
-
-	err := c.authServer.AddUser(user)
-	if err != nil {
-		return err
-	}
-
-	users, err := c.authServer.GetUsers()
-	if err != nil {
-		return err
-	}
-
-	if c.eventCh != nil {
-		c.eventCh <- UsersUpdatedEvent{
-			Users: users,
-		}
-	}
-
-	return nil
-}
-
-type UsersUpdatedEvent struct {
-	Users []*obligator.User
-}
+//type UsersUpdatedEvent struct {
+//	Users []*obligator.User
+//}
 
 type TunnelConnectedEvent struct {
 	TunnelConfig TunnelConfig
@@ -813,17 +783,19 @@ type OAuth2AuthUriEvent struct {
 }
 
 type ClientMux struct {
-	db         *ClientDatabase
-	mux        *http.ServeMux
-	authServer *obligator.Server
+	db          *ClientDatabase
+	mux         *http.ServeMux
+	authHandler *decentauth.Handler
+	adminID     string
 	//fileServer *gemdrive.Server
 }
 
-func NewClientMux(authServer *obligator.Server /*fileServer *gemdrive.Server,*/, db *ClientDatabase) *ClientMux {
+func NewClientMux(authHandler *decentauth.Handler /*fileServer *gemdrive.Server,*/, db *ClientDatabase, adminID string) *ClientMux {
 	m := &ClientMux{
-		db:         db,
-		mux:        http.NewServeMux(),
-		authServer: authServer,
+		db:          db,
+		mux:         http.NewServeMux(),
+		authHandler: authHandler,
+		adminID:     adminID,
 		//fileServer: fileServer,
 	}
 	return m
@@ -843,13 +815,13 @@ func (m *ClientMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	host := r.Host
 
-	authDomain := m.authServer.AuthDomains()[0]
+	authPrefix := "/auth"
 
 	//if host == m.fileServer.FsDomain() {
 	//	m.fileServer.ServeHTTP(w, r)
 	//	return
 	//} else if host != authDomain {
-	if host != authDomain {
+	if !strings.HasPrefix(r.URL.Path, authPrefix) {
 
 		if r.URL.Path == "/check" {
 			return
@@ -861,23 +833,12 @@ func (m *ClientMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		validation, err := m.authServer.Validate(r)
-		if err != nil {
-
-			redirectUri := fmt.Sprintf("https://%s%s", host, r.URL.Path)
-
-			authRedirUri := fmt.Sprintf("https://%s/auth", authDomain)
-
-			authUri := obligator.AuthUri(authRedirUri, &obligator.OAuth2AuthRequest{
-				// https://openid.net/specs/oauth-v2-multiple-response-types-1_0.html#none
-				ResponseType: "none",
-				ClientId:     "https://" + host,
-				RedirectUri:  redirectUri,
-				State:        "",
-				Scope:        "",
-			})
-
-			http.Redirect(w, r, authUri, 303)
+		session := m.authHandler.GetSession(r)
+		if session == nil {
+			http.Redirect(w, r, authPrefix, 303)
+			return
+		} else if session.Id != m.adminID {
+			http.Redirect(w, r, authPrefix+"/logout", 303)
 			return
 		}
 
@@ -899,17 +860,14 @@ func (m *ClientMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if origin == "" || origin == r.Host {
 			// TODO: according to the docs we're not supposed to be
 			// modifying r: https://pkg.go.dev/net/http#Handler
-			r.Header.Set("UserIDType", validation.IdType)
-			r.Header.Set("UserID", validation.Id)
+			r.Header.Set("UserIDType", session.IdType)
+			r.Header.Set("UserID", session.Id)
 		}
 
 		//if host == m.fileServer.DashboardDomain() {
 		//	m.fileServer.ServeHTTP(w, r)
 		//	return
 		//}
-	} else {
-		m.authServer.ServeHTTP(w, r)
-		return
 	}
 
 	m.mux.ServeHTTP(w, r)
