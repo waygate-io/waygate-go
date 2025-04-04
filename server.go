@@ -73,7 +73,7 @@ func (s *Server) Run() int {
 	}
 	defer dash.Close()
 
-	db, err := NewDatabase("waygate.sqlite")
+	db, err := NewDatabase("waygate_server_db.sqlite3")
 	exitOnError(err)
 
 	// Use random unprivileged port for ACME challenges. This is necessary

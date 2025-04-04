@@ -11,14 +11,13 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path/filepath"
 	"sync"
 	"time"
 
 	oauth "github.com/anderspitman/little-oauth2-go"
-	"github.com/anderspitman/treemess-go"
+	//"github.com/anderspitman/treemess-go"
 	"github.com/caddyserver/certmagic"
-	"github.com/gemdrive/gemdrive-go"
+	//"github.com/gemdrive/gemdrive-go"
 	"github.com/lastlogin-net/obligator"
 	"github.com/libdns/libdns"
 	"github.com/takingnames/namedrop-go"
@@ -57,7 +56,7 @@ type Client struct {
 
 func NewClient(config *ClientConfig) *Client {
 
-	db, err := NewClientDatabase("waygate.sqlite")
+	db, err := NewClientDatabase("waygate_client_db.sqlite3")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
@@ -326,36 +325,36 @@ func (c *Client) Run() error {
 	authServer := obligator.NewServer(authConfig)
 	c.authServer = authServer
 
-	filesDomain := "files." + tunConfig.Domain
+	//filesDomain := "files." + tunConfig.Domain
 
-	gdDataDir := filepath.Join(c.config.Dir, "gemdrive")
-	gdConfig := &gemdrive.Config{
-		DashboardDomain: "dash." + filesDomain,
-		FsDomain:        filesDomain,
-		Dirs:            []string{filepath.Join(gdDataDir, "files")},
-		DataDir:         gdDataDir,
-	}
+	//gdDataDir := filepath.Join(c.config.Dir, "gemdrive")
+	//gdConfig := &gemdrive.Config{
+	//	DashboardDomain: "dash." + filesDomain,
+	//	FsDomain:        filesDomain,
+	//	Dirs:            []string{filepath.Join(gdDataDir, "files")},
+	//	DataDir:         gdDataDir,
+	//}
 
-	tmess := treemess.NewTreeMess()
-	gdTmess := tmess.Branch()
+	//tmess := treemess.NewTreeMess()
+	//gdTmess := tmess.Branch()
 
-	gdServer, err := gemdrive.NewServer(gdConfig, gdTmess)
-	if err != nil {
-		return err
-	}
+	//gdServer, err := gemdrive.NewServer(gdConfig, gdTmess)
+	//if err != nil {
+	//	return err
+	//}
 
-	gdCh := make(chan treemess.Message)
-	tmess.Listen(gdCh)
+	//gdCh := make(chan treemess.Message)
+	//tmess.Listen(gdCh)
 
-	//tmess.Send("start", nil)
+	////tmess.Send("start", nil)
 
-	go func() {
-		for msg := range gdCh {
-			fmt.Println(msg)
-		}
-	}()
+	//go func() {
+	//	for msg := range gdCh {
+	//		fmt.Println(msg)
+	//	}
+	//}()
 
-	mux := NewClientMux(authServer, gdServer, c.db)
+	mux := NewClientMux(authServer /*gdServer,*/, c.db)
 
 	httpClient := &http.Client{
 		// Don't follow redirects
@@ -817,15 +816,15 @@ type ClientMux struct {
 	db         *ClientDatabase
 	mux        *http.ServeMux
 	authServer *obligator.Server
-	fileServer *gemdrive.Server
+	//fileServer *gemdrive.Server
 }
 
-func NewClientMux(authServer *obligator.Server, fileServer *gemdrive.Server, db *ClientDatabase) *ClientMux {
+func NewClientMux(authServer *obligator.Server /*fileServer *gemdrive.Server,*/, db *ClientDatabase) *ClientMux {
 	m := &ClientMux{
 		db:         db,
 		mux:        http.NewServeMux(),
 		authServer: authServer,
-		fileServer: fileServer,
+		//fileServer: fileServer,
 	}
 	return m
 }
@@ -846,10 +845,11 @@ func (m *ClientMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	authDomain := m.authServer.AuthDomains()[0]
 
-	if host == m.fileServer.FsDomain() {
-		m.fileServer.ServeHTTP(w, r)
-		return
-	} else if host != authDomain {
+	//if host == m.fileServer.FsDomain() {
+	//	m.fileServer.ServeHTTP(w, r)
+	//	return
+	//} else if host != authDomain {
+	if host != authDomain {
 
 		if r.URL.Path == "/check" {
 			return
@@ -903,10 +903,10 @@ func (m *ClientMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			r.Header.Set("UserID", validation.Id)
 		}
 
-		if host == m.fileServer.DashboardDomain() {
-			m.fileServer.ServeHTTP(w, r)
-			return
-		}
+		//if host == m.fileServer.DashboardDomain() {
+		//	m.fileServer.ServeHTTP(w, r)
+		//	return
+		//}
 	} else {
 		m.authServer.ServeHTTP(w, r)
 		return
