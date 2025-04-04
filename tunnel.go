@@ -204,14 +204,14 @@ func processRequest(tunnelReq TunnelRequest, tunnelDomains []string, jose *josen
 		}
 	}
 
-	if len(tunnelDomains) == 0 {
-		return nil, errors.New("No tunnel domains")
-	}
-
 	var domain string
 	if tunnelReq.Token == "" {
 		if !public {
 			return nil, errors.New("No token provided")
+		}
+
+		if len(tunnelDomains) == 0 {
+			return nil, errors.New("No tunnel domains")
 		}
 
 		domain = strings.ToLower(host) + "." + tunnelDomains[0]
