@@ -34,15 +34,15 @@ const TunnelTypeUDP = "UDP"
 var WaygateServerDomain string = "waygate.io"
 
 type ClientConfig struct {
-	Users        []string
-	ServerDomain string
-	Token        string
-	Dir          string
-	Public       bool
-	NoBrowser    bool
-	DNSProvider  string
-	DNSUser      string
-	DNSToken     string
+	Users       []string
+	ServerURI   string
+	Token       string
+	Dir         string
+	Public      bool
+	NoBrowser   bool
+	DNSProvider string
+	DNSUser     string
+	DNSToken    string
 }
 
 type Client struct {
@@ -70,8 +70,8 @@ func NewClient(config *ClientConfig) *Client {
 
 	configCopy := *config
 
-	if configCopy.ServerDomain != "" && configCopy.ServerDomain != WaygateServerDomain {
-		err := db.SetServerUri(configCopy.ServerDomain)
+	if configCopy.ServerURI != "" && configCopy.ServerURI != WaygateServerDomain {
+		err := db.SetServerUri(configCopy.ServerURI)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err.Error())
 			os.Exit(1)
@@ -85,7 +85,7 @@ func NewClient(config *ClientConfig) *Client {
 	}
 
 	if dbServerUri != "" {
-		WaygateServerDomain = configCopy.ServerDomain
+		WaygateServerDomain = configCopy.ServerURI
 	}
 
 	return &Client{

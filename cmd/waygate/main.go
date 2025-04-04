@@ -48,7 +48,7 @@ func main() {
 
 func runServer() {
 	flagSet := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
-	adminDomainArg := flagSet.String("admin-domain", "", "Admin domain")
+	adminDomainArg := flagSet.String("domain", "", "Server domain")
 	portArg := flagSet.Int("port", 443, "Port")
 	public := flagSet.Bool("public", false, "Create tunnels for unauthenticated clients")
 	dnsProvider := flagSet.String("dns-provider", "", "DNS Provider")
@@ -87,7 +87,7 @@ func runServer() {
 
 func runClient() {
 	flagSet := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
-	serverDomainArg := flagSet.String("server-domain", waygate.WaygateServerDomain, "Server domain")
+	serverURIArg := flagSet.String("server-uri", waygate.WaygateServerDomain, "Server API URI")
 	tokenArg := flagSet.String("token", "", "Token")
 	userArg := flagSet.String("user", "", "User")
 	dnsProviderArg := flagSet.String("dns-provider", "", "DNS Provider")
@@ -102,12 +102,12 @@ func runClient() {
 	flagSet.Parse(os.Args[2:])
 
 	config := &waygate.ClientConfig{
-		ServerDomain: *serverDomainArg,
-		Token:        *tokenArg,
-		NoBrowser:    *noBrowserArg,
-		DNSProvider:  *dnsProviderArg,
-		DNSUser:      *dnsUserArg,
-		DNSToken:     *dnsTokenArg,
+		ServerURI:   *serverURIArg,
+		Token:       *tokenArg,
+		NoBrowser:   *noBrowserArg,
+		DNSProvider: *dnsProviderArg,
+		DNSUser:     *dnsUserArg,
+		DNSToken:    *dnsTokenArg,
 	}
 
 	if *userArg != "" {
