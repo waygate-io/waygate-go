@@ -25,6 +25,7 @@ import (
 	"github.com/quic-go/quic-go"
 	"github.com/quic-go/quic-go/http3"
 	"github.com/quic-go/webtransport-go"
+	"github.com/takingnames/namedrop-go"
 	"github.com/waygate-io/waygate-go/josencillo"
 	"go.uber.org/zap"
 )
@@ -105,15 +106,15 @@ func (s *Server) Run() int {
 			},
 		}
 	} else {
-		certmagic.Default.OnDemand = &certmagic.OnDemandConfig{
-			DecisionFunc: func(ctx context.Context, name string) error {
-				// TODO: verify domain is in tunnels
-				//if name != tunnelDomain {
-				//	return fmt.Errorf("not allowed")
-				//}
-				return nil
-			},
-		}
+		//certmagic.Default.OnDemand = &certmagic.OnDemandConfig{
+		//	DecisionFunc: func(ctx context.Context, name string) error {
+		//		// TODO: verify domain is in tunnels
+		//		//if name != tunnelDomain {
+		//		//	return fmt.Errorf("not allowed")
+		//		//}
+		//		return nil
+		//	},
+		//}
 	}
 
 	//certmagic.Default.Storage = &certmagic.FileStorage{"./certs"}
@@ -127,10 +128,24 @@ func (s *Server) Run() int {
 		challengeDomains = append(challengeDomains, "*."+domain)
 	}
 
-	ctx := context.Background()
-	adminDomains := []string{s.config.AdminDomain, "*." + s.config.AdminDomain}
-	err = certConfig.ManageSync(ctx, append(adminDomains, challengeDomains...))
+	publicIp, err := namedrop.GetPublicIp("takingnames.io/namedrop", "tcp4")
 	exitOnError(err)
+
+	addrs, err := net.LookupHost(s.config.AdminDomain)
+	exitOnError(err)
+
+	found := false
+	for _, addr := range addrs {
+		if addr == publicIp {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		msg := fmt.Sprintf("The domain '%s' does not appear to be pointed at this server\n", s.config.AdminDomain)
+		exitOnError(errors.New(msg))
+	}
 
 	tlsConfig := &tls.Config{
 		GetCertificate: certConfig.GetCertificate,
@@ -420,7 +435,22 @@ func (s *Server) Run() int {
 		tunnels[domain] = tunnel
 	})
 
-	err = httpServer.Serve(tlsListener)
+	waitCh := make(chan struct{})
+
+	go func() {
+		err = httpServer.Serve(tlsListener)
+		fmt.Println("here", err)
+		waitCh <- struct{}{}
+	}()
+
+	ctx := context.Background()
+	//adminDomains := []string{s.config.AdminDomain, "*." + s.config.AdminDomain}
+	//err = certConfig.ManageSync(ctx, append(adminDomains, challengeDomains...))
+	adminDomains := []string{s.config.AdminDomain, authDomain}
+	err = certConfig.ManageSync(ctx, adminDomains)
+	exitOnError(err)
+
+	<-waitCh
 
 	switch exitReason {
 	case "restart":
