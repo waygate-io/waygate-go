@@ -13,8 +13,6 @@ github.com/anderspitman/little-oauth2-go v0.0.0-20241114224916-42fd761b6e86 h1:2
 github.com/anderspitman/little-oauth2-go v0.0.0-20241114224916-42fd761b6e86/go.mod h1:w3NvRJ2XEy/SJpE7VmX0R6WPoaKW93SRD+mLoCPiT7E=
 github.com/anderspitman/reanimator-go v0.0.0-20250402160345-943313c242a5 h1:/iXpXDexl27naS7tQKRKtrch3wa53LBJTwEJmDCbxcU=
 github.com/anderspitman/reanimator-go v0.0.0-20250402160345-943313c242a5/go.mod h1:/Pt4YvuGVYDF80OhpRt8Fo9iqsKv5HGVXA4KSTnRRt4=
-github.com/anderspitman/treemess-go v0.0.0-20210313015619-ba255d9f1e0f h1:WoJpnQrkAyFZC11AGy36SvlHTX7c2DLbDiNC46UU2zo=
-github.com/anderspitman/treemess-go v0.0.0-20210313015619-ba255d9f1e0f/go.mod h1:TIQB5pFXqgtUax4YssVoQE3e8aI7Df2G0f5ler9Anws=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
 github.com/caddyserver/certmagic v0.22.0 h1:hi2skv2jouUw9uQUEyYSTTmqPZPHgf61dOANSIVCLOw=
@@ -39,8 +37,6 @@ github.com/gdamore/encoding v1.0.1 h1:YzKZckdBL6jVt2Gc+5p82qhrGiqMdG/eNs6Wy0u3Uh
 github.com/gdamore/encoding v1.0.1/go.mod h1:0Z0cMFinngz9kS1QfMjCP8TY7em3bZYeeklsSDPivEo=
 github.com/gdamore/tcell/v2 v2.8.1 h1:KPNxyqclpWpWQlPLx6Xui1pMk8S+7+R37h3g07997NU=
 github.com/gdamore/tcell/v2 v2.8.1/go.mod h1:bj8ori1BG3OYMjmb3IklZVWfZUJ1UBQt9JXrOCOhGWw=
-github.com/gemdrive/gemdrive-go v0.0.0-20240229172336-f3f7f72ae546 h1:l35q+J3vysJcGDG19BcapjE9HKpQxHkvN/jZ+klrQ1M=
-github.com/gemdrive/gemdrive-go v0.0.0-20240229172336-f3f7f72ae546/go.mod h1:ZC42IpMEmagNKKmI0P2I8ATckxghJbMKW4oqczAmmeM=
 github.com/go-ini/ini v1.55.0/go.mod h1:ByCAeIL28uOIIG0E3PJtZPDL8WnHpFKFOtgjp+3Ies8=
 github.com/go-logr/logr v1.4.2 h1:6pFjapn8bFcIbiKo3XT4j/BhANplGihG6tvd+8rYgrY=
 github.com/go-logr/logr v1.4.2/go.mod h1:9T104GzyrTigFIr8wt5mBrctHMim0Nb2HLGrmQ40KvY=
@@ -114,8 +110,6 @@ github.com/miekg/dns v1.1.63 h1:8M5aAw6OMZfFXTT7K5V0Eu5YiiL8l7nUAkyN6C9YwaY=
 github.com/miekg/dns v1.1.63/go.mod h1:6NGHfjhpmr5lt3XPLuyfDJi5AXbNIPM9PY6H6sF1Nfs=
 github.com/navidys/tvxwidgets v0.10.0 h1:rnTJCbOdgtHUC5to9lzDed5I1GYlLsJFlp3vCe50ucQ=
 github.com/navidys/tvxwidgets v0.10.0/go.mod h1:eWUu9zHru+7JrtNv0oaPlWXYGxBYlD8RZ0P9tOshQXY=
-github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646 h1:zYyBkD/k9seD2A7fsi6Oo2LfFZAehjjQMERAvZLEDnQ=
-github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646/go.mod h1:jpp1/29i3P1S/RLdc7JQKbRpFeM1dOBd8T9ki5s+AY8=
 github.com/omnistreams/omnistreams-go v0.0.0-20250314191905-b56316fba295 h1:5gtzkkh+GMGSQSRgLb6wSepsEzBp2aGbug4hQe6o8Rc=
 github.com/omnistreams/omnistreams-go v0.0.0-20250314191905-b56316fba295/go.mod h1:crSgI15J0f9o6aBu/s5AKTCevb1Xdyp/EFTInYIuFl4=
 github.com/omnistreams/omnistreams-go/transports v0.0.0-20250314191905-b56316fba295 h1:AGq69pb0QAWPuL4pa+AflB5kpKjQBXzacdpFJOY+uks=

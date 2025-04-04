@@ -18,9 +18,7 @@ require (
 	github.com/anderspitman/dashtui v0.0.0-20240514182850-c3a359159ce1
 	github.com/anderspitman/little-oauth2-go v0.0.0-20241114224916-42fd761b6e86
 	github.com/anderspitman/reanimator-go v0.0.0-20250402160345-943313c242a5
-	github.com/anderspitman/treemess-go v0.0.0-20210313015619-ba255d9f1e0f
 	github.com/caddyserver/certmagic v0.22.0
-	github.com/gemdrive/gemdrive-go v0.0.0-20240229172336-f3f7f72ae546
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/lastlogin-net/obligator v0.0.0-20250319153436-bf303823472c
 	github.com/lestrrat-go/jwx/v2 v2.1.4
@@ -72,7 +70,6 @@ require (
 	github.com/mholt/acmez/v3 v3.1.0 // indirect
 	github.com/miekg/dns v1.1.63 // indirect
 	github.com/navidys/tvxwidgets v0.10.0 // indirect
-	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646 // indirect
 	github.com/onsi/ginkgo/v2 v2.22.2 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/prometheus/client_model v0.5.0 // indirect
