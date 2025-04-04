@@ -10,7 +10,7 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"net/url"
+	//"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -18,7 +18,7 @@ import (
 
 	"github.com/anderspitman/dashtui"
 	"github.com/caddyserver/certmagic"
-	"github.com/lastlogin-net/obligator"
+	"github.com/lastlogin-net/decent-auth-go"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -153,28 +153,42 @@ func (s *Server) Run() int {
 		NextProtos: []string{"http/1.1", "acme-tls/1", "waygate-tls-muxado"},
 	}
 
-	dbPrefix := "auth_"
-	authDb, err := obligator.NewSqliteDatabaseWithDb(db.db.DB, dbPrefix)
+	authPrefix := "/auth"
+
+	kvStore, err := decentauth.NewSqliteKvStore(&decentauth.SqliteKvOptions{
+		Db:        db.db.DB,
+		TableName: "auth_kv",
+	})
 	exitOnError(err)
 
-	authDomain := "auth." + s.config.AdminDomain
-	authConfig := obligator.ServerConfig{
-		Database: authDb,
-		Domains: []string{
-			s.config.AdminDomain,
-		},
-		Users: s.config.Users,
-		OAuth2Providers: []*obligator.OAuth2Provider{
-			&obligator.OAuth2Provider{
-				ID:            "lastlogin",
-				Name:          "LastLogin",
-				URI:           "https://lastlogin.net",
-				ClientID:      "https://" + authDomain,
-				OpenIDConnect: true,
+	authHandler, err := decentauth.NewHandler(&decentauth.HandlerOptions{
+		KvStore: kvStore,
+		Config: decentauth.Config{
+			PathPrefix:  authPrefix,
+			AdminID:     s.config.Users[0],
+			BehindProxy: false,
+			LoginMethods: []decentauth.LoginMethod{
+				decentauth.LoginMethod{
+					Name: "LastLogin",
+					URI:  "https://lastlogin.net",
+					Type: decentauth.LoginMethodOIDC,
+				},
+				decentauth.LoginMethod{
+					Type: decentauth.LoginMethodAdminCode,
+				},
+				decentauth.LoginMethod{
+					Type: decentauth.LoginMethodQRCode,
+				},
+				decentauth.LoginMethod{
+					Type: decentauth.LoginMethodATProto,
+				},
+				decentauth.LoginMethod{
+					Type: decentauth.LoginMethodFediverse,
+				},
 			},
 		},
-	}
-	authServer := obligator.NewServer(authConfig)
+	})
+	exitOnError(err)
 
 	jwksJson, err := db.GetJWKS()
 	if err != nil {
@@ -199,7 +213,7 @@ func (s *Server) Run() int {
 	oauth2Handler := NewOAuth2Handler(db, serverUri, oauth2Prefix, s.jose, tmpl)
 
 	//mux := http.NewServeMux()
-	mux := NewServerMux(authServer, s.config.AdminDomain)
+	mux := NewServerMux(authHandler, s.config.AdminDomain, s.config.Users[0])
 
 	numStreamsGauge := promauto.NewGauge(prometheus.GaugeOpts{
 		Name: "waygate_num_streams",
@@ -254,7 +268,7 @@ func (s *Server) Run() int {
 			tunnelsCopy := tunnels
 			s.mut.Unlock()
 			go func() {
-				err := s.handleConn(tcpConn, authDomain, waygateListener, tunnelsCopy, tlsConfig)
+				err := s.handleConn(tcpConn, waygateListener, tunnelsCopy, tlsConfig)
 				if err != nil {
 					log.Println(err)
 				}
@@ -266,6 +280,8 @@ func (s *Server) Run() int {
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 
+		fmt.Println(r.URL.Path)
+
 		tmplData := struct {
 		}{}
 
@@ -276,6 +292,8 @@ func (s *Server) Run() int {
 			return
 		}
 	})
+
+	mux.Handle(authPrefix+"/", authHandler)
 
 	mux.HandleFunc("/shutdown", func(w http.ResponseWriter, r *http.Request) {
 		exitReason = "shutdown"
@@ -446,7 +464,7 @@ func (s *Server) Run() int {
 	ctx := context.Background()
 	//adminDomains := []string{s.config.AdminDomain, "*." + s.config.AdminDomain}
 	//err = certConfig.ManageSync(ctx, append(adminDomains, challengeDomains...))
-	adminDomains := []string{s.config.AdminDomain, authDomain}
+	adminDomains := []string{s.config.AdminDomain}
 	err = certConfig.ManageSync(ctx, adminDomains)
 	exitOnError(err)
 
@@ -464,7 +482,6 @@ func (s *Server) Run() int {
 
 func (s *Server) handleConn(
 	tcpConn net.Conn,
-	authDomain string,
 	waygateListener *PassthroughListener,
 	tunnels map[string]Tunnel,
 	tlsConfig *tls.Config) error {
@@ -491,7 +508,7 @@ func (s *Server) handleConn(
 		//domain := tunnel.GetConfig().Domain
 		//tunnels[domain] = tunnel
 
-	} else if clientHello.ServerName == s.config.AdminDomain || clientHello.ServerName == authDomain {
+	} else if clientHello.ServerName == s.config.AdminDomain {
 		waygateListener.PassConn(passConn)
 	} else {
 
@@ -646,15 +663,17 @@ func handleListenUDP(tunnel Tunnel, listenAddr string, udpMap map[string]*net.UD
 
 type ServerMux struct {
 	mux         *http.ServeMux
-	authServer  *obligator.Server
+	authHandler *decentauth.Handler
 	adminDomain string
+	adminID     string
 }
 
-func NewServerMux(authServer *obligator.Server, adminDomain string) *ServerMux {
+func NewServerMux(authHandler *decentauth.Handler, adminDomain, adminID string) *ServerMux {
 	m := &ServerMux{
 		mux:         http.NewServeMux(),
-		authServer:  authServer,
+		authHandler: authHandler,
 		adminDomain: adminDomain,
+		adminID:     adminID,
 	}
 	return m
 }
@@ -663,21 +682,18 @@ func (m *ServerMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Security-Policy", "frame-ancestors 'none'; script-src 'none'")
 	w.Header().Set("Referrer-Policy", "no-referrer")
 
-	host := r.Host
+	authPrefix := "/auth"
 
-	authDomain := "auth." + m.adminDomain
+	if !strings.HasPrefix(r.URL.Path, authPrefix) && r.URL.Path != "/waygate" && r.URL.Path != "/oauth2/token" && r.URL.Path != "/oauth2/device" && r.URL.Path != "/oauth2/device-verify" {
 
-	if r.URL.Path != "/waygate" && host != authDomain && r.URL.Path != "/oauth2/token" && r.URL.Path != "/oauth2/device" && r.URL.Path != "/oauth2/device-verify" {
-		_, err := m.authServer.Validate(r)
-		if err != nil {
-			returnUri := url.QueryEscape(fmt.Sprintf("https://%s%s", r.Host, r.URL.RequestURI()))
-			uri := fmt.Sprintf("https://%s/login?return_uri=%s", authDomain, returnUri)
-			http.Redirect(w, r, uri, 303)
+		session := m.authHandler.GetSession(r)
+		if session == nil {
+			http.Redirect(w, r, authPrefix, 303)
+			return
+		} else if session.Id != m.adminID {
+			http.Redirect(w, r, authPrefix+"/logout", 303)
 			return
 		}
-	} else if host == authDomain {
-		m.authServer.ServeHTTP(w, r)
-		return
 	}
 
 	//timestamp := time.Now().Format(time.RFC3339)

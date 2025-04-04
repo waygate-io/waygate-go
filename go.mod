@@ -3,6 +3,9 @@ module github.com/waygate-io/waygate-go
 go 1.24.1
 
 //replace github.com/lastlogin-net/obligator => ../obligator
+//replace github.com/lastlogin-net/decent-auth-go => ../decent-auth-go
+//replace github.com/lastlogin-net/decent-auth-build => ../decent-auth-build
+
 //replace github.com/omnistreams/omnistreams-go => ../omnistreams-go
 //replace github.com/omnistreams/omnistreams-go/transports => ../omnistreams-go/transports
 //replace github.com/anderspitman/dashtui => ../dashtui
@@ -48,17 +51,23 @@ require (
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/coder/websocket v1.8.13 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
+	github.com/dylibso/observe-sdk/go v0.0.0-20240819160327-2d926c5d788a // indirect
+	github.com/extism/go-sdk v1.6.2-0.20241121002538-bef00f39873e // indirect
 	github.com/gdamore/encoding v1.0.1 // indirect
 	github.com/gdamore/tcell/v2 v2.8.1 // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/go-text/typesetting v0.0.0-20230803102845-24e03d8b5372 // indirect
+	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/gobwas/httphead v0.1.0 // indirect
 	github.com/gobwas/pool v0.2.1 // indirect
 	github.com/gobwas/ws v1.4.0 // indirect
 	github.com/goccy/go-json v0.10.3 // indirect
 	github.com/google/pprof v0.0.0-20241210010833-40e02aabc2ad // indirect
+	github.com/ianlancetaylor/demangle v0.0.0-20240805132620-81f5be970eca // indirect
 	github.com/ip2location/ip2location-go/v9 v9.6.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.10 // indirect
+	github.com/lastlogin-net/decent-auth-build v0.0.0-20250404183723-46b2c2f50617 // indirect
+	github.com/lastlogin-net/decent-auth-go v0.0.0-20250404184117-7ef0d9945161 // indirect
 	github.com/lestrrat-go/blackmagic v1.0.2 // indirect
 	github.com/lestrrat-go/httpcc v1.0.1 // indirect
 	github.com/lestrrat-go/httprc v1.0.6 // indirect
@@ -71,6 +80,10 @@ require (
 	github.com/miekg/dns v1.1.63 // indirect
 	github.com/navidys/tvxwidgets v0.10.0 // indirect
 	github.com/onsi/ginkgo/v2 v2.22.2 // indirect
+	github.com/philippgille/gokv v0.7.0 // indirect
+	github.com/philippgille/gokv/encoding v0.7.0 // indirect
+	github.com/philippgille/gokv/gomap v0.7.0 // indirect
+	github.com/philippgille/gokv/util v0.7.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/prometheus/client_model v0.5.0 // indirect
 	github.com/prometheus/common v0.48.0 // indirect
@@ -80,7 +93,10 @@ require (
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/segmentio/asm v1.2.0 // indirect
 	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e // indirect
+	github.com/tetratelabs/wabin v0.0.0-20230304001439-f6f874872834 // indirect
+	github.com/tetratelabs/wazero v1.8.1 // indirect
 	github.com/zeebo/blake3 v0.2.4 // indirect
+	go.opentelemetry.io/proto/otlp v1.3.1 // indirect
 	go.uber.org/mock v0.3.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap/exp v0.3.0 // indirect
