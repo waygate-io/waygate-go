@@ -18,4 +18,56 @@
   -->
 </div>
 
+{{if .Clients}}
+<h2>Clients</h2>
+
+<table>
+  <thead>
+    <tr>
+      <td>Domain</td>
+      <td>TLS Termination</td>
+      <td>Use Proxy Protocol</td>
+    </tr>
+  </thead>
+  {{range $tunnel := .Clients}}
+  <tr>
+    <td>
+      <a href='https://{{$tunnel.Domain}}' target='_blank'>{{$tunnel.Domain}}</a>
+    </td>
+    <td>
+      {{$tunnel.TerminationType}}
+    </td>
+    <td>
+      {{$tunnel.UseProxyProtocol}}
+    </td>
+  </tr>
+  {{end}}
+</table>
+{{end}}
+
+{{if .Tunnels}}
+<h2>Tunnels</h2>
+
+<table>
+  <thead>
+    <tr>
+      <td>Server Address</td>
+      <td>Client</td>
+    </tr>
+  </thead>
+  {{range $tunnel := .Tunnels}}
+  <tr>
+    <td>
+      <a href='https://{{$tunnel.Address}}' target='_blank'>{{$tunnel.Address}}</a>
+    </td>
+    <td>
+      {{$tunnel.Address}}
+    </td>
+  </tr>
+  {{end}}
+</table>
+{{end}}
+
+
+
 {{ template "footer.html" . }}

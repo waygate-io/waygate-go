@@ -31,6 +31,11 @@ type TunnelConfig struct {
 	UseProxyProtocol bool   `json:"use_proxy_protocol"`
 }
 
+type tunnel struct {
+	Address string
+	Client  string
+}
+
 var (
 	DefaultToken   string = ""
 	DefaultCertDir string = "./"

@@ -284,8 +284,29 @@ func (s *Server) Run() int {
 
 		fmt.Println(r.URL.Path)
 
+		clients := make(map[string]TunnelConfig)
+
+		tuns := []tunnel{}
+
+		for addr, tun := range tunnels {
+			config := tun.GetConfig()
+			clients[config.Domain] = config
+
+			tun := tunnel{
+				Address: addr,
+				Client:  config.Domain,
+			}
+
+			tuns = append(tuns, tun)
+		}
+
 		tmplData := struct {
-		}{}
+			Clients map[string]TunnelConfig
+			Tunnels []tunnel
+		}{
+			Clients: clients,
+			Tunnels: tuns,
+		}
 
 		err = tmpl.ExecuteTemplate(w, "server.html", tmplData)
 		if err != nil {
