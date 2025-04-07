@@ -22,7 +22,7 @@ require (
 	github.com/anderspitman/reanimator-go v0.0.0-20250402160345-943313c242a5
 	github.com/caddyserver/certmagic v0.22.0
 	github.com/jmoiron/sqlx v1.3.5
-	github.com/lastlogin-net/decent-auth-go v0.0.0-20250404184117-7ef0d9945161
+	github.com/lastlogin-net/decent-auth-go v0.0.0-20250407164606-a45702f72553
 	github.com/lestrrat-go/jwx/v2 v2.1.4
 	github.com/libdns/libdns v0.2.3
 	github.com/libdns/namedotcom v0.3.4-0.20241104014758-c641e4a2a4c9
