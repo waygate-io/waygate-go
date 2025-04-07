@@ -10,6 +10,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	//"net/url"
 	"strings"
@@ -689,7 +690,8 @@ func (m *ServerMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		session := m.authHandler.GetSession(r)
 		if session == nil {
-			http.Redirect(w, r, authPrefix, 303)
+			returnTarget := url.QueryEscape(fmt.Sprintf("%s?%s", r.URL.Path, r.URL.RawQuery))
+			http.Redirect(w, r, authPrefix+"?return_target="+returnTarget, 303)
 			return
 		} else if session.Id != m.adminID {
 			http.Redirect(w, r, authPrefix+"/logout", 303)
