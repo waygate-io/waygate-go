@@ -10,6 +10,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
 	//"net/url"
 	"strings"
 	"sync"
@@ -143,8 +144,8 @@ func (s *Server) Run() int {
 	}
 
 	if !found {
-		msg := fmt.Sprintf("The domain '%s' does not appear to be pointed at this server\n", s.config.AdminDomain)
-		exitOnError(errors.New(msg))
+		msg := fmt.Sprintf("WARNING: The domain '%s' does not appear to be pointed at this server\n", s.config.AdminDomain)
+		fmt.Fprintf(os.Stderr, msg)
 	}
 
 	tlsConfig := &tls.Config{
