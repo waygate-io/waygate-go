@@ -48,7 +48,7 @@ func main() {
 
 func runServer() {
 	flagSet := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
-	adminDomainArg := flagSet.String("domain", "", "Server domain")
+	domainArg := flagSet.String("domain", "", "Server domain")
 	portArg := flagSet.Int("port", 443, "Port")
 	public := flagSet.Bool("public", false, "Create tunnels for unauthenticated clients")
 	dnsProvider := flagSet.String("dns-provider", "", "DNS Provider")
@@ -67,7 +67,7 @@ func runServer() {
 	waygate.DebugMode = *debug
 
 	config := &waygate.ServerConfig{
-		AdminDomain:      *adminDomainArg,
+		Domain:           *domainArg,
 		Port:             *portArg,
 		Public:           *public,
 		DnsProvider:      *dnsProvider,

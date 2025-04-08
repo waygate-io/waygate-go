@@ -27,13 +27,15 @@ import (
 	"github.com/quic-go/quic-go"
 	"github.com/quic-go/quic-go/http3"
 	"github.com/quic-go/webtransport-go"
+	//oauth "github.com/anderspitman/little-oauth2-go"
+	"github.com/mdp/qrterminal/v3"
 	"github.com/takingnames/namedrop-go"
 	"github.com/waygate-io/waygate-go/josencillo"
 	"go.uber.org/zap"
 )
 
 type ServerConfig struct {
-	AdminDomain      string
+	Domain           string
 	Port             int
 	Public           bool
 	DnsProvider      string
@@ -49,6 +51,7 @@ type Server struct {
 	jose   *josencillo.JOSE
 	config *ServerConfig
 	mut    *sync.Mutex
+	db     *Database
 }
 
 func NewServer(config *ServerConfig) *Server {
@@ -78,6 +81,16 @@ func (s *Server) Run() int {
 
 	db, err := NewDatabase("waygate_server_db.sqlite3")
 	exitOnError(err)
+	s.db = db
+
+	dashboardDomain, err := db.GetDomain()
+	exitOnError(err)
+
+	if s.config.Domain != "" {
+		dashboardDomain = s.config.Domain
+		err = db.SetDomain(dashboardDomain)
+		exitOnError(err)
+	}
 
 	// Use random unprivileged port for ACME challenges. This is necessary
 	// because of the way certmagic works, in that if it fails to bind
@@ -124,30 +137,6 @@ func (s *Server) Run() int {
 	exitOnError(err)
 
 	certConfig := certmagic.NewDefault()
-
-	challengeDomains := []string{}
-	for _, domain := range s.config.TunnelDomains {
-		challengeDomains = append(challengeDomains, "*."+domain)
-	}
-
-	publicIp, err := namedrop.GetPublicIp("takingnames.io/namedrop", "tcp4")
-	exitOnError(err)
-
-	addrs, err := net.LookupHost(s.config.AdminDomain)
-	exitOnError(err)
-
-	found := false
-	for _, addr := range addrs {
-		if addr == publicIp {
-			found = true
-			break
-		}
-	}
-
-	if !found {
-		msg := fmt.Sprintf("WARNING: The domain '%s' does not appear to be pointed at this server\n", s.config.AdminDomain)
-		fmt.Fprintf(os.Stderr, msg)
-	}
 
 	tlsConfig := &tls.Config{
 		GetCertificate: certConfig.GetCertificate,
@@ -210,12 +199,8 @@ func (s *Server) Run() int {
 	tmpl, err := template.ParseFS(fs, "templates/*")
 	exitOnError(err)
 
-	serverUri := "https://" + s.config.AdminDomain
-	oauth2Prefix := "/oauth2"
-	oauth2Handler := NewOAuth2Handler(db, serverUri, oauth2Prefix, s.jose, tmpl)
-
 	//mux := http.NewServeMux()
-	mux := NewServerMux(authHandler, s.config.AdminDomain, s.config.Users[0])
+	mux := NewServerMux(authHandler, s.config.Users[0])
 
 	numStreamsGauge := promauto.NewGauge(prometheus.GaugeOpts{
 		Name: "waygate_num_streams",
@@ -223,8 +208,6 @@ func (s *Server) Run() int {
 	})
 	http.Handle("/metrics", promhttp.Handler())
 	go http.ListenAndServe(":9500", nil)
-
-	mux.Handle(oauth2Prefix+"/", http.StripPrefix(oauth2Prefix, oauth2Handler))
 
 	listenAddr := fmt.Sprintf(":%d", s.config.Port)
 	tcpListener, err := net.Listen("tcp", listenAddr)
@@ -480,16 +463,94 @@ func (s *Server) Run() int {
 
 	go func() {
 		err = httpServer.Serve(tlsListener)
-		fmt.Println("here", err)
 		waitCh <- struct{}{}
 	}()
 
-	ctx := context.Background()
-	//adminDomains := []string{s.config.AdminDomain, "*." + s.config.AdminDomain}
-	//err = certConfig.ManageSync(ctx, append(adminDomains, challengeDomains...))
-	adminDomains := []string{s.config.AdminDomain}
-	err = certConfig.ManageSync(ctx, adminDomains)
+	if dashboardDomain == "" {
+		action := prompt("\nNo domain set. Select an option below:\nEnter '1' to input manually\nEnter '2' to use an instant domain from TakingNames.io\nEnter '3' to set up a custom domain through TakingNames.io\n")
+		switch action {
+		case "1":
+			dashboardDomain = prompt("\nEnter domain:\n")
+			err = db.SetDomain(dashboardDomain)
+			exitOnError(err)
+		case "2":
+			namedropURI := "takingnames.io/namedrop"
+
+			bootstrapDomain, err := namedrop.GetIpDomain(namedropURI)
+			exitOnError(err)
+
+			dashboardDomain = bootstrapDomain
+			err = db.SetDomain(dashboardDomain)
+			exitOnError(err)
+		case "3":
+			log.Fatal("Not implemented")
+
+			//namedropURI := "takingnames.io/namedrop"
+
+			//bootstrapDomain, err := namedrop.GetIpDomain(namedropURI)
+			//exitOnError(err)
+
+			//fmt.Println(bootstrapDomain)
+
+			//clientId := "https://" + dashboardDomain
+			//redirUri := fmt.Sprintf("%s/namedrop/callback", clientId)
+			//authReq := &oauth.AuthRequest{
+			//	ClientId:    clientId,
+			//	RedirectUri: redirUri,
+			//	Scopes:      []string{namedrop.ScopeHosts, namedrop.ScopeAcme},
+			//}
+
+			//authUri := "https://" + namedropURI + "/authorize"
+			//flowState, err := oauth.StartAuthCodeFlow(authUri, authReq)
+			//exitOnError(err)
+
+			//fmt.Println(flowState.AuthUri)
+
+		default:
+			log.Fatal("Invalid option")
+		}
+	}
+
+	publicIp, err := namedrop.GetPublicIp("takingnames.io/namedrop", "tcp4")
 	exitOnError(err)
+
+	addrs, err := net.LookupHost(dashboardDomain)
+	exitOnError(err)
+
+	found := false
+	for _, addr := range addrs {
+		if addr == publicIp {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		msg := fmt.Sprintf("WARNING: The domain '%s' does not appear to be pointed at this server (public IP address: %s)\n", dashboardDomain, publicIp)
+		fmt.Fprintf(os.Stderr, msg)
+	}
+
+	ctx := context.Background()
+	//adminDomains := []string{s.config.Domain, "*." + s.config.Domain}
+	//challengeDomains := []string{}
+	//for _, dom := range s.config.TunnelDomains {
+	//	challengeDomains = append(challengeDomains, "*."+dom)
+	//}
+	//err = certConfig.ManageSync(ctx, append(adminDomains, challengeDomains...))
+	certDomains := []string{dashboardDomain}
+	err = certConfig.ManageSync(ctx, certDomains)
+	exitOnError(err)
+
+	// TODO: had to move this down here because oauth.Server doesn't support
+	// updated the serverURI at runtime. Need to implement that
+	serverUri := "https://" + dashboardDomain
+	oauth2Prefix := "/oauth2"
+	oauth2Handler := NewOAuth2Handler(db, serverUri, oauth2Prefix, s.jose, tmpl)
+	mux.Handle(oauth2Prefix+"/", http.StripPrefix(oauth2Prefix, oauth2Handler))
+
+	dashURL := fmt.Sprintf("https://%s", dashboardDomain)
+	qrterminal.GenerateHalfBlock(dashURL, qrterminal.L, os.Stdout)
+	fmt.Fprintf(os.Stdout, "Your server is available at %s\n", dashURL)
 
 	<-waitCh
 
@@ -516,7 +577,12 @@ func (s *Server) handleConn(
 
 	passConn := NewProxyConn(tcpConn, clientReader)
 
-	if clientHello.ServerName == s.config.AdminDomain && isTlsMuxado(clientHello) {
+	dashboardDomain, err := s.db.GetDomain()
+	if err != nil {
+		return err
+	}
+
+	if clientHello.ServerName == dashboardDomain && isTlsMuxado(clientHello) {
 
 		return errors.New("Muxado TLS not implemented")
 		//tlsConn := tls.Server(passConn, tlsConfig)
@@ -531,7 +597,7 @@ func (s *Server) handleConn(
 		//domain := tunnel.GetConfig().Domain
 		//tunnels[domain] = tunnel
 
-	} else if clientHello.ServerName == s.config.AdminDomain {
+	} else if clientHello.ServerName == dashboardDomain {
 		waygateListener.PassConn(passConn)
 	} else {
 
@@ -687,15 +753,13 @@ func handleListenUDP(tunnel Tunnel, listenAddr string, udpMap map[string]*net.UD
 type ServerMux struct {
 	mux         *http.ServeMux
 	authHandler *decentauth.Handler
-	adminDomain string
 	adminID     string
 }
 
-func NewServerMux(authHandler *decentauth.Handler, adminDomain, adminID string) *ServerMux {
+func NewServerMux(authHandler *decentauth.Handler, adminID string) *ServerMux {
 	m := &ServerMux{
 		mux:         http.NewServeMux(),
 		authHandler: authHandler,
-		adminDomain: adminDomain,
 		adminID:     adminID,
 	}
 	return m

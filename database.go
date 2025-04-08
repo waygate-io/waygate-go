@@ -26,7 +26,8 @@ func NewDatabase(path string) (*Database, error) {
 
 	stmt := `
         CREATE TABLE IF NOT EXISTS config(
-                jwks_json TEXT UNIQUE
+		domain TEXT UNIQUE NOT NULL DEFAULT '',
+		jwks_json TEXT UNIQUE
         );
         `
 	_, err = db.Exec(stmt)
@@ -58,6 +59,32 @@ func NewDatabase(path string) (*Database, error) {
 	}
 
 	return s, nil
+}
+
+func (d *Database) GetDomain() (string, error) {
+	var val string
+
+	stmt := `
+        SELECT domain FROM config;
+        `
+	err := d.db.QueryRow(stmt).Scan(&val)
+	if err != nil {
+		return "", err
+	}
+
+	return val, nil
+}
+
+func (d *Database) SetDomain(val string) error {
+	stmt := `
+        UPDATE config SET domain=?;
+        `
+	_, err := d.db.Exec(stmt, val)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (d *Database) GetJWKS() (string, error) {

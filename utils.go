@@ -1,6 +1,7 @@
 package waygate
 
 import (
+	"bufio"
 	"crypto/rand"
 	"encoding/json"
 	"errors"
@@ -329,4 +330,11 @@ func exit(w http.ResponseWriter, r *http.Request, tmpl *template.Template, httpS
 		err = httpServer.Shutdown(r.Context())
 		fmt.Println(err)
 	}()
+}
+
+func prompt(promptText string) string {
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Print(promptText)
+	text, _ := reader.ReadString('\n')
+	return strings.TrimSpace(text)
 }
