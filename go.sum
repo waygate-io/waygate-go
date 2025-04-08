@@ -80,10 +80,14 @@ github.com/klauspost/cpuid/v2 v2.2.10 h1:tBs3QSyvjDyFTq3uoc/9xFpCuOsJQFNPiAhYdw2
 github.com/klauspost/cpuid/v2 v2.2.10/go.mod h1:hqwkgyIinND0mEev00jJYCxPNVRVXFQeu1XKlok6oO0=
 github.com/lastlogin-net/decent-auth-build v0.0.0-20250404183723-46b2c2f50617 h1:UaLijFo37JpuE9TIlpK8DT21a9OICJg5xYrHGNuCgps=
 github.com/lastlogin-net/decent-auth-build v0.0.0-20250404183723-46b2c2f50617/go.mod h1:JUUikq2P0tUaEjw7nUjCVLYvJpUPeDazP6s2/SVsLSo=
+github.com/lastlogin-net/decent-auth-build v0.0.0-20250408135533-7a6070c673e3 h1:ELpZSYQ3jYxd+IN97IvLBpNCt18YZz9Tu3nGdku2LGE=
+github.com/lastlogin-net/decent-auth-build v0.0.0-20250408135533-7a6070c673e3/go.mod h1:JUUikq2P0tUaEjw7nUjCVLYvJpUPeDazP6s2/SVsLSo=
 github.com/lastlogin-net/decent-auth-go v0.0.0-20250404184117-7ef0d9945161 h1:7n6WzHFkwhCWSZ0UuPmkj+bkufBMbQGK+AOyLIjuxhc=
 github.com/lastlogin-net/decent-auth-go v0.0.0-20250404184117-7ef0d9945161/go.mod h1:qcA4T++n00ln1rWjk1nW792jfwt9DzmiUL5Iod1gYg4=
 github.com/lastlogin-net/decent-auth-go v0.0.0-20250407164606-a45702f72553 h1:1EoswCPKePMbCitUqT83B4iCrk8iM5qMnQ2lfoUnxpQ=
 github.com/lastlogin-net/decent-auth-go v0.0.0-20250407164606-a45702f72553/go.mod h1:qcA4T++n00ln1rWjk1nW792jfwt9DzmiUL5Iod1gYg4=
+github.com/lastlogin-net/decent-auth-go v0.0.0-20250408135734-dc76b8feb9fd h1:VpNq7NdjN9s9ydhyfnaksiJ6DD9s6p2N3wqk0vDo3A0=
+github.com/lastlogin-net/decent-auth-go v0.0.0-20250408135734-dc76b8feb9fd/go.mod h1:Jz0ihwgUevJtFVUbOoYDFT4hwjbryMCVai5TwThYq9g=
 github.com/lestrrat-go/blackmagic v1.0.2 h1:Cg2gVSc9h7sz9NOByczrbUvLopQmXrfFx//N+AkAr5k=
 github.com/lestrrat-go/blackmagic v1.0.2/go.mod h1:UrEqBzIR2U6CnzVyUtfM6oZNMt/7O7Vohk2J0OGSAtU=
 github.com/lestrrat-go/httpcc v1.0.1 h1:ydWCStUeJLkpYyjLDHihupbn2tYmZ7m22BGkcvZZrIE=
