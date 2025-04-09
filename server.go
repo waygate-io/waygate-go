@@ -3,6 +3,7 @@ package waygate
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"html/template"
@@ -19,17 +20,18 @@ import (
 	//_ "expvar"
 
 	"github.com/anderspitman/dashtui"
+	oauth "github.com/anderspitman/little-oauth2-go"
 	"github.com/caddyserver/certmagic"
 	"github.com/lastlogin-net/decent-auth-go"
+	"github.com/mdp/qrterminal/v3"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/quic-go/quic-go"
 	"github.com/quic-go/quic-go/http3"
 	"github.com/quic-go/webtransport-go"
-	//oauth "github.com/anderspitman/little-oauth2-go"
-	"github.com/mdp/qrterminal/v3"
 	"github.com/takingnames/namedrop-go"
+	namedropdns "github.com/takingnames/namedrop-libdns"
 	"github.com/waygate-io/waygate-go/josencillo"
 	"go.uber.org/zap"
 )
@@ -146,14 +148,20 @@ func (s *Server) Run() int {
 
 	authPrefix := "/auth"
 
-	kvStore, err := decentauth.NewSqliteKvStore(&decentauth.SqliteKvOptions{
+	authKV, err := decentauth.NewSqliteKvStore(&decentauth.SqliteKvOptions{
 		Db:        db.db.DB,
 		TableName: "auth_kv",
 	})
 	exitOnError(err)
 
+	kvStore, err := decentauth.NewSqliteKvStore(&decentauth.SqliteKvOptions{
+		Db:        db.db.DB,
+		TableName: "general_kv",
+	})
+	exitOnError(err)
+
 	authHandler, err := decentauth.NewHandler(&decentauth.HandlerOptions{
-		KvStore: kvStore,
+		KvStore: authKV,
 		Config: decentauth.Config{
 			PathPrefix:  authPrefix,
 			AdminID:     s.config.Users[0],
@@ -263,6 +271,8 @@ func (s *Server) Run() int {
 
 	tlsListener := tls.NewListener(waygateListener, tlsConfig)
 
+	namedropURI := "takingnames.io/namedrop"
+
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 
 		fmt.Println(r.URL.Path)
@@ -309,6 +319,125 @@ func (s *Server) Run() int {
 	mux.HandleFunc("/restart", func(w http.ResponseWriter, r *http.Request) {
 		exitReason = "restart"
 		exit(w, r, tmpl, httpServer)
+	})
+
+	mux.HandleFunc("/namedrop/configure-domain", func(w http.ResponseWriter, r *http.Request) {
+
+		clientId := "https://" + dashboardDomain
+		redirUri := fmt.Sprintf("%s/namedrop/callback", clientId)
+		authReq := &oauth.AuthRequest{
+			ClientId:    clientId,
+			RedirectUri: redirUri,
+			Scopes:      []string{namedrop.ScopeHosts, namedrop.ScopeAcme},
+		}
+
+		authUri := "https://" + namedropURI + "/authorize"
+		flowState, err := oauth.StartAuthCodeFlow(authUri, authReq)
+		if err != nil {
+			w.WriteHeader(500)
+			io.WriteString(w, err.Error())
+			return
+		}
+
+		jsonBytes, err := json.Marshal(flowState)
+		if err != nil {
+			w.WriteHeader(500)
+			io.WriteString(w, err.Error())
+			return
+		}
+
+		err = kvStore.Set("/namedrop_oauth_state/"+flowState.State, jsonBytes)
+		if err != nil {
+			w.WriteHeader(500)
+			io.WriteString(w, err.Error())
+			return
+		}
+
+		http.Redirect(w, r, flowState.AuthUri, 303)
+	})
+
+	mux.HandleFunc("/namedrop/callback", func(w http.ResponseWriter, r *http.Request) {
+
+		code := r.URL.Query().Get("code")
+		state := r.URL.Query().Get("state")
+
+		key := "/namedrop_oauth_state/" + state
+
+		jsonBytes, err := kvStore.Get(key)
+		if err != nil {
+			w.WriteHeader(400)
+			io.WriteString(w, err.Error())
+			return
+		}
+
+		kvStore.Delete(key)
+
+		var flowState *oauth.AuthCodeFlowState
+		err = json.Unmarshal(jsonBytes, &flowState)
+		if err != nil {
+			w.WriteHeader(500)
+			io.WriteString(w, err.Error())
+			return
+		}
+
+		tokenUri := "https://" + namedropURI + "/token"
+		resBytes, err := oauth.CompleteAuthCodeFlow(tokenUri, code, state, flowState)
+		if err != nil {
+			w.WriteHeader(500)
+			io.WriteString(w, err.Error())
+			return
+		}
+
+		var tokenRes *namedrop.TokenResponse
+
+		err = json.Unmarshal(resBytes, &tokenRes)
+		if err != nil {
+			w.WriteHeader(500)
+			io.WriteString(w, err.Error())
+			return
+		}
+
+		printJson(tokenRes)
+
+		dnsProvider := &namedropdns.Provider{
+			ServerUri: "https://" + namedropURI,
+			TokenData: tokenRes,
+		}
+
+		var perm *namedrop.Permission
+
+		for _, p := range tokenRes.Permissions {
+			if p.Scope == namedrop.ScopeHosts {
+				perm = p
+			}
+		}
+
+		if perm == nil {
+			w.WriteHeader(500)
+			io.WriteString(w, "Missing perm namedrop-hosts")
+			return
+		}
+
+		err = pointDomainAtDomain(r.Context(), dnsProvider, perm.Host, perm.Domain, dashboardDomain)
+		if err != nil {
+			w.WriteHeader(500)
+			io.WriteString(w, err.Error())
+			return
+		}
+
+		//dashboardDomain = perm.Domain
+		//if perm.Host != "" {
+		//	dashboardDomain = fmt.Sprintf("%s.%s", perm.Host, perm.Domain)
+		//}
+
+		//err = db.SetDomain(dashboardDomain)
+		//if err != nil {
+		//	w.WriteHeader(500)
+		//	io.WriteString(w, err.Error())
+		//	return
+		//}
+
+		//http.Redirect(w, r, "https://"+dashboardDomain, 303)
 	})
 
 	mux.HandleFunc("/waygate", func(w http.ResponseWriter, r *http.Request) {
@@ -467,45 +596,19 @@ func (s *Server) Run() int {
 	}()
 
 	if dashboardDomain == "" {
-		action := prompt("\nNo domain set. Select an option below:\nEnter '1' to input manually\nEnter '2' to use an instant domain from TakingNames.io\nEnter '3' to set up a custom domain through TakingNames.io\n")
+		action := prompt("\nNo domain set. Select an option below:\nEnter '1' to input manually\nEnter '2' to use a free instant domain from TakingNames.io\n")
 		switch action {
 		case "1":
 			dashboardDomain = prompt("\nEnter domain:\n")
 			err = db.SetDomain(dashboardDomain)
 			exitOnError(err)
 		case "2":
-			namedropURI := "takingnames.io/namedrop"
-
 			bootstrapDomain, err := namedrop.GetIpDomain(namedropURI)
 			exitOnError(err)
 
 			dashboardDomain = bootstrapDomain
 			err = db.SetDomain(dashboardDomain)
 			exitOnError(err)
-		case "3":
-			log.Fatal("Not implemented")
-
-			//namedropURI := "takingnames.io/namedrop"
-
-			//bootstrapDomain, err := namedrop.GetIpDomain(namedropURI)
-			//exitOnError(err)
-
-			//fmt.Println(bootstrapDomain)
-
-			//clientId := "https://" + dashboardDomain
-			//redirUri := fmt.Sprintf("%s/namedrop/callback", clientId)
-			//authReq := &oauth.AuthRequest{
-			//	ClientId:    clientId,
-			//	RedirectUri: redirUri,
-			//	Scopes:      []string{namedrop.ScopeHosts, namedrop.ScopeAcme},
-			//}
-
-			//authUri := "https://" + namedropURI + "/authorize"
-			//flowState, err := oauth.StartAuthCodeFlow(authUri, authReq)
-			//exitOnError(err)
-
-			//fmt.Println(flowState.AuthUri)
-
 		default:
 			log.Fatal("Invalid option")
 		}

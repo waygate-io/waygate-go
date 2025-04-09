@@ -2,6 +2,7 @@ package waygate
 
 import (
 	"bufio"
+	"context"
 	"crypto/rand"
 	"encoding/json"
 	"errors"
@@ -337,4 +338,60 @@ func prompt(promptText string) string {
 	fmt.Print(promptText)
 	text, _ := reader.ReadString('\n')
 	return strings.TrimSpace(text)
+}
+
+func pointDomainAtDomain(ctx context.Context, dnsProvider DNSProvider, host, domain, targetDomain string) (err error) {
+
+	recordType := "ANAME"
+	wildcardHost := "*"
+	if host != "" {
+		wildcardHost = "*." + host
+		recordType = "CNAME"
+	}
+
+	existingRecs, err := dnsProvider.GetRecords(ctx, domain)
+	if err != nil {
+		return
+	}
+
+	deleteList := []libdns.Record{}
+	for _, rec := range existingRecs {
+		if rec.Type == "A" || rec.Type == "AAAA" || rec.Type == "CNAME" || rec.Type == "ANAME" {
+			if rec.Name == host || rec.Name == wildcardHost {
+				delRec := libdns.Record{
+					ID:    rec.ID,
+					Type:  rec.Type,
+					Name:  rec.Name,
+					Value: rec.Value,
+				}
+				deleteList = append(deleteList, delRec)
+			}
+		}
+	}
+
+	if len(deleteList) > 0 {
+		_, err = dnsProvider.DeleteRecords(ctx, domain, deleteList)
+		if err != nil {
+			return
+		}
+	}
+
+	_, err = dnsProvider.SetRecords(ctx, domain, []libdns.Record{
+		libdns.Record{
+			Type:  recordType,
+			Name:  host,
+			Value: targetDomain,
+		},
+		libdns.Record{
+			Type:  "CNAME",
+			Name:  wildcardHost,
+			Value: targetDomain,
+		},
+	})
+	if err != nil {
+		return
+	}
+
+	return
+
 }

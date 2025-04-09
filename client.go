@@ -20,7 +20,6 @@ import (
 	"github.com/caddyserver/certmagic"
 	//"github.com/gemdrive/gemdrive-go"
 	"github.com/lastlogin-net/decent-auth-go"
-	"github.com/libdns/libdns"
 	"github.com/takingnames/namedrop-go"
 	namedropdns "github.com/takingnames/namedrop-libdns"
 )
@@ -623,7 +622,7 @@ func (c *Client) Run() error {
 		}
 
 		if serverTunnelDomain != "" && c.dnsProvider != nil {
-			err := setDNSRecords(r.Context(), tunHost, tunDomain, serverTunnelDomain, c.dnsProvider)
+			err := pointDomainAtDomain(r.Context(), c.dnsProvider, tunHost, tunDomain, serverTunnelDomain)
 			if err != nil {
 				w.WriteHeader(500)
 				io.WriteString(w, err.Error())
@@ -1037,59 +1036,4 @@ func proxyUdp(session *ClientSession, tunnel *ClientTunnel) {
 			}
 		}
 	}()
-}
-
-func setDNSRecords(ctx context.Context, tunHost, tunDomain, serverTunnelDomain string, dnsProvider DNSProvider) (err error) {
-	// TODO: ANAME records won't work for all providers
-	recordType := "ANAME"
-	wildcardHost := "*"
-	if tunHost != "" {
-		wildcardHost = "*." + tunHost
-		recordType = "CNAME"
-	}
-
-	existingRecs, err := dnsProvider.GetRecords(ctx, tunDomain)
-	if err != nil {
-		return
-	}
-
-	deleteList := []libdns.Record{}
-	for _, rec := range existingRecs {
-		if rec.Type == "A" || rec.Type == "AAAA" || rec.Type == "CNAME" || rec.Type == "ANAME" {
-			if rec.Name == tunHost || rec.Name == wildcardHost {
-				delRec := libdns.Record{
-					ID:    rec.ID,
-					Type:  rec.Type,
-					Name:  rec.Name,
-					Value: rec.Value,
-				}
-				deleteList = append(deleteList, delRec)
-			}
-		}
-	}
-
-	if len(deleteList) > 0 {
-		_, err = dnsProvider.DeleteRecords(ctx, tunDomain, deleteList)
-		if err != nil {
-			return
-		}
-	}
-
-	_, err = dnsProvider.SetRecords(ctx, tunDomain, []libdns.Record{
-		libdns.Record{
-			Type:  recordType,
-			Name:  tunHost,
-			Value: serverTunnelDomain,
-		},
-		libdns.Record{
-			Type:  "CNAME",
-			Name:  wildcardHost,
-			Value: serverTunnelDomain,
-		},
-	})
-	if err != nil {
-		return
-	}
-
-	return
 }
