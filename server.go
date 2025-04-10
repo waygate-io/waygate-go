@@ -37,6 +37,7 @@ import (
 
 type ServerConfig struct {
 	Domain           string
+	ACMEEmail        string
 	Port             int
 	Public           bool
 	DnsProvider      string
@@ -93,6 +94,25 @@ func (s *Server) Run() int {
 		exitOnError(err)
 	}
 
+	acmeEmail, err := db.GetACMEEmail()
+	exitOnError(err)
+
+	if s.config.ACMEEmail != "" {
+		acmeEmail = s.config.ACMEEmail
+		err = db.SetACMEEmail(acmeEmail)
+		exitOnError(err)
+	}
+
+	for {
+		if acmeEmail == "" {
+			acmeEmail = prompt("Enter an email address for your Let's Encrypt account:\n")
+			err = db.SetACMEEmail(acmeEmail)
+			exitOnError(err)
+		} else {
+			break
+		}
+	}
+
 	// Use random unprivileged port for ACME challenges. This is necessary
 	// because of the way certmagic works, in that if it fails to bind
 	// HTTPSPort (443 by default) and doesn't detect anything else binding
@@ -112,10 +132,10 @@ func (s *Server) Run() int {
 		dnsProvider, err := getDnsProvider(s.config.DnsProvider, s.config.DnsToken, s.config.DnsUser)
 		exitOnError(err)
 
-		certConfig, err = createDNSCertConfig(certCache, db.db.DB, "", dnsProvider)
+		certConfig, err = createDNSCertConfig(certCache, db.db.DB, acmeEmail, dnsProvider)
 		exitOnError(err)
 	} else {
-		certConfig, err = createNormalCertConfig(certCache, db.db.DB, "")
+		certConfig, err = createNormalCertConfig(certCache, db.db.DB, acmeEmail)
 		exitOnError(err)
 
 		//certmagic.Default.OnDemand = &certmagic.OnDemandConfig{
@@ -386,8 +406,6 @@ func (s *Server) Run() int {
 			return
 		}
 
-		printJson(tokenRes)
-
 		dnsProvider := &namedropdns.Provider{
 			ServerUri: "https://" + namedropURI,
 			TokenData: tokenRes,
@@ -414,19 +432,34 @@ func (s *Server) Run() int {
 			return
 		}
 
-		//dashboardDomain = perm.Domain
-		//if perm.Host != "" {
-		//	dashboardDomain = fmt.Sprintf("%s.%s", perm.Host, perm.Domain)
-		//}
+		certConfig, err := createDNSCertConfig(certCache, db.db.DB, acmeEmail, dnsProvider)
+		if err != nil {
+			w.WriteHeader(500)
+			io.WriteString(w, err.Error())
+			return
+		}
 
-		//err = db.SetDomain(dashboardDomain)
-		//if err != nil {
-		//	w.WriteHeader(500)
-		//	io.WriteString(w, err.Error())
-		//	return
-		//}
+		newDashboardDomain := perm.Domain
+		if perm.Host != "" {
+			newDashboardDomain = fmt.Sprintf("%s.%s", perm.Host, perm.Domain)
+		}
 
-		//http.Redirect(w, r, "https://"+dashboardDomain, 303)
+		err = certConfig.ManageSync(r.Context(), []string{newDashboardDomain})
+		if err != nil {
+			w.WriteHeader(500)
+			io.WriteString(w, err.Error())
+			return
+		}
+
+		err = db.SetDomain(newDashboardDomain)
+		if err != nil {
+			w.WriteHeader(500)
+			io.WriteString(w, err.Error())
+			return
+		}
+		dashboardDomain = newDashboardDomain
+
+		http.Redirect(w, r, "https://"+newDashboardDomain, 303)
 	})
 
 	mux.HandleFunc("/waygate", func(w http.ResponseWriter, r *http.Request) {

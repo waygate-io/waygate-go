@@ -27,7 +27,8 @@ func NewDatabase(path string) (*Database, error) {
 	stmt := `
         CREATE TABLE IF NOT EXISTS config(
 		domain TEXT UNIQUE NOT NULL DEFAULT '',
-		jwks_json TEXT UNIQUE
+		jwks_json TEXT UNIQUE,
+		acme_email TEXT UNIQUE DEFAULT ''
         );
         `
 	_, err = db.Exec(stmt)
@@ -113,6 +114,32 @@ func (d *Database) SetJWKS(jwks string) error {
 	return nil
 }
 
+func (d *Database) GetACMEEmail() (string, error) {
+	var val string
+
+	stmt := `
+        SELECT acme_email FROM config;
+        `
+	err := d.db.QueryRow(stmt).Scan(&val)
+	if err != nil {
+		return "", err
+	}
+
+	return val, nil
+}
+
+func (d *Database) SetACMEEmail(val string) error {
+	stmt := `
+        UPDATE config SET acme_email=?;
+        `
+	_, err := d.db.Exec(stmt, val)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 type ClientDatabase struct {
 	db *sqlx.DB
 }
@@ -126,7 +153,8 @@ func NewClientDatabase(path string) (*ClientDatabase, error) {
 	stmt := `
         CREATE TABLE IF NOT EXISTS config(
                 server_uri TEXT DEFAULT "" UNIQUE NOT NULL,
-                token TEXT DEFAULT "" UNIQUE NOT NULL
+                token TEXT DEFAULT "" UNIQUE NOT NULL,
+		acme_email TEXT DEFAULT "" UNIQUE
         );
         `
 	_, err = db.Exec(stmt)
@@ -228,6 +256,32 @@ func (d *ClientDatabase) SetToken(value string) error {
         UPDATE config SET token=?;
         `
 	_, err := d.db.Exec(stmt, value)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (d *ClientDatabase) GetACMEEmail() (string, error) {
+	var val string
+
+	stmt := `
+        SELECT acme_email FROM config;
+        `
+	err := d.db.QueryRow(stmt).Scan(&val)
+	if err != nil {
+		return "", err
+	}
+
+	return val, nil
+}
+
+func (d *ClientDatabase) SetACMEEmail(val string) error {
+	stmt := `
+        UPDATE config SET acme_email=?;
+        `
+	_, err := d.db.Exec(stmt, val)
 	if err != nil {
 		return err
 	}

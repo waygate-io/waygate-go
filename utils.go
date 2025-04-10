@@ -431,7 +431,7 @@ func createNormalCertConfig(certCache *certmagic.Cache, db *sql.DB, acmeEmail st
 
 	onDemandIssuer := certmagic.NewACMEIssuer(certConfig, certmagic.ACMEIssuer{
 		CA:                   acmeCA,
-		Email:                "",
+		Email:                acmeEmail,
 		Agreed:               true,
 		DisableHTTPChallenge: true,
 		Logger:               zap.NewNop(),
@@ -501,7 +501,7 @@ func createOnDemandCertConfig(certCache *certmagic.Cache, db *sql.DB, acmeEmail 
 
 	onDemandIssuer := certmagic.NewACMEIssuer(onDemandConfig, certmagic.ACMEIssuer{
 		CA:                   acmeCA,
-		Email:                "",
+		Email:                acmeEmail,
 		Agreed:               true,
 		DisableHTTPChallenge: true,
 		Logger:               zap.NewNop(),

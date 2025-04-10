@@ -43,6 +43,7 @@ type ClientConfig struct {
 	DNSProvider string
 	DNSUser     string
 	DNSToken    string
+	ACMEEmail   string
 }
 
 type Client struct {
@@ -114,6 +115,25 @@ func (c *Client) Run() error {
 	configCopy := c.config
 	db := c.db
 
+	acmeEmail, err := db.GetACMEEmail()
+	exitOnError(err)
+
+	if configCopy.ACMEEmail != "" {
+		acmeEmail = configCopy.ACMEEmail
+		err = db.SetACMEEmail(acmeEmail)
+		exitOnError(err)
+	}
+
+	for {
+		if acmeEmail == "" {
+			acmeEmail = prompt("Enter an email address for your Let's Encrypt account:\n")
+			err = db.SetACMEEmail(acmeEmail)
+			exitOnError(err)
+		} else {
+			break
+		}
+	}
+
 	// Use random unprivileged port for ACME challenges. This is necessary
 	// because of the way certmagic works, in that if it fails to bind
 	// HTTPSPort (443 by default) and doesn't detect anything else binding
@@ -135,7 +155,7 @@ func (c *Client) Run() error {
 		c.dnsProvider, err = getDnsProvider(configCopy.DNSProvider, configCopy.DNSToken, configCopy.DNSUser)
 		exitOnError(err)
 
-		certConfig, err := createDNSCertConfig(certCache, db.db.DB, "", c.dnsProvider)
+		certConfig, err := createDNSCertConfig(certCache, db.db.DB, acmeEmail, c.dnsProvider)
 		exitOnError(err)
 
 		tunnels, err := db.GetTunnels()
@@ -218,7 +238,7 @@ func (c *Client) Run() error {
 	disableOnDemand := false
 	if disableOnDemand {
 		if c.dnsProvider != nil {
-			certConfig, err = createDNSCertConfig(certCache, c.db.db.DB, "", c.dnsProvider)
+			certConfig, err = createDNSCertConfig(certCache, c.db.db.DB, acmeEmail, c.dnsProvider)
 			if err != nil {
 				return err
 			}
@@ -464,7 +484,7 @@ func (c *Client) Run() error {
 		// config passed in by user
 		c.dnsProvider = dnsProvider
 
-		certConfig, err = createDNSCertConfig(certCache, c.db.db.DB, "", c.dnsProvider)
+		certConfig, err = createDNSCertConfig(certCache, c.db.db.DB, acmeEmail, c.dnsProvider)
 		if err != nil {
 			w.WriteHeader(500)
 			io.WriteString(w, err.Error())
@@ -532,7 +552,7 @@ func (c *Client) Run() error {
 			}
 
 			if c.dnsProvider != nil {
-				certConfig, err = createDNSCertConfig(certCache, c.db.db.DB, "", c.dnsProvider)
+				certConfig, err = createDNSCertConfig(certCache, c.db.db.DB, acmeEmail, c.dnsProvider)
 				if err != nil {
 					w.WriteHeader(500)
 					io.WriteString(w, err.Error())
