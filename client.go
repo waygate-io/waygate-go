@@ -128,51 +128,15 @@ func (c *Client) Run() error {
 		exitOnError(errors.New("Must provider user"))
 	}
 
-	var certCache *certmagic.Cache
-	// TODO: probably need to be calling certCache.Stop()
-	certCache = certmagic.NewCache(certmagic.CacheOptions{
-		GetConfigForCert: func(cert certmagic.Certificate) (*certmagic.Config, error) {
-			// TODO: this never seems to be called, but I'm worried it might introduce bugs in
-			// the future by returning a different config than defined below.
-			return certmagic.New(certCache, certmagic.Config{}), nil
-		},
-	})
-
-	//certStorage := &certmagic.FileStorage{"./certs"}
-	certStorage, err := NewCertmagicSqliteStorage(db.db.DB)
-	exitOnError(err)
-
-	//acmeCA := certmagic.LetsEncryptStagingCA
-	acmeCA := certmagic.LetsEncryptProductionCA
-
-	createDNSConfig := func(dnsProvider certmagic.DNSProvider) *certmagic.Config {
-		certConfig := certmagic.New(certCache, certmagic.Config{
-			Storage: certStorage,
-		})
-
-		acmeIssuer := certmagic.NewACMEIssuer(certConfig, certmagic.ACMEIssuer{
-			CA:                   acmeCA,
-			Email:                configCopy.Users[0],
-			Agreed:               true,
-			DisableHTTPChallenge: true,
-			DNS01Solver: &certmagic.DNS01Solver{
-				DNSManager: certmagic.DNSManager{
-					DNSProvider: dnsProvider,
-				},
-			},
-		})
-
-		certConfig.Issuers = []certmagic.Issuer{acmeIssuer}
-
-		return certConfig
-	}
+	certCache := createCertCache()
 
 	if configCopy.DNSProvider != "" {
 
 		c.dnsProvider, err = getDnsProvider(configCopy.DNSProvider, configCopy.DNSToken, configCopy.DNSUser)
 		exitOnError(err)
 
-		certConfig := createDNSConfig(c.dnsProvider)
+		certConfig, err := createDNSCertConfig(certCache, db.db.DB, "", c.dnsProvider)
+		exitOnError(err)
 
 		tunnels, err := db.GetTunnels()
 		exitOnError(err)
@@ -186,26 +150,8 @@ func (c *Client) Run() error {
 		}
 	}
 
-	onDemandConfig := certmagic.New(certCache, certmagic.Config{
-		Storage: certStorage,
-		OnDemand: &certmagic.OnDemandConfig{
-			DecisionFunc: func(ctx context.Context, name string) error {
-				// TODO: verify domain is in tunnels
-				//if name != tunnelDomain {
-				//	return fmt.Errorf("not allowed")
-				//}
-				return nil
-			},
-		},
-	})
-
-	onDemandIssuer := certmagic.NewACMEIssuer(onDemandConfig, certmagic.ACMEIssuer{
-		CA:                   acmeCA,
-		Email:                configCopy.Users[0],
-		Agreed:               true,
-		DisableHTTPChallenge: true,
-	})
-	onDemandConfig.Issuers = []certmagic.Issuer{onDemandIssuer}
+	onDemandConfig, err := createOnDemandCertConfig(certCache, db.db.DB, "", c.dnsProvider)
+	exitOnError(err)
 
 	token := c.config.Token
 	redirUriCh := make(chan string)
@@ -272,7 +218,10 @@ func (c *Client) Run() error {
 	disableOnDemand := false
 	if disableOnDemand {
 		if c.dnsProvider != nil {
-			certConfig = createDNSConfig(c.dnsProvider)
+			certConfig, err = createDNSCertConfig(certCache, c.db.db.DB, "", c.dnsProvider)
+			if err != nil {
+				return err
+			}
 		} else {
 			exitOnError(errors.New("Can't use disableOnDemand without DNS settings"))
 		}
@@ -515,7 +464,12 @@ func (c *Client) Run() error {
 		// config passed in by user
 		c.dnsProvider = dnsProvider
 
-		certConfig := createDNSConfig(c.dnsProvider)
+		certConfig, err = createDNSCertConfig(certCache, c.db.db.DB, "", c.dnsProvider)
+		if err != nil {
+			w.WriteHeader(500)
+			io.WriteString(w, err.Error())
+			return
+		}
 
 		domain := tokenRes.Permissions[0].Domain
 		ctx := context.Background()
@@ -578,7 +532,12 @@ func (c *Client) Run() error {
 			}
 
 			if c.dnsProvider != nil {
-				certConfig := createDNSConfig(c.dnsProvider)
+				certConfig, err = createDNSCertConfig(certCache, c.db.db.DB, "", c.dnsProvider)
+				if err != nil {
+					w.WriteHeader(500)
+					io.WriteString(w, err.Error())
+					return
+				}
 				err := certConfig.ManageAsync(context.Background(), []string{fqdn, "*." + fqdn})
 				if err != nil {
 					w.WriteHeader(500)

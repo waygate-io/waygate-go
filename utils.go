@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"crypto/rand"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -20,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/caddyserver/certmagic"
 	"github.com/libdns/namedotcom"
 	//"github.com/libdns/route53"
 	"github.com/libdns/libdns"
@@ -394,4 +396,84 @@ func pointDomainAtDomain(ctx context.Context, dnsProvider DNSProvider, host, dom
 
 	return
 
+}
+
+func createCertCache() *certmagic.Cache {
+	var certCache *certmagic.Cache
+	// TODO: probably need to be calling certCache.Stop()
+	certCache = certmagic.NewCache(certmagic.CacheOptions{
+		GetConfigForCert: func(cert certmagic.Certificate) (*certmagic.Config, error) {
+			// TODO: this never seems to be called, but I'm worried it might introduce bugs in
+			// the future by returning a different config than defined below.
+			return certmagic.New(certCache, certmagic.Config{}), nil
+		},
+	})
+
+	return certCache
+}
+
+func createDNSCertConfig(certCache *certmagic.Cache, db *sql.DB, acmeEmail string, dnsProvider DNSProvider) (certConfig *certmagic.Config, err error) {
+
+	//certStorage := &certmagic.FileStorage{"./certs"}
+	certStorage, err := NewCertmagicSqliteStorage(db)
+	if err != nil {
+		return
+	}
+
+	//acmeCA := certmagic.LetsEncryptStagingCA
+	acmeCA := certmagic.LetsEncryptProductionCA
+
+	certConfig = certmagic.New(certCache, certmagic.Config{
+		Storage: certStorage,
+	})
+
+	acmeIssuer := certmagic.NewACMEIssuer(certConfig, certmagic.ACMEIssuer{
+		CA:                   acmeCA,
+		Email:                acmeEmail,
+		Agreed:               true,
+		DisableHTTPChallenge: true,
+		DNS01Solver: &certmagic.DNS01Solver{
+			DNSManager: certmagic.DNSManager{
+				DNSProvider: dnsProvider,
+			},
+		},
+	})
+
+	certConfig.Issuers = []certmagic.Issuer{acmeIssuer}
+
+	return
+}
+
+func createOnDemandCertConfig(certCache *certmagic.Cache, db *sql.DB, acmeEmail string, dnsProvider DNSProvider) (onDemandConfig *certmagic.Config, err error) {
+	//certStorage := &certmagic.FileStorage{"./certs"}
+	certStorage, err := NewCertmagicSqliteStorage(db)
+	if err != nil {
+		return
+	}
+
+	//acmeCA := certmagic.LetsEncryptStagingCA
+	acmeCA := certmagic.LetsEncryptProductionCA
+
+	onDemandConfig = certmagic.New(certCache, certmagic.Config{
+		Storage: certStorage,
+		OnDemand: &certmagic.OnDemandConfig{
+			DecisionFunc: func(ctx context.Context, name string) error {
+				// TODO: verify domain is in tunnels
+				//if name != tunnelDomain {
+				//	return fmt.Errorf("not allowed")
+				//}
+				return nil
+			},
+		},
+	})
+
+	onDemandIssuer := certmagic.NewACMEIssuer(onDemandConfig, certmagic.ACMEIssuer{
+		CA:                   acmeCA,
+		Email:                "",
+		Agreed:               true,
+		DisableHTTPChallenge: true,
+	})
+	onDemandConfig.Issuers = []certmagic.Issuer{onDemandIssuer}
+
+	return
 }
