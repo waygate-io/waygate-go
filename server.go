@@ -33,7 +33,6 @@ import (
 	"github.com/takingnames/namedrop-go"
 	namedropdns "github.com/takingnames/namedrop-libdns"
 	"github.com/waygate-io/waygate-go/josencillo"
-	"go.uber.org/zap"
 )
 
 type ServerConfig struct {
@@ -104,23 +103,21 @@ func (s *Server) Run() int {
 	certmagic.HTTPSPort, err = randomOpenPort()
 	exitOnError(err)
 
-	certmagic.DefaultACME.Email = ""
-	certmagic.DefaultACME.DisableHTTPChallenge = true
-	certmagic.DefaultACME.Agreed = true
-	certmagic.Default.Logger = zap.NewNop()
-	//certmagic.DefaultACME.CA = certmagic.LetsEncryptStagingCA
+	certCache := createCertCache()
+
+	var certConfig *certmagic.Config
 
 	// TODO: maybe perform this check on listen and use a separate certmagic object for each tunnel
 	if s.config.DnsProvider != "" {
 		dnsProvider, err := getDnsProvider(s.config.DnsProvider, s.config.DnsToken, s.config.DnsUser)
 		exitOnError(err)
 
-		certmagic.DefaultACME.DNS01Solver = &certmagic.DNS01Solver{
-			DNSManager: certmagic.DNSManager{
-				DNSProvider: dnsProvider,
-			},
-		}
+		certConfig, err = createDNSCertConfig(certCache, db.db.DB, "", dnsProvider)
+		exitOnError(err)
 	} else {
+		certConfig, err = createNormalCertConfig(certCache, db.db.DB, "")
+		exitOnError(err)
+
 		//certmagic.Default.OnDemand = &certmagic.OnDemandConfig{
 		//	DecisionFunc: func(ctx context.Context, name string) error {
 		//		// TODO: verify domain is in tunnels
@@ -131,12 +128,6 @@ func (s *Server) Run() int {
 		//	},
 		//}
 	}
-
-	//certmagic.Default.Storage = &certmagic.FileStorage{"./certs"}
-	certmagic.Default.Storage, err = NewCertmagicSqliteStorage(db.db.DB)
-	exitOnError(err)
-
-	certConfig := certmagic.NewDefault()
 
 	tlsConfig := &tls.Config{
 		GetCertificate: certConfig.GetCertificate,

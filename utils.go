@@ -27,6 +27,7 @@ import (
 	"github.com/libdns/libdns"
 	proxyproto "github.com/pires/go-proxyproto"
 	//"github.com/takingnames/namedrop-libdns"
+	"go.uber.org/zap"
 )
 
 type DNSProvider interface {
@@ -412,6 +413,32 @@ func createCertCache() *certmagic.Cache {
 	return certCache
 }
 
+func createNormalCertConfig(certCache *certmagic.Cache, db *sql.DB, acmeEmail string) (certConfig *certmagic.Config, err error) {
+	//certStorage := &certmagic.FileStorage{"./certs"}
+	certStorage, err := NewCertmagicSqliteStorage(db)
+	if err != nil {
+		return
+	}
+
+	//acmeCA := certmagic.LetsEncryptStagingCA
+	acmeCA := certmagic.LetsEncryptProductionCA
+
+	certConfig = certmagic.New(certCache, certmagic.Config{
+		Storage: certStorage,
+	})
+
+	onDemandIssuer := certmagic.NewACMEIssuer(certConfig, certmagic.ACMEIssuer{
+		CA:                   acmeCA,
+		Email:                "",
+		Agreed:               true,
+		DisableHTTPChallenge: true,
+		Logger:               zap.NewNop(),
+	})
+	certConfig.Issuers = []certmagic.Issuer{onDemandIssuer}
+
+	return
+}
+
 func createDNSCertConfig(certCache *certmagic.Cache, db *sql.DB, acmeEmail string, dnsProvider DNSProvider) (certConfig *certmagic.Config, err error) {
 
 	//certStorage := &certmagic.FileStorage{"./certs"}
@@ -432,6 +459,7 @@ func createDNSCertConfig(certCache *certmagic.Cache, db *sql.DB, acmeEmail strin
 		Email:                acmeEmail,
 		Agreed:               true,
 		DisableHTTPChallenge: true,
+		Logger:               zap.NewNop(),
 		DNS01Solver: &certmagic.DNS01Solver{
 			DNSManager: certmagic.DNSManager{
 				DNSProvider: dnsProvider,
@@ -444,7 +472,7 @@ func createDNSCertConfig(certCache *certmagic.Cache, db *sql.DB, acmeEmail strin
 	return
 }
 
-func createOnDemandCertConfig(certCache *certmagic.Cache, db *sql.DB, acmeEmail string, dnsProvider DNSProvider) (onDemandConfig *certmagic.Config, err error) {
+func createOnDemandCertConfig(certCache *certmagic.Cache, db *sql.DB, acmeEmail string) (onDemandConfig *certmagic.Config, err error) {
 	//certStorage := &certmagic.FileStorage{"./certs"}
 	certStorage, err := NewCertmagicSqliteStorage(db)
 	if err != nil {
@@ -472,6 +500,7 @@ func createOnDemandCertConfig(certCache *certmagic.Cache, db *sql.DB, acmeEmail 
 		Email:                "",
 		Agreed:               true,
 		DisableHTTPChallenge: true,
+		Logger:               zap.NewNop(),
 	})
 	onDemandConfig.Issuers = []certmagic.Issuer{onDemandIssuer}
 

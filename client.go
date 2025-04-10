@@ -150,7 +150,7 @@ func (c *Client) Run() error {
 		}
 	}
 
-	onDemandConfig, err := createOnDemandCertConfig(certCache, db.db.DB, "", c.dnsProvider)
+	onDemandConfig, err := createOnDemandCertConfig(certCache, db.db.DB, "")
 	exitOnError(err)
 
 	token := c.config.Token
