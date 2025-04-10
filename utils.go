@@ -408,6 +408,7 @@ func createCertCache() *certmagic.Cache {
 			// the future by returning a different config than defined below.
 			return certmagic.New(certCache, certmagic.Config{}), nil
 		},
+		Logger: zap.NewNop(),
 	})
 
 	return certCache
@@ -425,6 +426,7 @@ func createNormalCertConfig(certCache *certmagic.Cache, db *sql.DB, acmeEmail st
 
 	certConfig = certmagic.New(certCache, certmagic.Config{
 		Storage: certStorage,
+		Logger:  zap.NewNop(),
 	})
 
 	onDemandIssuer := certmagic.NewACMEIssuer(certConfig, certmagic.ACMEIssuer{
@@ -452,6 +454,7 @@ func createDNSCertConfig(certCache *certmagic.Cache, db *sql.DB, acmeEmail strin
 
 	certConfig = certmagic.New(certCache, certmagic.Config{
 		Storage: certStorage,
+		Logger:  zap.NewNop(),
 	})
 
 	acmeIssuer := certmagic.NewACMEIssuer(certConfig, certmagic.ACMEIssuer{
@@ -484,6 +487,7 @@ func createOnDemandCertConfig(certCache *certmagic.Cache, db *sql.DB, acmeEmail 
 
 	onDemandConfig = certmagic.New(certCache, certmagic.Config{
 		Storage: certStorage,
+		Logger:  zap.NewNop(),
 		OnDemand: &certmagic.OnDemandConfig{
 			DecisionFunc: func(ctx context.Context, name string) error {
 				// TODO: verify domain is in tunnels
