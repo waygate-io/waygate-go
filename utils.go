@@ -429,14 +429,14 @@ func createNormalCertConfig(certCache *certmagic.Cache, db *sql.DB, acmeEmail st
 		Logger:  zap.NewNop(),
 	})
 
-	onDemandIssuer := certmagic.NewACMEIssuer(certConfig, certmagic.ACMEIssuer{
+	issuer := certmagic.NewACMEIssuer(certConfig, certmagic.ACMEIssuer{
 		CA:                   acmeCA,
 		Email:                acmeEmail,
 		Agreed:               true,
 		DisableHTTPChallenge: true,
 		Logger:               zap.NewNop(),
 	})
-	certConfig.Issuers = []certmagic.Issuer{onDemandIssuer}
+	certConfig.Issuers = []certmagic.Issuer{issuer}
 
 	return
 }
@@ -507,6 +507,40 @@ func createOnDemandCertConfig(certCache *certmagic.Cache, db *sql.DB, acmeEmail 
 		Logger:               zap.NewNop(),
 	})
 	onDemandConfig.Issuers = []certmagic.Issuer{onDemandIssuer}
+
+	return
+}
+
+func getHost(r *http.Request, behindProxy bool) string {
+	return r.Host
+}
+
+func checkDomains(db *Database, certCache *certmagic.Cache) (err error) {
+
+	acmeEmail, err := db.GetACMEEmail()
+	if err != nil {
+		return
+	}
+
+	certConfig, err := createNormalCertConfig(certCache, db.db.DB, acmeEmail)
+
+	domains, err := db.GetDomains()
+
+	if err != nil {
+		return
+	}
+
+	for _, domain := range domains {
+		// TODO: wildcard domains via DNS-01 challenge
+		err = certConfig.ManageSync(context.Background(), []string{domain.Domain})
+		if err != nil {
+			domain.Status = DomainStatusPending
+			db.SetDomain(domain)
+		} else if domain.Status != DomainStatusReady {
+			domain.Status = DomainStatusReady
+			db.SetDomain(domain)
+		}
+	}
 
 	return
 }

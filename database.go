@@ -5,6 +5,14 @@ import (
 	//"github.com/mattn/go-sqlite3"
 )
 
+type serverDomain struct {
+	Domain string `db:"domain"`
+	Status string `db:"status"`
+}
+
+const DomainStatusPending = "Pending"
+const DomainStatusReady = "Ready"
+
 type ClientTunnel struct {
 	ServerAddress  string `db:"server_address"`
 	ClientAddress  string `db:"client_address"`
@@ -26,7 +34,6 @@ func NewDatabase(path string) (*Database, error) {
 
 	stmt := `
         CREATE TABLE IF NOT EXISTS config(
-		domain TEXT UNIQUE NOT NULL DEFAULT '',
 		jwks_json TEXT UNIQUE,
 		acme_email TEXT UNIQUE DEFAULT ''
         );
@@ -55,6 +62,17 @@ func NewDatabase(path string) (*Database, error) {
 		}
 	}
 
+	stmt = `
+        CREATE TABLE IF NOT EXISTS domains(
+                domain TEXT UNIQUE NOT NULL,
+		status TEXT NOT NULL
+        );
+        `
+	_, err = db.Exec(stmt)
+	if err != nil {
+		return nil, err
+	}
+
 	s := &Database{
 		db: db,
 	}
@@ -62,25 +80,39 @@ func NewDatabase(path string) (*Database, error) {
 	return s, nil
 }
 
-func (d *Database) GetDomain() (string, error) {
-	var val string
+func (d *Database) GetDomains() ([]serverDomain, error) {
 
 	stmt := `
-        SELECT domain FROM config;
+        SELECT domain,status FROM domains;
         `
-	err := d.db.QueryRow(stmt).Scan(&val)
+
+	var domains []serverDomain
+
+	err := d.db.Select(&domains, stmt)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return val, nil
+	return domains, nil
 }
 
-func (d *Database) SetDomain(val string) error {
+func (d *Database) SetDomain(v serverDomain) error {
 	stmt := `
-        UPDATE config SET domain=?;
+        INSERT OR REPLACE INTO domains(domain,status) VALUES(?,?);
         `
-	_, err := d.db.Exec(stmt, val)
+	_, err := d.db.Exec(stmt, v.Domain, v.Status)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (d *Database) DeleteDomain(domain string) error {
+	stmt := `
+        DELETE FROM domains WHERE domain = ?;
+        `
+	_, err := d.db.Exec(stmt, domain)
 	if err != nil {
 		return err
 	}

@@ -85,12 +85,11 @@ func (s *Server) Run() int {
 	exitOnError(err)
 	s.db = db
 
-	dashboardDomain, err := db.GetDomain()
-	exitOnError(err)
-
 	if s.config.Domain != "" {
-		dashboardDomain = s.config.Domain
-		err = db.SetDomain(dashboardDomain)
+		err = db.SetDomain(serverDomain{
+			Domain: s.config.Domain,
+			Status: DomainStatusPending,
+		})
 		exitOnError(err)
 	}
 
@@ -169,12 +168,14 @@ func (s *Server) Run() int {
 	})
 	exitOnError(err)
 
+	behindProxy := false
+
 	authHandler, err := decentauth.NewHandler(&decentauth.HandlerOptions{
 		KvStore: authKV,
 		Config: decentauth.Config{
 			PathPrefix:  authPrefix,
 			AdminID:     s.config.Users[0],
-			BehindProxy: false,
+			BehindProxy: behindProxy,
 			LoginMethods: []decentauth.LoginMethod{
 				decentauth.LoginMethod{
 					Name: "LastLogin",
@@ -302,12 +303,21 @@ func (s *Server) Run() int {
 			tuns = append(tuns, tun)
 		}
 
+		domains, err := db.GetDomains()
+		if err != nil {
+			w.WriteHeader(500)
+			io.WriteString(w, err.Error())
+			return
+		}
+
 		tmplData := struct {
 			Clients map[string]TunnelConfig
 			Tunnels []tunnel
+			Domains []serverDomain
 		}{
 			Clients: clients,
 			Tunnels: tuns,
+			Domains: domains,
 		}
 
 		err = tmpl.ExecuteTemplate(w, "server.html", tmplData)
@@ -330,9 +340,29 @@ func (s *Server) Run() int {
 		exit(w, r, tmpl, httpServer)
 	})
 
+	mux.HandleFunc("/delete-domain", func(w http.ResponseWriter, r *http.Request) {
+		r.ParseForm()
+
+		domain := r.Form.Get("domain")
+		if domain == "" {
+			w.WriteHeader(400)
+			io.WriteString(w, "Missing domain")
+			return
+		}
+
+		err := db.DeleteDomain(domain)
+		if err != nil {
+			w.WriteHeader(500)
+			io.WriteString(w, err.Error())
+			return
+		}
+
+		http.Redirect(w, r, "/", 303)
+	})
+
 	mux.HandleFunc("/namedrop/configure-domain", func(w http.ResponseWriter, r *http.Request) {
 
-		clientId := "https://" + dashboardDomain
+		clientId := "https://" + getHost(r, behindProxy)
 		redirUri := fmt.Sprintf("%s/namedrop/callback", clientId)
 		authReq := &oauth.AuthRequest{
 			ClientId:    clientId,
@@ -425,41 +455,33 @@ func (s *Server) Run() int {
 			return
 		}
 
-		err = pointDomainAtDomain(r.Context(), dnsProvider, perm.Host, perm.Domain, dashboardDomain)
-		if err != nil {
-			w.WriteHeader(500)
-			io.WriteString(w, err.Error())
-			return
-		}
-
-		certConfig, err := createDNSCertConfig(certCache, db.db.DB, acmeEmail, dnsProvider)
-		if err != nil {
-			w.WriteHeader(500)
-			io.WriteString(w, err.Error())
-			return
-		}
-
 		newDashboardDomain := perm.Domain
 		if perm.Host != "" {
 			newDashboardDomain = fmt.Sprintf("%s.%s", perm.Host, perm.Domain)
 		}
 
-		err = certConfig.ManageSync(r.Context(), []string{newDashboardDomain})
+		host := getHost(r, behindProxy)
+
+		err = pointDomainAtDomain(r.Context(), dnsProvider, perm.Host, perm.Domain, host)
 		if err != nil {
 			w.WriteHeader(500)
 			io.WriteString(w, err.Error())
 			return
 		}
 
-		err = db.SetDomain(newDashboardDomain)
+		err = db.SetDomain(serverDomain{
+			Domain: newDashboardDomain,
+			Status: DomainStatusPending,
+		})
 		if err != nil {
 			w.WriteHeader(500)
 			io.WriteString(w, err.Error())
 			return
 		}
-		dashboardDomain = newDashboardDomain
 
-		http.Redirect(w, r, "https://"+newDashboardDomain, 303)
+		go checkDomains(db, certCache)
+
+		http.Redirect(w, r, "https://"+host, 303)
 	})
 
 	mux.HandleFunc("/waygate", func(w http.ResponseWriter, r *http.Request) {
@@ -617,23 +639,35 @@ func (s *Server) Run() int {
 		waitCh <- struct{}{}
 	}()
 
-	if dashboardDomain == "" {
+	domains, err := db.GetDomains()
+	exitOnError(err)
+
+	var dashboardDomain string
+
+	if len(domains) == 0 {
 		action := prompt("\nNo domain set. Select an option below:\nEnter '1' to input manually\nEnter '2' to use a free instant domain from TakingNames.io\n")
 		switch action {
 		case "1":
 			dashboardDomain = prompt("\nEnter domain:\n")
-			err = db.SetDomain(dashboardDomain)
+			err = db.SetDomain(serverDomain{
+				Domain: dashboardDomain,
+				Status: DomainStatusPending,
+			})
 			exitOnError(err)
 		case "2":
-			bootstrapDomain, err := namedrop.GetIpDomain(namedropURI)
+			dashboardDomain, err = namedrop.GetIpDomain(namedropURI)
 			exitOnError(err)
 
-			dashboardDomain = bootstrapDomain
-			err = db.SetDomain(dashboardDomain)
+			err = db.SetDomain(serverDomain{
+				Domain: dashboardDomain,
+				Status: DomainStatusPending,
+			})
 			exitOnError(err)
 		default:
 			log.Fatal("Invalid option")
 		}
+	} else {
+		dashboardDomain = domains[len(domains)-1].Domain
 	}
 
 	publicIp, err := namedrop.GetPublicIp("takingnames.io/namedrop", "tcp4")
@@ -677,6 +711,16 @@ func (s *Server) Run() int {
 	qrterminal.GenerateHalfBlock(dashURL, qrterminal.L, os.Stdout)
 	fmt.Fprintf(os.Stdout, "Your server is available at %s\n", dashURL)
 
+	go func() {
+		for {
+			err := checkDomains(db, certCache)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, err.Error())
+			}
+			time.Sleep(5 * time.Second)
+		}
+	}()
+
 	<-waitCh
 
 	switch exitReason {
@@ -702,27 +746,24 @@ func (s *Server) handleConn(
 
 	passConn := NewProxyConn(tcpConn, clientReader)
 
-	dashboardDomain, err := s.db.GetDomain()
+	domains, err := s.db.GetDomains()
 	if err != nil {
 		return err
 	}
 
-	if clientHello.ServerName == dashboardDomain && isTlsMuxado(clientHello) {
+	if len(domains) == 0 {
+		return errors.New("No domains configured")
+	}
 
-		return errors.New("Muxado TLS not implemented")
-		//tlsConn := tls.Server(passConn, tlsConfig)
+	isDashboardDomain := false
+	for _, domain := range domains {
+		if domain.Domain == clientHello.ServerName {
+			isDashboardDomain = true
+			break
+		}
+	}
 
-		//tunnel, err := NewTlsMuxadoServerTunnel(tlsConn, s.jose, s.config.Public)
-		//if err != nil {
-		//	return err
-		//}
-
-		//s.mut.Lock()
-		//defer s.mut.Unlock()
-		//domain := tunnel.GetConfig().Domain
-		//tunnels[domain] = tunnel
-
-	} else if clientHello.ServerName == dashboardDomain {
+	if isDashboardDomain {
 		waygateListener.PassConn(passConn)
 	} else {
 
