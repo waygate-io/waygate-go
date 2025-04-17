@@ -5,6 +5,10 @@ import (
 	//"github.com/mattn/go-sqlite3"
 )
 
+type user struct {
+	ID string `db:"id"`
+}
+
 type serverDomain struct {
 	Domain string `db:"domain"`
 	Status string `db:"status"`
@@ -63,6 +67,16 @@ func NewDatabase(path string) (*Database, error) {
 	}
 
 	stmt = `
+        CREATE TABLE IF NOT EXISTS users(
+                id TEXT UNIQUE NOT NULL
+        );
+        `
+	_, err = db.Exec(stmt)
+	if err != nil {
+		return nil, err
+	}
+
+	stmt = `
         CREATE TABLE IF NOT EXISTS domains(
                 domain TEXT UNIQUE NOT NULL,
 		status TEXT NOT NULL
@@ -78,6 +92,34 @@ func NewDatabase(path string) (*Database, error) {
 	}
 
 	return s, nil
+}
+
+func (d *Database) GetUsers() ([]user, error) {
+
+	stmt := `
+        SELECT id FROM users;
+        `
+
+	var vals []user
+
+	err := d.db.Select(&vals, stmt)
+	if err != nil {
+		return nil, err
+	}
+
+	return vals, nil
+}
+
+func (d *Database) SetUser(v user) error {
+	stmt := `
+        INSERT OR REPLACE INTO users(id) VALUES(?);
+        `
+	_, err := d.db.Exec(stmt, v.ID)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (d *Database) GetDomains() ([]serverDomain, error) {
@@ -214,6 +256,16 @@ func NewClientDatabase(path string) (*ClientDatabase, error) {
 	}
 
 	stmt = `
+        CREATE TABLE IF NOT EXISTS users(
+                id TEXT UNIQUE NOT NULL
+        );
+        `
+	_, err = db.Exec(stmt)
+	if err != nil {
+		return nil, err
+	}
+
+	stmt = `
         CREATE TABLE IF NOT EXISTS tunnels(
                 server_address TEXT NOT NULL,
                 client_address TEXT NOT NULL,
@@ -243,6 +295,34 @@ func NewClientDatabase(path string) (*ClientDatabase, error) {
 	}
 
 	return s, nil
+}
+
+func (d *ClientDatabase) GetUsers() ([]user, error) {
+
+	stmt := `
+        SELECT id FROM users;
+        `
+
+	var vals []user
+
+	err := d.db.Select(&vals, stmt)
+	if err != nil {
+		return nil, err
+	}
+
+	return vals, nil
+}
+
+func (d *ClientDatabase) SetUser(v user) error {
+	stmt := `
+        INSERT OR REPLACE INTO users(id) VALUES(?);
+        `
+	_, err := d.db.Exec(stmt, v.ID)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (d *ClientDatabase) GetServerUri() (string, error) {

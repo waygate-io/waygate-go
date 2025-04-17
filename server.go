@@ -85,6 +85,27 @@ func (s *Server) Run() int {
 	exitOnError(err)
 	s.db = db
 
+	for _, userID := range s.config.Users {
+		err := db.SetUser(user{
+			ID: userID,
+		})
+		exitOnError(err)
+	}
+
+	users, err := db.GetUsers()
+	exitOnError(err)
+
+	for len(users) < 1 {
+		userID := prompt("No users configured. Enter a userID:\n")
+		err := db.SetUser(user{
+			ID: userID,
+		})
+		exitOnError(err)
+
+		users, err = db.GetUsers()
+		exitOnError(err)
+	}
+
 	if s.config.Domain != "" {
 		err = db.SetDomain(serverDomain{
 			Domain: s.config.Domain,
@@ -174,7 +195,7 @@ func (s *Server) Run() int {
 		KvStore: authKV,
 		Config: decentauth.Config{
 			PathPrefix:  authPrefix,
-			AdminID:     s.config.Users[0],
+			AdminID:     users[len(users)-1].ID,
 			BehindProxy: behindProxy,
 			LoginMethods: []decentauth.LoginMethod{
 				decentauth.LoginMethod{
@@ -218,7 +239,7 @@ func (s *Server) Run() int {
 	exitOnError(err)
 
 	//mux := http.NewServeMux()
-	mux := NewServerMux(authHandler, s.config.Users[0])
+	mux := NewServerMux(authHandler, users[len(users)-1].ID)
 
 	numStreamsGauge := promauto.NewGauge(prometheus.GaugeOpts{
 		Name: "waygate_num_streams",

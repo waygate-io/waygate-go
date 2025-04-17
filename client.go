@@ -144,8 +144,25 @@ func (c *Client) Run() error {
 	certmagic.HTTPSPort, err = randomOpenPort()
 	exitOnError(err)
 
-	if len(configCopy.Users) < 1 {
-		exitOnError(errors.New("Must provider user"))
+	for _, userID := range configCopy.Users {
+		err := db.SetUser(user{
+			ID: userID,
+		})
+		exitOnError(err)
+	}
+
+	users, err := db.GetUsers()
+	exitOnError(err)
+
+	for len(users) < 1 {
+		userID := prompt("No users configured. Enter a userID:\n")
+		err := db.SetUser(user{
+			ID: userID,
+		})
+		exitOnError(err)
+
+		users, err = db.GetUsers()
+		exitOnError(err)
 	}
 
 	certCache := createCertCache()
@@ -271,7 +288,7 @@ func (c *Client) Run() error {
 	})
 	exitOnError(err)
 
-	adminID := c.config.Users[0]
+	adminID := users[len(users)-1].ID
 
 	authHandler, err := decentauth.NewHandler(&decentauth.HandlerOptions{
 		KvStore: kvStore,
