@@ -258,6 +258,10 @@ func getDnsProvider(provider, token, user string) (DNSProvider, error) {
 	}
 }
 
+func ExitOnError(err error) {
+	exitOnError(err)
+}
+
 func exitOnError(err error) {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, err.Error())

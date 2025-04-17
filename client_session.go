@@ -58,6 +58,9 @@ func NewClientSession(token string, db *ClientDatabase, certConfig *certmagic.Co
 	//tunnel, err := NewTlsMuxadoClientTunnel(tunReq)
 	//tunnel, err := NewWebSocketMuxadoClientTunnel(tunReq)
 	if err != nil {
+		// TODO: feels hacky.
+		// Probably a bad token. Reset it which will force re-auth
+		db.SetToken("")
 		return nil, err
 	}
 

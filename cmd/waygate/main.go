@@ -140,9 +140,7 @@ func runClient() {
 	client.ListenEvents(eventCh)
 	go func() {
 		err := client.Run()
-		if err != nil {
-			panic(err)
-		}
+		waygate.ExitOnError(err)
 	}()
 
 	for {

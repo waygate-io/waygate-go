@@ -266,6 +266,9 @@ func (c *Client) Run() error {
 
 	session, err := NewClientSession(token, c.db, certConfig)
 	if err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+		// TODO: hacky to do this here
+		os.Exit(64)
 		return err
 	}
 
