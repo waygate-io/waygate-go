@@ -11,8 +11,8 @@ github.com/anderspitman/dashtui v0.0.0-20240514182850-c3a359159ce1 h1:TDyENvvcP9
 github.com/anderspitman/dashtui v0.0.0-20240514182850-c3a359159ce1/go.mod h1:EYsRkMq9qcwI7z6zRJwZghqcK1lnMcJq4j2741L3BGs=
 github.com/anderspitman/little-oauth2-go v0.0.0-20241114224916-42fd761b6e86 h1:2jgOxgFtrkuk33ZtUW9/6kc8lQNQeTTl2IorqN2lIpQ=
 github.com/anderspitman/little-oauth2-go v0.0.0-20241114224916-42fd761b6e86/go.mod h1:w3NvRJ2XEy/SJpE7VmX0R6WPoaKW93SRD+mLoCPiT7E=
-github.com/anderspitman/reanimator-go v0.0.0-20250402160345-943313c242a5 h1:/iXpXDexl27naS7tQKRKtrch3wa53LBJTwEJmDCbxcU=
-github.com/anderspitman/reanimator-go v0.0.0-20250402160345-943313c242a5/go.mod h1:/Pt4YvuGVYDF80OhpRt8Fo9iqsKv5HGVXA4KSTnRRt4=
+github.com/anderspitman/reanimator-go v0.0.0-20250417150941-e646c05959ad h1:0niBWN67g648s5LGtcrhHSsFbS6TMtkeuDHUasmgLiw=
+github.com/anderspitman/reanimator-go v0.0.0-20250417150941-e646c05959ad/go.mod h1:/Pt4YvuGVYDF80OhpRt8Fo9iqsKv5HGVXA4KSTnRRt4=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
 github.com/caddyserver/certmagic v0.22.0 h1:hi2skv2jouUw9uQUEyYSTTmqPZPHgf61dOANSIVCLOw=

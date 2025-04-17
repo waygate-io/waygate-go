@@ -20,7 +20,7 @@ require (
 	gioui.org v0.5.0
 	github.com/anderspitman/dashtui v0.0.0-20240514182850-c3a359159ce1
 	github.com/anderspitman/little-oauth2-go v0.0.0-20241114224916-42fd761b6e86
-	github.com/anderspitman/reanimator-go v0.0.0-20250402160345-943313c242a5
+	github.com/anderspitman/reanimator-go v0.0.0-20250417150941-e646c05959ad
 	github.com/caddyserver/certmagic v0.22.0
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/lastlogin-net/decent-auth-go v0.0.0-20250408135734-dc76b8feb9fd
