@@ -1,7 +1,6 @@
 package waygate
 
 import (
-	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -67,10 +66,6 @@ func NewClientSession(token string, db *ClientDatabase, certConfig *certmagic.Co
 	domain := tunnel.GetConfig().Domain
 
 	db.SetDomain(domain)
-
-	ctx := context.Background()
-	err = certConfig.ManageSync(ctx, []string{domain, "*." + domain})
-	exitOnError(err)
 
 	s = &ClientSession{
 		tunnel:         tunnel,

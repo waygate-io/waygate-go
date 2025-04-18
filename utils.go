@@ -143,7 +143,8 @@ func pipeConns(readConn net.Conn, writeConn connCloseWriter) error {
 	//log.Println("CloseWrite:", reflect.TypeOf(writeConn))
 }
 
-const chars string = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+// const chars string = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+const chars string = "0123456789abcdefghijklmnopqrstuvwxyz"
 
 func genRandomText(length int) (string, error) {
 	id := ""

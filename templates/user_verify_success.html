@@ -1,8 +1,11 @@
 {{ template "header.html" . }}
 
 <p>
-  Verification successful. Click to continue to
-  <a href='//{{.Domain}}'>{{.Domain}}</a>
+  Verification successful. You can access your client at {{.Domain}} using the
+  link below:
+  <div>
+    <a href='https://{{.Domain}}'><strong>https://{{.Domain}}</strong></a>
+  </div>
 </p>
 
 {{ template "footer.html" . }}

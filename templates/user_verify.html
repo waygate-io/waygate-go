@@ -4,6 +4,10 @@
 
 <form action='{{.Prefix}}/approve-device' method='POST'>
 
+  <p>
+    A device is requesting a session for creating tunnels.
+  </p>
+
   {{if .UserCode}}
   <p>
     Confirm that the code below is displayed on your device:
@@ -17,11 +21,6 @@
   <div>
     <label for='code-input'>Code:</label>
     <input id='code-input' type='text' name='user_code' value='{{.UserCode}}'/>
-  </div>
-
-  <div>
-    <label for='domain-input'>Domain:</label>
-    <input id='domain-input' type='text' name='domain' />
   </div>
 
   <button type='submit'>Approve</button>

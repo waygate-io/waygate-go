@@ -65,7 +65,19 @@ func NewOAuth2Handler(db *Database, serverUri, prefix string, jose *josencillo.J
 		r.ParseForm()
 
 		userCode := r.Form.Get("user_code")
-		domain := r.Form.Get("domain")
+
+		// TODO: properly pass in behindProxy
+		behindProxy := false
+		serverHost := getHost(r, behindProxy)
+
+		randomHost, err := genRandomText(8)
+		if err != nil {
+			w.WriteHeader(500)
+			io.WriteString(w, err.Error())
+			return
+		}
+
+		domain := randomHost + "." + serverHost
 
 		issuedAt := time.Now().UTC()
 		accessTokenJwt, err := jose.NewJWT(map[string]interface{}{
@@ -138,9 +150,11 @@ func NewOAuth2Handler(db *Database, serverUri, prefix string, jose *josencillo.J
 
 		tmplData := struct {
 			Prefix      string
+			ClientID    string
 			RedirectUri string
 		}{
 			Prefix:      prefix,
+			ClientID:    authReq.ClientId,
 			RedirectUri: authReq.RedirectUri,
 		}
 
@@ -176,7 +190,18 @@ func NewOAuth2Handler(db *Database, serverUri, prefix string, jose *josencillo.J
 			return
 		}
 
-		domain := r.Form.Get("domain")
+		// TODO: properly pass in behindProxy
+		behindProxy := false
+		serverHost := getHost(r, behindProxy)
+
+		randomHost, err := genRandomText(8)
+		if err != nil {
+			w.WriteHeader(500)
+			io.WriteString(w, err.Error())
+			return
+		}
+
+		domain := randomHost + "." + serverHost
 
 		issuedAt := time.Now().UTC()
 		codeJwt, err := jose.NewJWT(map[string]interface{}{

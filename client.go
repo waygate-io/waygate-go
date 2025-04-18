@@ -167,6 +167,8 @@ func (c *Client) Run() error {
 
 	certCache := createCertCache()
 
+	// TODO: might be able to remove in favor of a more robust background
+	// cert system
 	if configCopy.DNSProvider != "" {
 
 		c.dnsProvider, err = getDnsProvider(configCopy.DNSProvider, configCopy.DNSToken, configCopy.DNSUser)
@@ -249,7 +251,8 @@ func (c *Client) Run() error {
 		fmt.Println(token)
 	}
 
-	certConfig := onDemandConfig
+	certConfig, err := createNormalCertConfig(certCache, c.db.db.DB, acmeEmail)
+	exitOnError(err)
 
 	//disableOnDemand := true
 	disableOnDemand := false
@@ -264,7 +267,7 @@ func (c *Client) Run() error {
 		}
 	}
 
-	session, err := NewClientSession(token, c.db, certConfig)
+	session, err := NewClientSession(token, c.db, onDemandConfig)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		// TODO: hacky to do this here
@@ -281,6 +284,11 @@ func (c *Client) Run() error {
 	tunConfig := listener.GetTunnelConfig()
 
 	dashUri := "https://" + tunConfig.Domain
+
+	ctx := context.Background()
+	err = certConfig.ManageAsync(ctx, []string{tunConfig.Domain})
+	exitOnError(err)
+
 	redirUriCh <- dashUri
 
 	authPrefix := "/auth"
@@ -322,6 +330,7 @@ func (c *Client) Run() error {
 	})
 	exitOnError(err)
 
+	// TODO: consider re-enabling GemDrive
 	//filesDomain := "files." + tunConfig.Domain
 
 	//gdDataDir := filepath.Join(c.config.Dir, "gemdrive")
@@ -748,6 +757,8 @@ func (c *Client) Run() error {
 			Timeout: 5 * time.Second,
 		}
 		for {
+			time.Sleep(30 * time.Second)
+
 			res, err := httpClient.Get(dashUri + "/check")
 			if err != nil {
 				os.Exit(64)
@@ -756,8 +767,6 @@ func (c *Client) Run() error {
 			if res.StatusCode != 200 {
 				os.Exit(65)
 			}
-
-			time.Sleep(30 * time.Second)
 		}
 	}()
 
