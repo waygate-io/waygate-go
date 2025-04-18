@@ -36,6 +36,22 @@ type tunnel struct {
 	Client  string
 }
 
+type httpError struct {
+	message    string
+	statusCode int
+}
+
+func newHTTPError(statusCode int, message string) *httpError {
+	return &httpError{
+		message:    message,
+		statusCode: statusCode,
+	}
+}
+
+func (e *httpError) Error() string {
+	return fmt.Sprintf("HTTP Error - Status code: %d - Message: %s", e.statusCode, e.message)
+}
+
 var (
 	DefaultToken   string = ""
 	DefaultCertDir string = "./"

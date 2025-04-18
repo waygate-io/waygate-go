@@ -29,6 +29,8 @@ type OmnistreamsTunnel struct {
 	mut            *sync.Mutex
 }
 
+type authError error
+
 func (t *OmnistreamsTunnel) OpenStream() (connCloseWriter, error) {
 	return t.OpenStreamType(MessageTypeStream)
 }

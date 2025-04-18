@@ -207,18 +207,18 @@ func processRequest(tunnelReq TunnelRequest, tunnelDomains []string, jose *josen
 	var domain string
 	if tunnelReq.Token == "" {
 		if !public {
-			return nil, errors.New("No token provided")
+			return nil, newHTTPError(401, "No token provided")
 		}
 
 		if len(tunnelDomains) == 0 {
-			return nil, errors.New("No tunnel domains")
+			return nil, newHTTPError(400, "No tunnel domains")
 		}
 
 		domain = strings.ToLower(host) + "." + tunnelDomains[0]
 	} else {
 		claims, err := jose.ParseJWT(tunnelReq.Token)
 		if err != nil {
-			return nil, err
+			return nil, newHTTPError(401, err.Error())
 		}
 
 		domain = claims["domain"].(string)

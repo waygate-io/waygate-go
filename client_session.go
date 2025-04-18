@@ -13,6 +13,7 @@ import (
 
 	"github.com/caddyserver/certmagic"
 	"github.com/mailgun/proxyproto"
+	omnitransport "github.com/omnistreams/omnistreams-go/transports"
 )
 
 const PROXY_PROTO_PP2_TYPE_MIN_CUSTOM = 0xe0
@@ -56,10 +57,12 @@ func NewClientSession(token string, db *ClientDatabase, certConfig *certmagic.Co
 	//tunnel, err := NewWebTransportClientTunnel(tunReq)
 	//tunnel, err := NewTlsMuxadoClientTunnel(tunReq)
 	//tunnel, err := NewWebSocketMuxadoClientTunnel(tunReq)
-	if err != nil {
+	if authErr, ok := err.(*omnitransport.AuthenticationError); ok {
 		// TODO: feels hacky.
 		// Probably a bad token. Reset it which will force re-auth
 		db.SetToken("")
+		return nil, authErr
+	} else if err != nil {
 		return nil, err
 	}
 

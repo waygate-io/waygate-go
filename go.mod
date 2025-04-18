@@ -8,6 +8,7 @@ go 1.24.1
 //replace github.com/omnistreams/omnistreams-go => ../omnistreams-go
 
 //replace github.com/omnistreams/omnistreams-go/transports => ../omnistreams-go/transports
+
 //replace github.com/anderspitman/dashtui => ../dashtui
 //replace github.com/anderspitman/little-oauth2-go => ../little-oauth2-go
 //replace github.com/takingnames/namedrop-libdns => ../namedrop-libdns
@@ -29,8 +30,8 @@ require (
 	github.com/libdns/namedotcom v0.3.4-0.20241104014758-c641e4a2a4c9
 	github.com/mailgun/proxyproto v1.0.0
 	github.com/mdp/qrterminal/v3 v3.2.0
-	github.com/omnistreams/omnistreams-go v0.0.0-20250409181019-d7ce518eec08
-	github.com/omnistreams/omnistreams-go/transports v0.0.0-20250314191905-b56316fba295
+	github.com/omnistreams/omnistreams-go v0.0.0-20250418155357-eeb2fa59dfab
+	github.com/omnistreams/omnistreams-go/transports v0.0.0-20250418155357-eeb2fa59dfab
 	github.com/pires/go-proxyproto v0.7.0
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
 	github.com/prometheus/client_golang v1.19.0

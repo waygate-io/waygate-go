@@ -523,9 +523,13 @@ func (s *Server) Run() int {
 		} else {
 			//tunnel, err = NewWebSocketMuxadoServerTunnel(w, r, s.jose, s.config.Public, s.config.TunnelDomains, numStreamsGauge)
 			tunnel, err = NewOmnistreamsServerTunnel(w, r, s.jose, s.config.Public, s.config.TunnelDomains, numStreamsGauge, dash)
-			if err != nil {
+			if httpErr, ok := err.(*httpError); ok {
+				w.WriteHeader(httpErr.statusCode)
+				io.WriteString(w, httpErr.message)
+				return
+			} else if err != nil {
 				w.WriteHeader(500)
-				log.Println("NewOmnistreamsClientTunnel error", err)
+				log.Println("NewOmnistreamsServerTunnel error", err)
 				return
 			}
 		}
