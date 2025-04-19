@@ -24,7 +24,7 @@ type OAuth2Handler struct {
 	mux *http.ServeMux
 }
 
-func NewOAuth2Handler(db *Database, serverUri, prefix string, jose *josencillo.JOSE, tmpl *template.Template) *OAuth2Handler {
+func NewOAuth2Handler(db *ServerDatabase, serverUri, prefix string, jose *josencillo.JOSE, tmpl *template.Template) *OAuth2Handler {
 
 	mux := http.NewServeMux()
 

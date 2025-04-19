@@ -25,11 +25,11 @@ type ClientTunnel struct {
 	TLSPassthrough bool   `db:"tls_passthrough"`
 }
 
-type Database struct {
+type ServerDatabase struct {
 	db *sqlx.DB
 }
 
-func NewDatabase(path string) (*Database, error) {
+func NewServerDatabase(path string) (*ServerDatabase, error) {
 
 	db, err := sqlx.Open("sqlite3", path)
 	if err != nil {
@@ -87,14 +87,14 @@ func NewDatabase(path string) (*Database, error) {
 		return nil, err
 	}
 
-	s := &Database{
+	s := &ServerDatabase{
 		db: db,
 	}
 
 	return s, nil
 }
 
-func (d *Database) GetUsers() ([]user, error) {
+func (d *ServerDatabase) GetUsers() ([]user, error) {
 
 	stmt := `
         SELECT id FROM users;
@@ -110,7 +110,7 @@ func (d *Database) GetUsers() ([]user, error) {
 	return vals, nil
 }
 
-func (d *Database) SetUser(v user) error {
+func (d *ServerDatabase) SetUser(v user) error {
 	stmt := `
         INSERT OR REPLACE INTO users(id) VALUES(?);
         `
@@ -122,7 +122,7 @@ func (d *Database) SetUser(v user) error {
 	return nil
 }
 
-func (d *Database) GetDomains() ([]serverDomain, error) {
+func (d *ServerDatabase) GetDomains() ([]serverDomain, error) {
 
 	stmt := `
         SELECT domain,status FROM domains;
@@ -138,7 +138,7 @@ func (d *Database) GetDomains() ([]serverDomain, error) {
 	return domains, nil
 }
 
-func (d *Database) SetDomain(v serverDomain) error {
+func (d *ServerDatabase) SetDomain(v serverDomain) error {
 	stmt := `
         INSERT OR REPLACE INTO domains(domain,status) VALUES(?,?);
         `
@@ -150,7 +150,7 @@ func (d *Database) SetDomain(v serverDomain) error {
 	return nil
 }
 
-func (d *Database) DeleteDomain(domain string) error {
+func (d *ServerDatabase) DeleteDomain(domain string) error {
 	stmt := `
         DELETE FROM domains WHERE domain = ?;
         `
@@ -162,7 +162,7 @@ func (d *Database) DeleteDomain(domain string) error {
 	return nil
 }
 
-func (d *Database) GetJWKS() (string, error) {
+func (d *ServerDatabase) GetJWKS() (string, error) {
 	var jwks_json string
 
 	stmt := `
@@ -176,7 +176,7 @@ func (d *Database) GetJWKS() (string, error) {
 	return jwks_json, nil
 }
 
-func (d *Database) SetJWKS(jwks string) error {
+func (d *ServerDatabase) SetJWKS(jwks string) error {
 	stmt := `
         UPDATE config SET jwks_json=?;
         `
@@ -188,7 +188,7 @@ func (d *Database) SetJWKS(jwks string) error {
 	return nil
 }
 
-func (d *Database) GetACMEEmail() (string, error) {
+func (d *ServerDatabase) GetACMEEmail() (string, error) {
 	var val string
 
 	stmt := `
@@ -202,7 +202,7 @@ func (d *Database) GetACMEEmail() (string, error) {
 	return val, nil
 }
 
-func (d *Database) SetACMEEmail(val string) error {
+func (d *ServerDatabase) SetACMEEmail(val string) error {
 	stmt := `
         UPDATE config SET acme_email=?;
         `

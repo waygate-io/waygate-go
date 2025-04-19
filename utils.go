@@ -520,7 +520,7 @@ func getHost(r *http.Request, behindProxy bool) string {
 	return r.Host
 }
 
-func checkDomains(db *Database, certCache *certmagic.Cache) (err error) {
+func checkDomains(db *ServerDatabase, certCache *certmagic.Cache) (err error) {
 
 	acmeEmail, err := db.GetACMEEmail()
 	if err != nil {

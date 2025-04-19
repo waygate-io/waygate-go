@@ -53,7 +53,7 @@ type Server struct {
 	jose   *josencillo.JOSE
 	config *ServerConfig
 	mut    *sync.Mutex
-	db     *Database
+	db     *ServerDatabase
 }
 
 func NewServer(config *ServerConfig) *Server {
@@ -81,7 +81,7 @@ func (s *Server) Run() int {
 	}
 	defer dash.Close()
 
-	db, err := NewDatabase("waygate_server_db.sqlite3")
+	db, err := NewServerDatabase("waygate_server_db.sqlite3")
 	exitOnError(err)
 	s.db = db
 
