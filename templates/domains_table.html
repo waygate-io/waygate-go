@@ -1,0 +1,25 @@
+<table>
+  <thead>
+    <tr>
+      <td>Domain</td>
+      <td>Status</td>
+      <td></td>
+    </tr>
+  </thead>
+  {{range $domain := .Domains}}
+  <tr>
+    <td>
+      <a href='https://{{$domain.Domain}}' target='_blank'>{{$domain.Domain}}</a>
+    </td>
+    <td>
+      {{$domain.Status}}
+    </td>
+    <td>
+      <form action='/delete-domain' method='POST'>
+        <input type='hidden' name='domain' value='{{$domain.Domain}}' />
+        <button>Delete</button>
+      </form>
+    </td>
+  </tr>
+  {{end}}
+</table>

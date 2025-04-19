@@ -68,7 +68,13 @@ func NewClientSession(token string, db *ClientDatabase, certConfig *certmagic.Co
 
 	domain := tunnel.GetConfig().Domain
 
-	db.SetDomain(domain)
+	err = db.SetDomain(Domain{
+		Domain: domain,
+		Status: DomainStatusPending,
+	})
+	if err != nil {
+		return nil, err
+	}
 
 	s = &ClientSession{
 		tunnel:         tunnel,

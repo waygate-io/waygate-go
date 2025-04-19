@@ -1,6 +1,7 @@
 package waygate
 
 import (
+	"database/sql"
 	"github.com/jmoiron/sqlx"
 	//"github.com/mattn/go-sqlite3"
 )
@@ -9,7 +10,7 @@ type user struct {
 	ID string `db:"id"`
 }
 
-type serverDomain struct {
+type Domain struct {
 	Domain string `db:"domain"`
 	Status string `db:"status"`
 }
@@ -23,6 +24,13 @@ type ClientTunnel struct {
 	Protected      bool   `db:"protected"`
 	Type           string `db:"type"`
 	TLSPassthrough bool   `db:"tls_passthrough"`
+}
+
+type Database interface {
+	GetDomains() ([]Domain, error)
+	SetDomain(v Domain) error
+	GetACMEEmail() (string, error)
+	GetSQLDB() *sql.DB
 }
 
 type ServerDatabase struct {
@@ -76,13 +84,7 @@ func NewServerDatabase(path string) (*ServerDatabase, error) {
 		return nil, err
 	}
 
-	stmt = `
-        CREATE TABLE IF NOT EXISTS domains(
-                domain TEXT UNIQUE NOT NULL,
-		status TEXT NOT NULL
-        );
-        `
-	_, err = db.Exec(stmt)
+	err = createDomainsTable(db.DB)
 	if err != nil {
 		return nil, err
 	}
@@ -92,6 +94,10 @@ func NewServerDatabase(path string) (*ServerDatabase, error) {
 	}
 
 	return s, nil
+}
+
+func (d *ServerDatabase) GetSQLDB() *sql.DB {
+	return d.db.DB
 }
 
 func (d *ServerDatabase) GetUsers() ([]user, error) {
@@ -122,32 +128,12 @@ func (d *ServerDatabase) SetUser(v user) error {
 	return nil
 }
 
-func (d *ServerDatabase) GetDomains() ([]serverDomain, error) {
-
-	stmt := `
-        SELECT domain,status FROM domains;
-        `
-
-	var domains []serverDomain
-
-	err := d.db.Select(&domains, stmt)
-	if err != nil {
-		return nil, err
-	}
-
-	return domains, nil
+func (d *ServerDatabase) GetDomains() ([]Domain, error) {
+	return getDomains(d.db)
 }
 
-func (d *ServerDatabase) SetDomain(v serverDomain) error {
-	stmt := `
-        INSERT OR REPLACE INTO domains(domain,status) VALUES(?,?);
-        `
-	_, err := d.db.Exec(stmt, v.Domain, v.Status)
-	if err != nil {
-		return err
-	}
-
-	return nil
+func (d *ServerDatabase) SetDomain(v Domain) error {
+	return setDomain(d.db, v)
 }
 
 func (d *ServerDatabase) DeleteDomain(domain string) error {
@@ -189,17 +175,7 @@ func (d *ServerDatabase) SetJWKS(jwks string) error {
 }
 
 func (d *ServerDatabase) GetACMEEmail() (string, error) {
-	var val string
-
-	stmt := `
-        SELECT acme_email FROM config;
-        `
-	err := d.db.QueryRow(stmt).Scan(&val)
-	if err != nil {
-		return "", err
-	}
-
-	return val, nil
+	return getACMEEmail(d.db)
 }
 
 func (d *ServerDatabase) SetACMEEmail(val string) error {
@@ -280,12 +256,7 @@ func NewClientDatabase(path string) (*ClientDatabase, error) {
 		return nil, err
 	}
 
-	stmt = `
-        CREATE TABLE IF NOT EXISTS domains(
-                domain TEXT UNIQUE NOT NULL
-        );
-        `
-	_, err = db.Exec(stmt)
+	err = createDomainsTable(db.DB)
 	if err != nil {
 		return nil, err
 	}
@@ -295,6 +266,10 @@ func NewClientDatabase(path string) (*ClientDatabase, error) {
 	}
 
 	return s, nil
+}
+
+func (d *ClientDatabase) GetSQLDB() *sql.DB {
+	return d.db.DB
 }
 
 func (d *ClientDatabase) GetUsers() ([]user, error) {
@@ -376,17 +351,7 @@ func (d *ClientDatabase) SetToken(value string) error {
 }
 
 func (d *ClientDatabase) GetACMEEmail() (string, error) {
-	var val string
-
-	stmt := `
-        SELECT acme_email FROM config;
-        `
-	err := d.db.QueryRow(stmt).Scan(&val)
-	if err != nil {
-		return "", err
-	}
-
-	return val, nil
+	return getACMEEmail(d.db)
 }
 
 func (d *ClientDatabase) SetACMEEmail(val string) error {
@@ -457,32 +422,12 @@ func (d *ClientDatabase) DeleteTunnel(tunnelType TunnelType, address string) err
 	return nil
 }
 
-func (d *ClientDatabase) GetDomains() ([]string, error) {
-
-	stmt := `
-        SELECT domain FROM domains;
-        `
-
-	var domains []string
-
-	err := d.db.Select(&domains, stmt)
-	if err != nil {
-		return nil, err
-	}
-
-	return domains, nil
+func (d *ClientDatabase) GetDomains() ([]Domain, error) {
+	return getDomains(d.db)
 }
 
-func (d *ClientDatabase) SetDomain(domain string) error {
-	stmt := `
-        INSERT OR REPLACE INTO domains(domain) VALUES(?);
-        `
-	_, err := d.db.Exec(stmt, domain)
-	if err != nil {
-		return err
-	}
-
-	return nil
+func (d *ClientDatabase) SetDomain(v Domain) error {
+	return setDomain(d.db, v)
 }
 
 func (d *ClientDatabase) DeleteDomain(domain string) error {
@@ -495,4 +440,61 @@ func (d *ClientDatabase) DeleteDomain(domain string) error {
 	}
 
 	return nil
+}
+
+func createDomainsTable(db *sql.DB) (err error) {
+	stmt := `
+        CREATE TABLE IF NOT EXISTS domains(
+                domain TEXT UNIQUE NOT NULL,
+		status TEXT NOT NULL
+        );
+        `
+	_, err = db.Exec(stmt)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
+func getDomains(db *sqlx.DB) ([]Domain, error) {
+
+	stmt := `
+        SELECT domain,status FROM domains;
+        `
+
+	var domains []Domain
+
+	err := db.Select(&domains, stmt)
+	if err != nil {
+		return nil, err
+	}
+
+	return domains, nil
+}
+
+func setDomain(db *sqlx.DB, v Domain) error {
+	stmt := `
+        INSERT OR REPLACE INTO domains(domain,status) VALUES(?,?);
+        `
+	_, err := db.Exec(stmt, v.Domain, v.Status)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func getACMEEmail(db *sqlx.DB) (string, error) {
+	var val string
+
+	stmt := `
+        SELECT acme_email FROM config;
+        `
+	err := db.QueryRow(stmt).Scan(&val)
+	if err != nil {
+		return "", err
+	}
+
+	return val, nil
 }

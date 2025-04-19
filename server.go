@@ -107,7 +107,7 @@ func (s *Server) Run() int {
 	}
 
 	if s.config.Domain != "" {
-		err = db.SetDomain(serverDomain{
+		err = db.SetDomain(Domain{
 			Domain: s.config.Domain,
 			Status: DomainStatusPending,
 		})
@@ -334,7 +334,7 @@ func (s *Server) Run() int {
 		tmplData := struct {
 			Clients map[string]TunnelConfig
 			Tunnels []tunnel
-			Domains []serverDomain
+			Domains []Domain
 		}{
 			Clients: clients,
 			Tunnels: tuns,
@@ -490,7 +490,7 @@ func (s *Server) Run() int {
 			return
 		}
 
-		err = db.SetDomain(serverDomain{
+		err = db.SetDomain(Domain{
 			Domain: newDashboardDomain,
 			Status: DomainStatusPending,
 		})
@@ -674,7 +674,7 @@ func (s *Server) Run() int {
 		switch action {
 		case "1":
 			dashboardDomain = prompt("\nEnter domain:\n")
-			err = db.SetDomain(serverDomain{
+			err = db.SetDomain(Domain{
 				Domain: dashboardDomain,
 				Status: DomainStatusPending,
 			})
@@ -683,7 +683,7 @@ func (s *Server) Run() int {
 			dashboardDomain, err = namedrop.GetIpDomain(namedropURI)
 			exitOnError(err)
 
-			err = db.SetDomain(serverDomain{
+			err = db.SetDomain(Domain{
 				Domain: dashboardDomain,
 				Status: DomainStatusPending,
 			})

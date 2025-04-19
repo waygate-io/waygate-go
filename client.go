@@ -383,27 +383,27 @@ func (c *Client) Run() error {
 			return
 		}
 
-		var domains []string
-		if c.dnsProvider != nil {
-			zones, err := c.dnsProvider.ListZones(r.Context())
-			if err != nil {
-				fmt.Println(err)
-				return
-			}
+		//var domains []string
+		//if c.dnsProvider != nil {
+		//	zones, err := c.dnsProvider.ListZones(r.Context())
+		//	if err != nil {
+		//		fmt.Println(err)
+		//		return
+		//	}
 
-			for _, zone := range zones {
-				domains = append(domains, zone.Name)
-			}
-		}
-
-		//domains, err := c.db.GetDomains()
-		//if err != nil {
-		//	fmt.Println(err)
-		//	return
+		//	for _, zone := range zones {
+		//		domains = append(domains, zone.Name)
+		//	}
 		//}
 
+		domains, err := c.db.GetDomains()
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
 		tmplData := struct {
-			Domains []string
+			Domains []Domain
 			Tunnels []*ClientTunnel
 		}{
 			Domains: domains,
@@ -678,7 +678,10 @@ func (c *Client) Run() error {
 			return
 		}
 
-		err := c.db.SetDomain(domain)
+		err := c.db.SetDomain(Domain{
+			Domain: domain,
+			Status: DomainStatusPending,
+		})
 		if err != nil {
 			w.WriteHeader(500)
 			io.WriteString(w, err.Error())
@@ -729,6 +732,16 @@ func (c *Client) Run() error {
 			exitOnError(err)
 		}()
 	}
+
+	go func() {
+		for {
+			err := checkDomains(db, certCache)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, err.Error())
+			}
+			time.Sleep(5 * time.Second)
+		}
+	}()
 
 	go func() {
 		err = httpServer.Serve(listener)

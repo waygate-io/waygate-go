@@ -169,19 +169,8 @@
 
 <h2>Domains</h2>
 
-<div class='domain-list'>
-  {{range .Domains}}
-  <div class='row'>
-    <span>{{.}}</span>
-    <!--
-    <form action='/delete-domain' method='POST'>
-      <input type='hidden' name='domain' value='{{.}}' />
-      <button>Delete</button>
-    </form>
-    -->
-  </div>
-  {{end}}
-</div>
+{{ template "domains_table.html" . }}
+
 
 <h3>Add domain with TakingNames.io</h3>
 
