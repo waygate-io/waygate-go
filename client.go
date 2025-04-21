@@ -513,6 +513,24 @@ func (c *Client) Run() error {
 		// config passed in by user
 		c.dnsProvider = dnsProvider
 
+		host := tokenRes.Permissions[0].Host
+		domain := tokenRes.Permissions[0].Domain
+
+		behindProxy := false
+		curHost := getHost(r, behindProxy)
+
+		err = pointDomainAtDomain(r.Context(), c.dnsProvider, host, domain, curHost)
+		if err != nil {
+			w.WriteHeader(500)
+			io.WriteString(w, err.Error())
+			return
+		}
+
+		fqdn := domain
+		if host != "" {
+			fqdn = fmt.Sprintf("%s.%s", host, domain)
+		}
+
 		certConfig, err = createDNSCertConfig(certCache, c.db.db.DB, acmeEmail, c.dnsProvider)
 		if err != nil {
 			w.WriteHeader(500)
@@ -520,9 +538,18 @@ func (c *Client) Run() error {
 			return
 		}
 
-		domain := tokenRes.Permissions[0].Domain
 		ctx := context.Background()
-		err = certConfig.ManageAsync(ctx, []string{domain, "*." + domain})
+		err = certConfig.ManageAsync(ctx, []string{fqdn, "*." + fqdn})
+		if err != nil {
+			w.WriteHeader(500)
+			io.WriteString(w, err.Error())
+			return
+		}
+
+		err = db.SetDomain(Domain{
+			Domain: fqdn,
+			Status: DomainStatusPending,
+		})
 		if err != nil {
 			w.WriteHeader(500)
 			io.WriteString(w, err.Error())
