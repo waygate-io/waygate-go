@@ -95,12 +95,12 @@ func (d *ServerDatabase) GetSQLDB() *sql.DB {
 	return d.db.DB
 }
 
-func (d *ServerDatabase) GetUsers() ([]user, error) {
-	return getUsers(d.db)
+func (d *ServerDatabase) GetACMEEmail() (string, error) {
+	return getACMEEmail(d.db)
 }
 
-func (d *ServerDatabase) SetUser(v user) error {
-	return setUser(d.db, v)
+func (d *ServerDatabase) GetUsers() ([]user, error) {
+	return getUsers(d.db)
 }
 
 func (d *ServerDatabase) GetDomains() ([]Domain, error) {
@@ -113,6 +113,14 @@ func (d *ServerDatabase) SetDomain(v Domain) error {
 
 func (d *ServerDatabase) DeleteDomain(domain string) error {
 	return deleteDomain(d.db, domain)
+}
+
+func (d *ServerDatabase) SetUser(v user) error {
+	return setUser(d.db, v)
+}
+
+func (d *ServerDatabase) SetACMEEmail(val string) error {
+	return setACMEEmail(d.db, val)
 }
 
 func (d *ServerDatabase) GetJWKS() (string, error) {
@@ -139,14 +147,6 @@ func (d *ServerDatabase) SetJWKS(jwks string) error {
 	}
 
 	return nil
-}
-
-func (d *ServerDatabase) GetACMEEmail() (string, error) {
-	return getACMEEmail(d.db)
-}
-
-func (d *ServerDatabase) SetACMEEmail(val string) error {
-	return setACMEEmail(d.db, val)
 }
 
 type ClientDatabase struct {
@@ -191,16 +191,6 @@ func NewClientDatabase(path string) (*ClientDatabase, error) {
 	}
 
 	stmt = `
-        CREATE TABLE IF NOT EXISTS users(
-                id TEXT UNIQUE NOT NULL
-        );
-        `
-	_, err = db.Exec(stmt)
-	if err != nil {
-		return nil, err
-	}
-
-	stmt = `
         CREATE TABLE IF NOT EXISTS tunnels(
                 server_address TEXT NOT NULL,
                 client_address TEXT NOT NULL,
@@ -234,6 +224,26 @@ func NewClientDatabase(path string) (*ClientDatabase, error) {
 
 func (d *ClientDatabase) GetSQLDB() *sql.DB {
 	return d.db.DB
+}
+
+func (d *ClientDatabase) GetACMEEmail() (string, error) {
+	return getACMEEmail(d.db)
+}
+
+func (d *ClientDatabase) SetACMEEmail(val string) error {
+	return setACMEEmail(d.db, val)
+}
+
+func (d *ClientDatabase) GetDomains() ([]Domain, error) {
+	return getDomains(d.db)
+}
+
+func (d *ClientDatabase) SetDomain(v Domain) error {
+	return setDomain(d.db, v)
+}
+
+func (d *ClientDatabase) DeleteDomain(domain string) error {
+	return deleteDomain(d.db, domain)
 }
 
 func (d *ClientDatabase) GetUsers() ([]user, error) {
@@ -294,14 +304,6 @@ func (d *ClientDatabase) SetToken(value string) error {
 	return nil
 }
 
-func (d *ClientDatabase) GetACMEEmail() (string, error) {
-	return getACMEEmail(d.db)
-}
-
-func (d *ClientDatabase) SetACMEEmail(val string) error {
-	return setACMEEmail(d.db, val)
-}
-
 func (d *ClientDatabase) GetTunnels() ([]*ClientTunnel, error) {
 
 	stmt := `
@@ -356,18 +358,6 @@ func (d *ClientDatabase) DeleteTunnel(tunnelType TunnelType, address string) err
 	}
 
 	return nil
-}
-
-func (d *ClientDatabase) GetDomains() ([]Domain, error) {
-	return getDomains(d.db)
-}
-
-func (d *ClientDatabase) SetDomain(v Domain) error {
-	return setDomain(d.db, v)
-}
-
-func (d *ClientDatabase) DeleteDomain(domain string) error {
-	return deleteDomain(d.db, domain)
 }
 
 func createUsersTable(db *sql.DB) (err error) {
