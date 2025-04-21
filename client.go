@@ -375,6 +375,9 @@ func (c *Client) Run() error {
 		if err == nil {
 			proxyHttp(w, r, httpClient, tunnel.ClientAddress, false)
 			return
+		} else if strings.HasPrefix(r.URL.Path, authPrefix) {
+			authHandler.ServeHTTP(w, r)
+			return
 		}
 
 		tunnels, err := c.db.GetTunnels()
@@ -418,8 +421,6 @@ func (c *Client) Run() error {
 		}
 
 	})
-
-	mux.Handle(authPrefix+"/", authHandler)
 
 	// TODO: handle concurrent requests
 	var flowState *oauth.AuthCodeFlowState
@@ -868,6 +869,7 @@ func (m *ClientMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	//	m.fileServer.ServeHTTP(w, r)
 	//	return
 	//} else if host != authDomain {
+
 	if !strings.HasPrefix(r.URL.Path, authPrefix) {
 
 		if r.URL.Path == "/check" {
