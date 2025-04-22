@@ -353,8 +353,8 @@ func pointDomainAtDomain(ctx context.Context, dnsProvider DNSProvider, host, dom
 	recordType := "ANAME"
 	wildcardHost := "*"
 	if host != "" {
-		wildcardHost = "*." + host
 		recordType = "CNAME"
+		wildcardHost = "*." + host
 	}
 
 	existingRecs, err := dnsProvider.GetRecords(ctx, domain)
