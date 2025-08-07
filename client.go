@@ -361,6 +361,7 @@ func (c *Client) Run() error {
 	//}()
 
 	mux := NewClientMux(authHandler /*gdServer,*/, c.db, adminID)
+	tunMux := NewClientMux(authHandler, c.db, adminID)
 
 	httpClient := &http.Client{
 		// Don't follow redirects
@@ -369,13 +370,27 @@ func (c *Client) Run() error {
 		},
 	}
 
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	tunMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 
 		tunnel, err := c.db.GetTunnel(r.Host)
-		if err == nil {
-			proxyHttp(w, r, httpClient, tunnel.ClientAddress, false)
+		if err != nil {
+			w.WriteHeader(500)
+			io.WriteString(w, err.Error())
 			return
-		} else if strings.HasPrefix(r.URL.Path, authPrefix) {
+		}
+
+		// TODO: feels like a hacky safety check
+		if strings.HasPrefix(r.URL.Path, authPrefix) {
+			authHandler.ServeHTTP(w, r)
+			return
+		}
+
+		proxyHttp(w, r, httpClient, tunnel.ClientAddress, false)
+	})
+
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+
+		if strings.HasPrefix(r.URL.Path, authPrefix) {
 			authHandler.ServeHTTP(w, r)
 			return
 		}
@@ -650,7 +665,7 @@ func (c *Client) Run() error {
 			return
 		}
 
-		serverTunnelDomain, err := openTunnel(session, mux, tunnel)
+		serverTunnelDomain, err := openTunnel(session, tunMux, tunnel)
 		if err != nil {
 			w.WriteHeader(500)
 			io.WriteString(w, err.Error())
@@ -756,7 +771,7 @@ func (c *Client) Run() error {
 	for _, tunnel := range tunnels {
 		printJson(tunnel)
 		go func() {
-			_, err = openTunnel(session, mux, tunnel)
+			_, err = openTunnel(session, tunMux, tunnel)
 			exitOnError(err)
 		}()
 	}
