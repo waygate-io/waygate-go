@@ -956,9 +956,18 @@ func openTunnel(session *ClientSession, mux *ClientMux, tunnel *ClientTunnel) (d
 
 		go proxyTcpConns(listener, tunnel)
 	case TunnelTypeTLS:
-		fallthrough
-	case TunnelTypeHTTPS:
 		fmt.Println("listen tls")
+
+		// TODO: this should probably be called in a goroutine
+		listener, err = session.Listen("tls", addr)
+		if err != nil {
+			return
+		}
+
+		go proxyTcpConns(listener, tunnel)
+
+	case TunnelTypeHTTPS:
+		fmt.Println("listen https")
 
 		if tunnel.TLSPassthrough {
 			// TODO: this should probably be called in a goroutine
