@@ -178,6 +178,7 @@ func NewOmnistreamsServerTunnel(
 		Token:            r.URL.Query().Get("token"),
 		TerminationType:  r.URL.Query().Get("termination-type"),
 		UseProxyProtocol: r.URL.Query().Get("use-proxy-protocol") == "true",
+		ClientName:       r.URL.Query().Get("client-name"),
 	}
 
 	tunConfig, err := processRequest(tunnelReq, tunnelDomains, jose, public)
@@ -251,11 +252,12 @@ func NewOmnistreamsClientTunnel(tunReq TunnelRequest) (*OmnistreamsTunnel, error
 
 	ctx := context.Background()
 
-	uri := fmt.Sprintf("wss://%s/waygate?token=%s&termination-type=%s&use-proxy-protocol=%t",
+	uri := fmt.Sprintf("wss://%s/waygate?token=%s&termination-type=%s&use-proxy-protocol=%t&client-name=%s",
 		WaygateServerDomain,
 		tunReq.Token,
 		tunReq.TerminationType,
 		tunReq.UseProxyProtocol,
+		tunReq.ClientName,
 	)
 
 	wr, err := transports.NewWebSocketClientTransport(ctx, uri)

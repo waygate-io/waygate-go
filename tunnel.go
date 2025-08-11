@@ -228,6 +228,7 @@ func processRequest(tunnelReq TunnelRequest, tunnelDomains []string, jose *josen
 		Domain:           domain,
 		TerminationType:  tunnelReq.TerminationType,
 		UseProxyProtocol: tunnelReq.UseProxyProtocol,
+		ClientName:       tunnelReq.ClientName,
 	}
 
 	return tunConfig, nil

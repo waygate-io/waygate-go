@@ -36,6 +36,11 @@ func NewClientSession(token string, db *ClientDatabase, certConfig *certmagic.Co
 
 	var err error
 
+	clientName, err := db.GetClientName()
+	if err != nil {
+		return nil, err
+	}
+
 	tlsConfig := &tls.Config{
 		GetCertificate: func(ch *tls.ClientHelloInfo) (*tls.Certificate, error) {
 			//fmt.Println("GetCertificate")
@@ -51,6 +56,7 @@ func NewClientSession(token string, db *ClientDatabase, certConfig *certmagic.Co
 		TerminationType: "client",
 		//TerminationType:  "server",
 		UseProxyProtocol: true,
+		ClientName:       clientName,
 	}
 
 	tunnel, err := NewOmnistreamsClientTunnel(tunReq)

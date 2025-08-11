@@ -44,6 +44,7 @@ type ClientConfig struct {
 	DNSUser     string
 	DNSToken    string
 	ACMEEmail   string
+	ClientName  string
 }
 
 type Client struct {
@@ -82,6 +83,34 @@ func NewClient(config *ClientConfig) *Client {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
+	}
+
+	if config.ClientName != "" {
+		err := db.SetClientName(config.ClientName)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err.Error())
+			os.Exit(1)
+		}
+	}
+
+	clientName, err := db.GetClientName()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+		os.Exit(1)
+	}
+
+	if clientName == "" {
+		clientName, err = os.Hostname()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err.Error())
+			os.Exit(1)
+		}
+
+		err := db.SetClientName(clientName)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err.Error())
+			os.Exit(1)
+		}
 	}
 
 	if dbServerUri != "" {

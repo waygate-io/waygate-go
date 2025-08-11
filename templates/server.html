@@ -24,6 +24,7 @@
 <table>
   <thead>
     <tr>
+      <td>Client</td>
       <td>Domain</td>
       <td>TLS Termination</td>
       <td>Use Proxy Protocol</td>
@@ -31,6 +32,9 @@
   </thead>
   {{range $tunnel := .Clients}}
   <tr>
+    <td>
+      {{$tunnel.ClientName}}
+    </td>
     <td>
       <a href='https://{{$tunnel.Domain}}' target='_blank'>{{$tunnel.Domain}}</a>
     </td>
@@ -53,12 +57,16 @@
     <tr>
       <td>Server Address</td>
       <td>Client</td>
+      <td>Client Domain</td>
     </tr>
   </thead>
   {{range $tunnel := .Tunnels}}
   <tr>
     <td>
       <a href='https://{{$tunnel.Address}}' target='_blank'>{{$tunnel.Address}}</a>
+    </td>
+    <td>
+      {{$tunnel.ClientName}}
     </td>
     <td>
       <a href='https://{{$tunnel.Client}}' target='_blank'>{{$tunnel.Client}}</a>

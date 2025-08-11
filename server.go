@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"sort"
 	//"net/url"
 	"strings"
 	"sync"
@@ -317,8 +318,9 @@ func (s *Server) Run() int {
 			clients[config.Domain] = config
 
 			tun := tunnel{
-				Address: addr,
-				Client:  config.Domain,
+				Address:    addr,
+				Client:     config.Domain,
+				ClientName: config.ClientName,
 			}
 
 			tuns = append(tuns, tun)
@@ -330,6 +332,13 @@ func (s *Server) Run() int {
 			io.WriteString(w, err.Error())
 			return
 		}
+
+		sort.Slice(tuns, func(i, j int) bool {
+			if tuns[i].ClientName == tuns[j].ClientName {
+				return tuns[i].Address < tuns[j].Address
+			}
+			return tuns[i].ClientName < tuns[j].ClientName
+		})
 
 		tmplData := struct {
 			Clients map[string]TunnelConfig

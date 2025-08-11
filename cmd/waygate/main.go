@@ -97,6 +97,7 @@ func runClient() {
 	dnsUserArg := flagSet.String("dns-user", "", "DNS User")
 	noBrowserArg := flagSet.Bool("no-browser", false, "Use OAuth2 device flow to get tokens")
 	acmeEmailArg := flagSet.String("acme-email", "", "ACME Email")
+	clientName := flagSet.String("client-name", "", "Client Name")
 	var tunnels arrayFlags
 	flagSet.Var(&tunnels, "tunnel", "Tunnels")
 
@@ -112,6 +113,7 @@ func runClient() {
 		DNSUser:     *dnsUserArg,
 		DNSToken:    *dnsTokenArg,
 		ACMEEmail:   *acmeEmailArg,
+		ClientName:  *clientName,
 	}
 
 	if *userArg != "" {

@@ -23,17 +23,20 @@ type TunnelRequest struct {
 	Token            string `json:"token"`
 	TerminationType  string `json:"termination_type"`
 	UseProxyProtocol bool   `json:"use_proxy_protocol"`
+	ClientName       string `json:"client_name"`
 }
 
 type TunnelConfig struct {
 	Domain           string `json:"domain"`
 	TerminationType  string `json:"termination_type"`
 	UseProxyProtocol bool   `json:"use_proxy_protocol"`
+	ClientName       string `json:"client_name"`
 }
 
 type tunnel struct {
-	Address string
-	Client  string
+	Address    string
+	Client     string
+	ClientName string
 }
 
 type httpError struct {
