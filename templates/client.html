@@ -22,48 +22,50 @@
 {{if .Tunnels}}
 <h2>Tunnels</h2>
 
-<table>
-  <thead>
+<div class='table-container'>
+  <table>
+    <thead>
+      <tr>
+        <td>Type</td>
+        <td>Server Address</td>
+        <td>Client Address</td>
+        <!--
+        <td>Protected</td>
+        <td>TLS Passthrough</td>
+        -->
+        <td>Actions</td>
+      </tr>
+    </thead>
+    {{range $tunnel := .Tunnels}}
     <tr>
-      <td>Type</td>
-      <td>Server Address</td>
-      <td>Client Address</td>
+      <td>
+        {{$tunnel.Type}}
+      </td>
+      <td>
+        <a href='https://{{$tunnel.ServerAddress}}' target='_blank'>{{$tunnel.ServerAddress}}</a>
+      </td>
+      <td>
+        {{$tunnel.ClientAddress}}
+      </td>
       <!--
-      <td>Protected</td>
-      <td>TLS Passthrough</td>
+      <td>
+        {{$tunnel.Protected}}
+      </td>
+      <td>
+        {{$tunnel.TLSPassthrough}}
+      </td>
       -->
-      <td>Actions</td>
+      <td>
+        <form action='/delete-tunnel' method='POST'>
+          <input type='hidden' name='type' value='{{$tunnel.Type}}' />
+          <input type='hidden' name='address' value='{{$tunnel.ServerAddress}}' />
+          <button>Delete</button>
+        </form>
+      </td>
     </tr>
-  </thead>
-  {{range $tunnel := .Tunnels}}
-  <tr>
-    <td>
-      {{$tunnel.Type}}
-    </td>
-    <td>
-      <a href='https://{{$tunnel.ServerAddress}}' target='_blank'>{{$tunnel.ServerAddress}}</a>
-    </td>
-    <td>
-      {{$tunnel.ClientAddress}}
-    </td>
-    <!--
-    <td>
-      {{$tunnel.Protected}}
-    </td>
-    <td>
-      {{$tunnel.TLSPassthrough}}
-    </td>
-    -->
-    <td>
-      <form action='/delete-tunnel' method='POST'>
-        <input type='hidden' name='type' value='{{$tunnel.Type}}' />
-        <input type='hidden' name='address' value='{{$tunnel.ServerAddress}}' />
-        <button>Delete</button>
-      </form>
-    </td>
-  </tr>
-  {{end}}
-</table>
+    {{end}}
+  </table>
+</div>
 {{end}}
 
 
