@@ -53,6 +53,11 @@ type Client struct {
 	eventCh     chan interface{}
 	tmpl        *template.Template
 	dnsProvider DNSProvider
+	certConfig  *certmagic.Config
+	certCache   *certmagic.Cache
+	acmeEmail   string
+	session     *ClientSession
+	tunMux      *ClientMux
 }
 
 func NewClient(config *ClientConfig) *Client {
@@ -144,19 +149,19 @@ func (c *Client) Run() error {
 	configCopy := c.config
 	db := c.db
 
-	acmeEmail, err := db.GetACMEEmail()
+	c.acmeEmail, err = db.GetACMEEmail()
 	exitOnError(err)
 
 	if configCopy.ACMEEmail != "" {
-		acmeEmail = configCopy.ACMEEmail
-		err = db.SetACMEEmail(acmeEmail)
+		c.acmeEmail = configCopy.ACMEEmail
+		err = db.SetACMEEmail(c.acmeEmail)
 		exitOnError(err)
 	}
 
 	for {
-		if acmeEmail == "" {
-			acmeEmail = prompt("Enter an email address for your Let's Encrypt account:\n")
-			err = db.SetACMEEmail(acmeEmail)
+		if c.acmeEmail == "" {
+			c.acmeEmail = prompt("Enter an email address for your Let's Encrypt account:\n")
+			err = db.SetACMEEmail(c.acmeEmail)
 			exitOnError(err)
 		} else {
 			break
@@ -194,7 +199,7 @@ func (c *Client) Run() error {
 		exitOnError(err)
 	}
 
-	certCache := createCertCache()
+	c.certCache = createCertCache()
 
 	// TODO: might be able to remove in favor of a more robust background
 	// cert system
@@ -203,7 +208,7 @@ func (c *Client) Run() error {
 		c.dnsProvider, err = getDnsProvider(configCopy.DNSProvider, configCopy.DNSToken, configCopy.DNSUser)
 		exitOnError(err)
 
-		certConfig, err := createDNSCertConfig(certCache, db.db.DB, acmeEmail, c.dnsProvider)
+		certConfig, err := createDNSCertConfig(c.certCache, db.db.DB, c.acmeEmail, c.dnsProvider)
 		exitOnError(err)
 
 		tunnels, err := db.GetTunnels()
@@ -218,7 +223,7 @@ func (c *Client) Run() error {
 		}
 	}
 
-	onDemandConfig, err := createOnDemandCertConfig(certCache, db.db.DB, "")
+	onDemandConfig, err := createOnDemandCertConfig(c.certCache, db.db.DB, "")
 	exitOnError(err)
 
 	token := c.config.Token
@@ -280,14 +285,14 @@ func (c *Client) Run() error {
 		fmt.Println(token)
 	}
 
-	certConfig, err := createNormalCertConfig(certCache, c.db.db.DB, acmeEmail)
+	c.certConfig, err = createNormalCertConfig(c.certCache, c.db.db.DB, c.acmeEmail)
 	exitOnError(err)
 
 	//disableOnDemand := true
 	disableOnDemand := false
 	if disableOnDemand {
 		if c.dnsProvider != nil {
-			certConfig, err = createDNSCertConfig(certCache, c.db.db.DB, acmeEmail, c.dnsProvider)
+			c.certConfig, err = createDNSCertConfig(c.certCache, c.db.db.DB, c.acmeEmail, c.dnsProvider)
 			if err != nil {
 				return err
 			}
@@ -296,7 +301,7 @@ func (c *Client) Run() error {
 		}
 	}
 
-	session, err := NewClientSession(token, c.db, onDemandConfig)
+	c.session, err = NewClientSession(token, c.db, onDemandConfig)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		// TODO: hacky to do this here
@@ -305,7 +310,7 @@ func (c *Client) Run() error {
 	}
 
 	//listener, err := Listen("tls", "tn7.org", ListenOptions{
-	listener, err := session.Listen("tls", "")
+	listener, err := c.session.Listen("tls", "")
 	if err != nil {
 		return err
 	}
@@ -315,7 +320,7 @@ func (c *Client) Run() error {
 	dashUri := "https://" + tunConfig.Domain
 
 	ctx := context.Background()
-	err = certConfig.ManageAsync(ctx, []string{tunConfig.Domain})
+	err = c.certConfig.ManageAsync(ctx, []string{tunConfig.Domain})
 	exitOnError(err)
 
 	redirUriCh <- dashUri
@@ -390,7 +395,7 @@ func (c *Client) Run() error {
 	//}()
 
 	mux := NewClientMux(authHandler /*gdServer,*/, c.db, adminID)
-	tunMux := NewClientMux(authHandler, c.db, adminID)
+	c.tunMux = NewClientMux(authHandler, c.db, adminID)
 
 	httpClient := &http.Client{
 		// Don't follow redirects
@@ -399,7 +404,7 @@ func (c *Client) Run() error {
 		},
 	}
 
-	tunMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	c.tunMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 
 		tunnel, err := c.db.GetTunnel(r.Host)
 		if err != nil {
@@ -576,7 +581,7 @@ func (c *Client) Run() error {
 			fqdn = fmt.Sprintf("%s.%s", host, domain)
 		}
 
-		certConfig, err = createDNSCertConfig(certCache, c.db.db.DB, acmeEmail, c.dnsProvider)
+		c.certConfig, err = createDNSCertConfig(c.certCache, c.db.db.DB, c.acmeEmail, c.dnsProvider)
 		if err != nil {
 			w.WriteHeader(500)
 			io.WriteString(w, err.Error())
@@ -584,7 +589,7 @@ func (c *Client) Run() error {
 		}
 
 		ctx := context.Background()
-		err = certConfig.ManageAsync(ctx, []string{fqdn, "*." + fqdn})
+		err = c.certConfig.ManageAsync(ctx, []string{fqdn, "*." + fqdn})
 		if err != nil {
 			w.WriteHeader(500)
 			io.WriteString(w, err.Error())
@@ -605,109 +610,19 @@ func (c *Client) Run() error {
 	})
 
 	mux.HandleFunc("/add-tunnel", func(w http.ResponseWriter, r *http.Request) {
+
 		r.ParseForm()
 
-		clientAddressArg := r.Form.Get("client_address")
-		if clientAddressArg == "" {
-			w.WriteHeader(400)
-			io.WriteString(w, "Missing client_address")
+		err := c.AddTunnel(r.Context(), r.Form)
+
+		if httpErr, ok := err.(*httpError); ok {
+			w.WriteHeader(httpErr.statusCode)
+			io.WriteString(w, httpErr.message)
 			return
-		}
-
-		clientPort := r.Form.Get("client_port")
-		if clientPort == "" {
-			w.WriteHeader(400)
-			io.WriteString(w, "Missing client_port")
-			return
-		}
-
-		clientAddress := fmt.Sprintf("%s:%s", clientAddressArg, clientPort)
-
-		protected := r.Form.Get("protected") == "on"
-		tlsPassthrough := r.Form.Get("tls_passthrough") == "on"
-		tunnelType := r.Form.Get("type")
-
-		if tunnelType != TunnelTypeHTTPS && tunnelType != TunnelTypeTLS && tunnelType != TunnelTypeTCP && tunnelType != TunnelTypeUDP {
-			w.WriteHeader(400)
-			io.WriteString(w, "Invalid 'type' parameter")
-			return
-		}
-
-		var serverAddress string
-		var tunDomain string
-		var tunHost string
-		if tunnelType == TunnelTypeHTTPS || tunnelType == TunnelTypeTLS {
-
-			tunDomain = r.Form.Get("domain")
-			if tunDomain == "" {
-				w.WriteHeader(400)
-				io.WriteString(w, "Missing domain param")
-				return
-			}
-
-			fqdn := tunDomain
-
-			tunHost = r.Form.Get("host")
-			if tunHost != "" {
-				fqdn = fmt.Sprintf("%s.%s", tunHost, tunDomain)
-			}
-
-			if c.dnsProvider != nil {
-				certConfig, err = createDNSCertConfig(certCache, c.db.db.DB, acmeEmail, c.dnsProvider)
-				if err != nil {
-					w.WriteHeader(500)
-					io.WriteString(w, err.Error())
-					return
-				}
-				err := certConfig.ManageAsync(context.Background(), []string{fqdn, "*." + fqdn})
-				if err != nil {
-					w.WriteHeader(500)
-					io.WriteString(w, err.Error())
-					return
-				}
-			}
-
-			serverAddress = fqdn
-		} else {
-			serverPort := r.Form.Get("server_port")
-			if serverPort == "" {
-				w.WriteHeader(400)
-				io.WriteString(w, "Missing server_port")
-				return
-			}
-
-			serverAddress = fmt.Sprintf("0.0.0.0:%s", serverPort)
-		}
-
-		tunnel := &ClientTunnel{
-			ServerAddress:  serverAddress,
-			ClientAddress:  clientAddress,
-			Protected:      protected,
-			Type:           tunnelType,
-			TLSPassthrough: tlsPassthrough,
-		}
-
-		err := c.db.SetTunnel(tunnel)
-		if err != nil {
+		} else if err != nil {
 			w.WriteHeader(500)
-			io.WriteString(w, err.Error())
+			io.WriteString(w, "/add-tunnel error")
 			return
-		}
-
-		serverTunnelDomain, err := openTunnel(session, tunMux, tunnel)
-		if err != nil {
-			w.WriteHeader(500)
-			io.WriteString(w, err.Error())
-			return
-		}
-
-		if serverTunnelDomain != "" && c.dnsProvider != nil {
-			err := pointDomainAtDomain(r.Context(), c.dnsProvider, tunHost, tunDomain, serverTunnelDomain)
-			if err != nil {
-				w.WriteHeader(500)
-				io.WriteString(w, err.Error())
-				return
-			}
 		}
 
 		http.Redirect(w, r, "/", 303)
@@ -800,14 +715,14 @@ func (c *Client) Run() error {
 	for _, tunnel := range tunnels {
 		printJson(tunnel)
 		go func() {
-			_, err = openTunnel(session, tunMux, tunnel)
+			_, err = openTunnel(c.session, c.tunMux, tunnel)
 			exitOnError(err)
 		}()
 	}
 
 	go func() {
 		for {
-			err := checkDomains(db, certCache)
+			err := checkDomains(db, c.certCache)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, err.Error())
 			}
@@ -854,6 +769,95 @@ func (c *Client) Run() error {
 			}
 		}
 	}()
+
+	return nil
+}
+
+func (c *Client) AddTunnel(ctx context.Context, params url.Values) error {
+
+	clientAddressArg := params.Get("client_address")
+	if clientAddressArg == "" {
+		return newHTTPError(400, "Missing client_address")
+	}
+
+	clientPort := params.Get("client_port")
+	if clientPort == "" {
+		return newHTTPError(400, "Missing client_port")
+	}
+
+	clientAddress := fmt.Sprintf("%s:%s", clientAddressArg, clientPort)
+
+	protected := params.Get("protected") == "on"
+	tlsPassthrough := params.Get("tls_passthrough") == "on"
+	tunnelType := params.Get("type")
+
+	if tunnelType != TunnelTypeHTTPS && tunnelType != TunnelTypeTLS && tunnelType != TunnelTypeTCP && tunnelType != TunnelTypeUDP {
+		return newHTTPError(400, "Invalid 'type' parameter")
+	}
+
+	var serverAddress string
+	var tunDomain string
+	var tunHost string
+	if tunnelType == TunnelTypeHTTPS || tunnelType == TunnelTypeTLS {
+
+		tunDomain = params.Get("domain")
+		if tunDomain == "" {
+			return newHTTPError(400, "Missing domain param")
+		}
+
+		fqdn := tunDomain
+
+		tunHost = params.Get("host")
+		if tunHost != "" {
+			fqdn = fmt.Sprintf("%s.%s", tunHost, tunDomain)
+		}
+
+		if c.dnsProvider != nil {
+			var err error
+			c.certConfig, err = createDNSCertConfig(c.certCache, c.db.db.DB, c.acmeEmail, c.dnsProvider)
+			if err != nil {
+				return newHTTPError(500, err.Error())
+			}
+			err = c.certConfig.ManageAsync(context.Background(), []string{fqdn, "*." + fqdn})
+			if err != nil {
+				return newHTTPError(500, err.Error())
+			}
+		}
+
+		serverAddress = fqdn
+	} else {
+		serverPort := params.Get("server_port")
+		if serverPort == "" {
+			return newHTTPError(400, "Missing server_port")
+		}
+
+		serverAddress = fmt.Sprintf("0.0.0.0:%s", serverPort)
+	}
+
+	tunnel := &ClientTunnel{
+		ServerAddress:  serverAddress,
+		ClientAddress:  clientAddress,
+		Protected:      protected,
+		Type:           tunnelType,
+		TLSPassthrough: tlsPassthrough,
+	}
+
+	err := c.db.SetTunnel(tunnel)
+	if err != nil {
+		return newHTTPError(500, err.Error())
+	}
+
+	serverTunnelDomain, err := openTunnel(c.session, c.tunMux, tunnel)
+	if err != nil {
+		return newHTTPError(500, err.Error())
+	}
+
+	if serverTunnelDomain != "" && c.dnsProvider != nil {
+		err := pointDomainAtDomain(ctx, c.dnsProvider, tunHost, tunDomain, serverTunnelDomain)
+		if err != nil {
+			return newHTTPError(500, err.Error())
+		}
+	}
 
 	return nil
 }
