@@ -781,6 +781,14 @@ func (c *Client) DeleteTunnel(tunType TunnelType, addr string) error {
 	return c.db.DeleteTunnel(tunType, addr)
 }
 
+func (c *Client) GetDomains() ([]Domain, error) {
+	return c.db.GetDomains()
+}
+
+func (c *Client) DeleteDomain(domain string) error {
+	return c.db.DeleteDomain(domain)
+}
+
 func (c *Client) AddTunnel(ctx context.Context, params url.Values) error {
 
 	clientAddressArg := params.Get("client_address")
