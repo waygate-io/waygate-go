@@ -19,11 +19,11 @@ const DomainStatusPending = "Pending"
 const DomainStatusReady = "Ready"
 
 type ClientTunnel struct {
-	ServerAddress  string `db:"server_address"`
-	ClientAddress  string `db:"client_address"`
-	Protected      bool   `db:"protected"`
-	Type           string `db:"type"`
-	TLSPassthrough bool   `db:"tls_passthrough"`
+	ServerAddress  string     `db:"server_address"`
+	ClientAddress  string     `db:"client_address"`
+	Protected      bool       `db:"protected"`
+	Type           TunnelType `db:"type"`
+	TLSPassthrough bool       `db:"tls_passthrough"`
 }
 
 type Database interface {

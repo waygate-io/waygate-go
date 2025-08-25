@@ -773,6 +773,14 @@ func (c *Client) Run() error {
 	return nil
 }
 
+func (c *Client) GetTunnels() ([]*ClientTunnel, error) {
+	return c.db.GetTunnels()
+}
+
+func (c *Client) DeleteTunnel(tunType TunnelType, addr string) error {
+	return c.db.DeleteTunnel(tunType, addr)
+}
+
 func (c *Client) AddTunnel(ctx context.Context, params url.Values) error {
 
 	clientAddressArg := params.Get("client_address")
@@ -789,7 +797,7 @@ func (c *Client) AddTunnel(ctx context.Context, params url.Values) error {
 
 	protected := params.Get("protected") == "on"
 	tlsPassthrough := params.Get("tls_passthrough") == "on"
-	tunnelType := params.Get("type")
+	tunnelType := TunnelType(params.Get("type"))
 
 	if tunnelType != TunnelTypeHTTPS && tunnelType != TunnelTypeTLS && tunnelType != TunnelTypeTCP && tunnelType != TunnelTypeUDP {
 		return newHTTPError(400, "Invalid 'type' parameter")
