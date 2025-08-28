@@ -31,6 +31,8 @@ const TunnelTypeTLS = "TLS"
 const TunnelTypeTCP = "TCP"
 const TunnelTypeUDP = "UDP"
 
+const authPrefix = "/waygate-auth"
+
 var WaygateServerDomain string = "waygate.io"
 
 type ClientConfig struct {
@@ -327,8 +329,6 @@ func (c *Client) Run() error {
 	}
 
 	redirUriCh <- dashUri
-
-	authPrefix := "/auth"
 
 	kvStore, err := decentauth.NewSqliteKvStore(&decentauth.SqliteKvOptions{
 		Db:        db.db.DB,
@@ -930,8 +930,6 @@ func (m *ClientMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	//w.Header().Set("Referrer-Policy", "no-referrer")
 
 	host := r.Host
-
-	authPrefix := "/auth"
 
 	//if host == m.fileServer.FsDomain() {
 	//	m.fileServer.ServeHTTP(w, r)
