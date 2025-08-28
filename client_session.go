@@ -30,7 +30,7 @@ type ClientSession struct {
 	mut            *sync.Mutex
 }
 
-func NewClientSession(token string, db *ClientDatabase, certConfig *certmagic.Config) (*ClientSession, error) {
+func NewClientSession(token string, db *ClientDatabase, certConfig *certmagic.Config, terminationType TerminationType) (*ClientSession, error) {
 
 	var s *ClientSession
 
@@ -52,9 +52,8 @@ func NewClientSession(token string, db *ClientDatabase, certConfig *certmagic.Co
 	}
 
 	tunReq := TunnelRequest{
-		Token:           token,
-		TerminationType: "client",
-		//TerminationType:  "server",
+		Token:            token,
+		TerminationType:  string(terminationType),
 		UseProxyProtocol: true,
 		ClientName:       clientName,
 	}
@@ -215,7 +214,7 @@ func (s *ClientSession) handleStream(downstreamConn connCloseWriter) {
 	// TerminationType should probably be a per-listen setting, instead
 	// of per-tunnel
 	// TODO: still some stuff here that might should be mutexed
-	if s.tlsTermination == "client" && !listener.tlsPassthrough && serverName != "" {
+	if s.tlsTermination == TerminationTypeClient && !listener.tlsPassthrough && serverName != "" {
 		tlsConn := tls.Server(conn, s.tlsConfig)
 		err := tlsConn.Handshake()
 		if err != nil {
@@ -414,51 +413,52 @@ func (l *Listener) Close() error {
 func (l *Listener) GetTunnelConfig() TunnelConfig {
 	return l.tunnel.GetConfig()
 }
-func DialUDP(network string, udpAddr *net.UDPAddr) (*UDPConn, error) {
-	s, err := NewClientSession(DefaultToken, nil, nil)
-	if err != nil {
-		return nil, err
-	}
 
-	return s.DialUDP(network, udpAddr)
-}
-func ListenUDP(network string, udpAddr *net.UDPAddr) (*UDPConn, error) {
-
-	//address := fmt.Sprintf("%s:%d", udpAddr.IP, udpAddr.Port)
-
-	s, err := NewClientSession(DefaultToken, nil, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return s.ListenUDP(network, udpAddr)
-}
-func Listen(network, address string, opts ...ListenOptions) (*Listener, error) {
-
-	token := DefaultToken
-	var db *ClientDatabase
-
-	if len(opts) > 0 {
-		token = opts[0].Token
-		db = opts[0].Db
-	}
-
-	s, err := NewClientSession(token, db, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return s.Listen(network, address)
-}
-func ListenWithOpts(network, address, token string, db *ClientDatabase) (*Listener, error) {
-
-	s, err := NewClientSession(token, db, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return s.Listen(network, address)
-}
+//func DialUDP(network string, udpAddr *net.UDPAddr) (*UDPConn, error) {
+//	s, err := NewClientSession(DefaultToken, nil, nil)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	return s.DialUDP(network, udpAddr)
+//}
+//func ListenUDP(network string, udpAddr *net.UDPAddr) (*UDPConn, error) {
+//
+//	//address := fmt.Sprintf("%s:%d", udpAddr.IP, udpAddr.Port)
+//
+//	s, err := NewClientSession(DefaultToken, nil, nil)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	return s.ListenUDP(network, udpAddr)
+//}
+//func Listen(network, address string, opts ...ListenOptions) (*Listener, error) {
+//
+//	token := DefaultToken
+//	var db *ClientDatabase
+//
+//	if len(opts) > 0 {
+//		token = opts[0].Token
+//		db = opts[0].Db
+//	}
+//
+//	s, err := NewClientSession(token, db, nil)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	return s.Listen(network, address)
+//}
+//func ListenWithOpts(network, address, token string, db *ClientDatabase) (*Listener, error) {
+//
+//	s, err := NewClientSession(token, db, nil)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	return s.Listen(network, address)
+//}
 
 type UDPConn struct {
 	recvCh    chan datagram

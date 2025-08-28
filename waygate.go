@@ -19,6 +19,11 @@ const (
 	MessageTypeError
 )
 
+type TerminationType string
+
+const TerminationTypeClient = "client"
+const TerminationTypeServer = "server"
+
 type TunnelRequest struct {
 	Token            string `json:"token"`
 	TerminationType  string `json:"termination_type"`

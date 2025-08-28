@@ -34,17 +34,18 @@ const TunnelTypeUDP = "UDP"
 var WaygateServerDomain string = "waygate.io"
 
 type ClientConfig struct {
-	Users       []string
-	ServerURI   string
-	Token       string
-	Dir         string
-	Public      bool
-	NoBrowser   bool
-	DNSProvider string
-	DNSUser     string
-	DNSToken    string
-	ACMEEmail   string
-	ClientName  string
+	Users           []string
+	ServerURI       string
+	Token           string
+	Dir             string
+	Public          bool
+	NoBrowser       bool
+	DNSProvider     string
+	DNSUser         string
+	DNSToken        string
+	ACMEEmail       string
+	ClientName      string
+	TerminationType TerminationType
 }
 
 type Client struct {
@@ -301,7 +302,7 @@ func (c *Client) Run() error {
 		}
 	}
 
-	c.session, err = NewClientSession(token, c.db, onDemandConfig)
+	c.session, err = NewClientSession(token, c.db, onDemandConfig, c.config.TerminationType)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		// TODO: hacky to do this here
@@ -319,9 +320,11 @@ func (c *Client) Run() error {
 
 	dashUri := "https://" + tunConfig.Domain
 
-	ctx := context.Background()
-	err = c.certConfig.ManageAsync(ctx, []string{tunConfig.Domain})
-	exitOnError(err)
+	if tunConfig.TerminationType == TerminationTypeClient {
+		ctx := context.Background()
+		err = c.certConfig.ManageAsync(ctx, []string{tunConfig.Domain})
+		exitOnError(err)
+	}
 
 	redirUriCh <- dashUri
 
@@ -720,15 +723,16 @@ func (c *Client) Run() error {
 		}()
 	}
 
-	go func() {
-		for {
-			err := checkDomains(db, c.certCache)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, err.Error())
-			}
-			time.Sleep(5 * time.Second)
-		}
-	}()
+	// TODO: probably need to re-enable at some point
+	//go func() {
+	//	for {
+	//		err := checkDomains(db, c.certCache)
+	//		if err != nil {
+	//			fmt.Fprintf(os.Stderr, err.Error())
+	//		}
+	//		time.Sleep(5 * time.Second)
+	//	}
+	//}()
 
 	go func() {
 		err = httpServer.Serve(listener)
