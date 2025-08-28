@@ -98,6 +98,7 @@ func runClient() {
 	noBrowserArg := flagSet.Bool("no-browser", false, "Use OAuth2 device flow to get tokens")
 	acmeEmailArg := flagSet.String("acme-email", "", "ACME Email")
 	clientName := flagSet.String("client-name", "", "Client Name")
+	terminationType := flagSet.String("tls-termination-type", waygate.TerminationTypeClient, "TLS termination client/server")
 	var tunnels arrayFlags
 	flagSet.Var(&tunnels, "tunnel", "Tunnels")
 
@@ -106,14 +107,15 @@ func runClient() {
 	flagSet.Parse(os.Args[2:])
 
 	config := &waygate.ClientConfig{
-		ServerURI:   *serverURIArg,
-		Token:       *tokenArg,
-		NoBrowser:   *noBrowserArg,
-		DNSProvider: *dnsProviderArg,
-		DNSUser:     *dnsUserArg,
-		DNSToken:    *dnsTokenArg,
-		ACMEEmail:   *acmeEmailArg,
-		ClientName:  *clientName,
+		ServerURI:       *serverURIArg,
+		Token:           *tokenArg,
+		NoBrowser:       *noBrowserArg,
+		DNSProvider:     *dnsProviderArg,
+		DNSUser:         *dnsUserArg,
+		DNSToken:        *dnsTokenArg,
+		ACMEEmail:       *acmeEmailArg,
+		ClientName:      *clientName,
+		TerminationType: waygate.TerminationType(*terminationType),
 	}
 
 	if *userArg != "" {
