@@ -724,13 +724,14 @@ func (s *Server) Run() int {
 	}
 
 	ctx := context.Background()
-	//adminDomains := []string{s.config.Domain, "*." + s.config.Domain}
-	//challengeDomains := []string{}
-	//for _, dom := range s.config.TunnelDomains {
-	//	challengeDomains = append(challengeDomains, "*."+dom)
-	//}
-	//err = certConfig.ManageSync(ctx, append(adminDomains, challengeDomains...))
 	certDomains := []string{dashboardDomain}
+
+	if s.config.DnsProvider != "" {
+		for _, dom := range s.config.TunnelDomains {
+			certDomains = append(certDomains, "*."+dom)
+		}
+	}
+
 	err = certConfig.ManageSync(ctx, certDomains)
 	exitOnError(err)
 
