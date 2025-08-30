@@ -7,6 +7,19 @@ import (
 	"net/http"
 )
 
+type flushWriter struct {
+	w http.ResponseWriter
+	f http.Flusher
+}
+
+func (fw *flushWriter) Write(p []byte) (int, error) {
+	n, err := fw.w.Write(p)
+	if err == nil {
+		fw.f.Flush()
+	}
+	return n, err
+}
+
 func proxyHttp(w http.ResponseWriter, r *http.Request, httpClient *http.Client, upstreamAddr string, behindProxy bool) {
 
 	downstreamReqHeaders := r.Header.Clone()
@@ -81,8 +94,23 @@ func proxyHttp(w http.ResponseWriter, r *http.Request, httpClient *http.Client, 
 		downstreamResHeaders[k] = v
 	}
 
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+		return
+	}
+
+	// Wrap writer so it flushes after every write.
+	// TODO: this sends small messages with minimal latency, but will
+	// likely reduce performance for high thoughput streaming. Eventually
+	// we probably want something like Nagle's algorithm, where if big
+	// chunks are coming through we buffer them (with a timeout so they
+	// don't sit around forever, but if chunks are small we send them right
+	// away.
+	fw := &flushWriter{w: w, f: flusher}
+
 	w.WriteHeader(upstreamRes.StatusCode)
-	io.Copy(w, upstreamRes.Body)
+	io.Copy(fw, upstreamRes.Body)
 }
 
 //// Need to strip out headers that shouldn't be forwarded from HTTP/1.1 to
