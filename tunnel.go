@@ -198,10 +198,13 @@ func processRequest(tunnelReq TunnelRequest, tunnelDomains []string, jose *josen
 		host = "debug"
 	} else {
 		var err error
-		host, err = genRandomText(8)
+
+		nameGen, err := NewNameGenerator()
 		if err != nil {
 			return nil, err
 		}
+
+		host = nameGen.GenerateName()
 	}
 
 	var domain string

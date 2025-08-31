@@ -2,7 +2,6 @@ package waygate
 
 import (
 	"context"
-	"embed"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -16,9 +15,6 @@ import (
 	"github.com/mdp/qrterminal/v3"
 	"github.com/waygate-io/waygate-go/josencillo"
 )
-
-//go:embed templates
-var fs embed.FS
 
 type OAuth2Handler struct {
 	mux *http.ServeMux

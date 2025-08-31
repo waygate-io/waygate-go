@@ -1,8 +1,12 @@
 package waygate
 
 import (
+	"embed"
 	"fmt"
 )
+
+//go:embed templates names/names.json
+var fs embed.FS
 
 type MessageType uint8
 
