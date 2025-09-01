@@ -33,7 +33,7 @@ const TunnelTypeUDP = "UDP"
 
 const authPrefix = "/waygate-auth"
 
-var WaygateServerDomain string = "waygate.io"
+var WaygateServerDomain string = "wg8.org"
 
 type ClientConfig struct {
 	Users           []string
