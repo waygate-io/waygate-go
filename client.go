@@ -66,59 +66,35 @@ type Client struct {
 func NewClient(config *ClientConfig) *Client {
 
 	db, err := NewClientDatabase("waygate_client_db.sqlite3")
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err.Error())
-		os.Exit(1)
-	}
+	exitOnError(err)
 
 	tmpl, err := template.ParseFS(fs, "templates/*")
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err.Error())
-		os.Exit(1)
-	}
+	exitOnError(err)
 
 	configCopy := *config
 
 	if configCopy.ServerURI != "" && configCopy.ServerURI != WaygateServerDomain {
 		err := db.SetServerUri(configCopy.ServerURI)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err.Error())
-			os.Exit(1)
-		}
+		exitOnError(err)
 	}
 
 	dbServerUri, err := db.GetServerUri()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err.Error())
-		os.Exit(1)
-	}
+	exitOnError(err)
 
 	if config.ClientName != "" {
 		err := db.SetClientName(config.ClientName)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err.Error())
-			os.Exit(1)
-		}
+		exitOnError(err)
 	}
 
 	clientName, err := db.GetClientName()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err.Error())
-		os.Exit(1)
-	}
+	exitOnError(err)
 
 	if clientName == "" {
 		clientName, err = os.Hostname()
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err.Error())
-			os.Exit(1)
-		}
+		exitOnError(err)
 
 		err := db.SetClientName(clientName)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err.Error())
-			os.Exit(1)
-		}
+		exitOnError(err)
 	}
 
 	if dbServerUri != "" {
