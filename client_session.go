@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -21,7 +20,8 @@ const PROXY_PROTO_SERVER_NAME_OFFSET = PROXY_PROTO_PP2_TYPE_MIN_CUSTOM + 0
 const ListenerDefaultKey = "default-listener"
 
 type ClientSession struct {
-	tunnel Tunnel
+	DoneChan chan int
+	tunnel   Tunnel
 	//tunnel         *WebTransportTunnel
 	tlsConfig      *tls.Config
 	tlsTermination string
@@ -82,6 +82,7 @@ func NewClientSession(token string, db *ClientDatabase, certConfig *certmagic.Co
 	}
 
 	s = &ClientSession{
+		DoneChan:       make(chan int),
 		tunnel:         tunnel,
 		tlsConfig:      tlsConfig,
 		tlsTermination: tunnel.GetConfig().TerminationType,
@@ -149,7 +150,7 @@ func (s *ClientSession) start() {
 			}()
 		}
 
-		os.Exit(64)
+		s.DoneChan <- 64
 	}()
 }
 

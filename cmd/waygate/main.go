@@ -152,6 +152,9 @@ func runClient() {
 		switch evt := event.(type) {
 		case waygate.OAuth2AuthUriEvent:
 			fmt.Println(evt.Uri)
+		case waygate.ErrorEvent:
+			fmt.Println("ErrorEvent received. Exiting...")
+			os.Exit(evt.Code)
 		}
 	}
 }

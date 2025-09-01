@@ -288,6 +288,15 @@ func (c *Client) Run() error {
 		return err
 	}
 
+	go func() {
+		code := <-c.session.DoneChan
+		if c.eventCh != nil {
+			c.eventCh <- ErrorEvent{
+				Code: code,
+			}
+		}
+	}()
+
 	//listener, err := Listen("tls", "tn7.org", ListenOptions{
 	listener, err := c.session.Listen("tls", "")
 	if err != nil {
@@ -718,11 +727,23 @@ func (c *Client) Run() error {
 
 		switch exitReason {
 		case "restart":
-			os.Exit(64)
+			if c.eventCh != nil {
+				c.eventCh <- ErrorEvent{
+					Code: 64,
+				}
+			}
 		case "shutdown":
-			os.Exit(0)
+			if c.eventCh != nil {
+				c.eventCh <- ErrorEvent{
+					Code: 0,
+				}
+			}
 		default:
-			os.Exit(0)
+			if c.eventCh != nil {
+				c.eventCh <- ErrorEvent{
+					Code: 0,
+				}
+			}
 		}
 	}()
 
@@ -741,11 +762,19 @@ func (c *Client) Run() error {
 
 			res, err := httpClient.Get(dashUri + "/check")
 			if err != nil {
-				os.Exit(64)
+				if c.eventCh != nil {
+					c.eventCh <- ErrorEvent{
+						Code: 64,
+					}
+				}
 			}
 
 			if res.StatusCode != 200 {
-				os.Exit(65)
+				if c.eventCh != nil {
+					c.eventCh <- ErrorEvent{
+						Code: 65,
+					}
+				}
 			}
 		}
 	}()
@@ -872,6 +901,10 @@ type TunnelConnectedEvent struct {
 
 type OAuth2AuthUriEvent struct {
 	Uri string
+}
+
+type ErrorEvent struct {
+	Code int
 }
 
 type ClientMux struct {
