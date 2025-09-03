@@ -61,6 +61,7 @@ type Client struct {
 	acmeEmail   string
 	session     *ClientSession
 	tunMux      *ClientMux
+	authHandler *decentauth.Handler
 }
 
 func NewClient(config *ClientConfig) *Client {
@@ -351,6 +352,8 @@ func (c *Client) Run() error {
 		},
 	})
 	exitOnError(err)
+
+	c.authHandler = authHandler
 
 	// TODO: consider re-enabling GemDrive
 	//filesDomain := "files." + tunConfig.Domain
@@ -889,6 +892,21 @@ func (c *Client) AddTunnel(ctx context.Context, params url.Values) error {
 
 func (c *Client) SetTunnel(tunnel *ClientTunnel) error {
 	return c.db.SetTunnel(tunnel)
+}
+
+func (c *Client) CreateSession(id string) (code string, err error) {
+	res, err := c.authHandler.CreateSession(decentauth.CreateSessionRequest{
+		Id:     id,
+		IdType: decentauth.IDTypeEmail,
+	})
+
+	if err != nil {
+		return
+	}
+
+	code = res.Code
+
+	return
 }
 
 //type UsersUpdatedEvent struct {
