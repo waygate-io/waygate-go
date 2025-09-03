@@ -138,15 +138,15 @@ func (c *Client) Run() error {
 		exitOnError(err)
 	}
 
-	for {
-		if c.acmeEmail == "" {
-			c.acmeEmail = prompt("Enter an email address for your Let's Encrypt account:\n")
-			err = db.SetACMEEmail(c.acmeEmail)
-			exitOnError(err)
-		} else {
-			break
-		}
-	}
+	//for {
+	//	if c.acmeEmail == "" {
+	//		c.acmeEmail = prompt("Enter an email address for your Let's Encrypt account:\n")
+	//		err = db.SetACMEEmail(c.acmeEmail)
+	//		exitOnError(err)
+	//	} else {
+	//		break
+	//	}
+	//}
 
 	// Use random unprivileged port for ACME challenges. This is necessary
 	// because of the way certmagic works, in that if it fails to bind
