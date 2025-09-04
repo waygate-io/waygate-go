@@ -2,8 +2,9 @@ module github.com/waygate-io/waygate-go
 
 go 1.24.1
 
-replace github.com/lastlogin-net/decent-auth-go => ../decent-auth-go
-replace github.com/lastlogin-net/decent-auth-build => ../decent-auth-build
+//replace github.com/lastlogin-net/decent-auth-go => ../decent-auth-go
+
+//replace github.com/lastlogin-net/decent-auth-build => ../decent-auth-build
 
 //replace github.com/omnistreams/omnistreams-go => ../omnistreams-go
 
@@ -24,7 +25,7 @@ require (
 	github.com/anderspitman/reanimator-go v0.0.0-20250417150941-e646c05959ad
 	github.com/caddyserver/certmagic v0.22.0
 	github.com/jmoiron/sqlx v1.3.5
-	github.com/lastlogin-net/decent-auth-go v0.0.0-20250408135734-dc76b8feb9fd
+	github.com/lastlogin-net/decent-auth-go v0.0.0-20250904173551-cc123f5587e6
 	github.com/lestrrat-go/jwx/v2 v2.1.4
 	github.com/libdns/libdns v0.2.3
 	github.com/libdns/namedotcom v0.3.4-0.20241104014758-c641e4a2a4c9
@@ -66,7 +67,7 @@ require (
 	github.com/google/pprof v0.0.0-20241210010833-40e02aabc2ad // indirect
 	github.com/ianlancetaylor/demangle v0.0.0-20240805132620-81f5be970eca // indirect
 	github.com/klauspost/cpuid/v2 v2.2.10 // indirect
-	github.com/lastlogin-net/decent-auth-build v0.0.0-20250408135533-7a6070c673e3 // indirect
+	github.com/lastlogin-net/decent-auth-build v0.0.0-20250904173141-3ee6bb444f9a // indirect
 	github.com/lestrrat-go/blackmagic v1.0.2 // indirect
 	github.com/lestrrat-go/httpcc v1.0.1 // indirect
 	github.com/lestrrat-go/httprc v1.0.6 // indirect
