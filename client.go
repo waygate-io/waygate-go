@@ -64,6 +64,26 @@ type Client struct {
 	authHandler *decentauth.Handler
 }
 
+type responseWrapper struct {
+	wrapped http.ResponseWriter
+	success *bool
+}
+
+func (w responseWrapper) Header() http.Header {
+	return w.wrapped.Header()
+}
+func (w responseWrapper) Write(d []byte) (int, error) {
+	return w.wrapped.Write(d)
+}
+func (w responseWrapper) WriteHeader(code int) {
+	if code <= 399 {
+		*w.success = true
+	} else {
+		fmt.Println("code", code)
+	}
+	w.wrapped.WriteHeader(code)
+}
+
 func NewClient(config *ClientConfig) *Client {
 
 	db, err := NewClientDatabase("waygate_client_db.sqlite3")
@@ -401,6 +421,25 @@ func (c *Client) Run() error {
 		if err != nil {
 			w.WriteHeader(500)
 			io.WriteString(w, err.Error())
+			return
+		}
+
+		// TODO: feels hacky having this check here and in ClientMux.ServeHTTP
+		key := r.URL.Query().Get("k")
+
+		if key != "" {
+			var success bool
+			wrapper := responseWrapper{
+				wrapped: w,
+				success: &success,
+			}
+			authHandler.ServeHTTP(wrapper, r)
+
+			fmt.Println(success, c.eventCh)
+			if success && c.eventCh != nil {
+				c.eventCh <- SessionCreatedEvent{}
+			}
+
 			return
 		}
 
@@ -921,6 +960,9 @@ type OAuth2AuthUriEvent struct {
 	Uri string
 }
 
+type SessionCreatedEvent struct {
+}
+
 type ErrorEvent struct {
 	Code int
 }
@@ -955,6 +997,13 @@ func (s *ClientMux) HandleFunc(p string, f func(w http.ResponseWriter, r *http.R
 func (m *ClientMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	//w.Header().Set("Content-Security-Policy", "frame-ancestors 'none'; script-src 'none'")
 	//w.Header().Set("Referrer-Policy", "no-referrer")
+
+	key := r.URL.Query().Get("k")
+
+	if key != "" {
+		m.mux.ServeHTTP(w, r)
+		return
+	}
 
 	host := r.Host
 
