@@ -449,7 +449,7 @@ func (c *Client) Run() error {
 			return
 		}
 
-		proxyHttp(w, r, httpClient, tunnel.ClientAddress, false)
+		ProxyHttp(w, r, httpClient, tunnel.ClientAddress, false)
 	})
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

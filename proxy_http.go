@@ -20,7 +20,7 @@ func (fw *flushWriter) Write(p []byte) (int, error) {
 	return n, err
 }
 
-func proxyHttp(w http.ResponseWriter, r *http.Request, httpClient *http.Client, upstreamAddr string, behindProxy bool) {
+func ProxyHttp(w http.ResponseWriter, r *http.Request, httpClient *http.Client, upstreamAddr string, behindProxy bool) {
 
 	downstreamReqHeaders := r.Header.Clone()
 
