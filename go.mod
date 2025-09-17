@@ -67,7 +67,7 @@ require (
 	github.com/google/pprof v0.0.0-20241210010833-40e02aabc2ad // indirect
 	github.com/ianlancetaylor/demangle v0.0.0-20240805132620-81f5be970eca // indirect
 	github.com/klauspost/cpuid/v2 v2.2.10 // indirect
-	github.com/lastlogin-net/decent-auth-build v0.0.0-20250904173141-3ee6bb444f9a // indirect
+	github.com/lastlogin-net/decent-auth-build v0.0.0-20250917165336-0c82e8a9d03f // indirect
 	github.com/lestrrat-go/blackmagic v1.0.2 // indirect
 	github.com/lestrrat-go/httpcc v1.0.1 // indirect
 	github.com/lestrrat-go/httprc v1.0.6 // indirect

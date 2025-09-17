@@ -80,6 +80,10 @@ github.com/klauspost/cpuid/v2 v2.2.10 h1:tBs3QSyvjDyFTq3uoc/9xFpCuOsJQFNPiAhYdw2
 github.com/klauspost/cpuid/v2 v2.2.10/go.mod h1:hqwkgyIinND0mEev00jJYCxPNVRVXFQeu1XKlok6oO0=
 github.com/lastlogin-net/decent-auth-build v0.0.0-20250904173141-3ee6bb444f9a h1:q96NObEK6vSw8M3A0u2bXG9uoJ2ihfPTVVxLnAR32KA=
 github.com/lastlogin-net/decent-auth-build v0.0.0-20250904173141-3ee6bb444f9a/go.mod h1:JUUikq2P0tUaEjw7nUjCVLYvJpUPeDazP6s2/SVsLSo=
+github.com/lastlogin-net/decent-auth-build v0.0.0-20250907020049-4dbb32e91166 h1:75edZzKKsiAk3OubWY0p54n6I1H40LXdM+T9jHBXEt4=
+github.com/lastlogin-net/decent-auth-build v0.0.0-20250907020049-4dbb32e91166/go.mod h1:JUUikq2P0tUaEjw7nUjCVLYvJpUPeDazP6s2/SVsLSo=
+github.com/lastlogin-net/decent-auth-build v0.0.0-20250917165336-0c82e8a9d03f h1:kQhCJs4h3yT7J05X/0NMm75cUBuRj2u0FogS8Uz3JSs=
+github.com/lastlogin-net/decent-auth-build v0.0.0-20250917165336-0c82e8a9d03f/go.mod h1:JUUikq2P0tUaEjw7nUjCVLYvJpUPeDazP6s2/SVsLSo=
 github.com/lastlogin-net/decent-auth-go v0.0.0-20250901202107-6a33d3e73953 h1:kV1g7+ezzCZiE0wDPnymhsgDJXAp02ocAzeO0W6QMAo=
 github.com/lastlogin-net/decent-auth-go v0.0.0-20250901202107-6a33d3e73953/go.mod h1:Jz0ihwgUevJtFVUbOoYDFT4hwjbryMCVai5TwThYq9g=
 github.com/lastlogin-net/decent-auth-go v0.0.0-20250904173551-cc123f5587e6 h1:h+WYaSyEcLaRf2kAM25d5Xda2t4JN3u1xkDN+0XNdq4=
