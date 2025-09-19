@@ -99,6 +99,7 @@ func runClient() {
 	acmeEmailArg := flagSet.String("acme-email", "", "ACME Email")
 	clientName := flagSet.String("client-name", "", "Client Name")
 	terminationType := flagSet.String("tls-termination-type", waygate.TerminationTypeClient, "TLS termination client/server")
+	public := flagSet.Bool("public", false, "Create tunnels for unauthenticated clients")
 	var tunnels arrayFlags
 	flagSet.Var(&tunnels, "tunnel", "Tunnels")
 
@@ -116,6 +117,7 @@ func runClient() {
 		ACMEEmail:       *acmeEmailArg,
 		ClientName:      *clientName,
 		TerminationType: waygate.TerminationType(*terminationType),
+		Public:          *public,
 	}
 
 	if *userArg != "" {
