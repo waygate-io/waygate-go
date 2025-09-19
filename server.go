@@ -739,7 +739,7 @@ func (s *Server) Run() int {
 	// updated the serverURI at runtime. Need to implement that
 	serverUri := "https://" + dashboardDomain
 	oauth2Prefix := "/oauth2"
-	oauth2Handler := NewOAuth2Handler(db, serverUri, oauth2Prefix, s.jose, tmpl)
+	oauth2Handler := NewOAuth2Handler(db, serverUri, oauth2Prefix, s.jose, tmpl, authHandler)
 	mux.Handle(oauth2Prefix+"/", http.StripPrefix(oauth2Prefix, oauth2Handler))
 
 	dashURL := fmt.Sprintf("https://%s", dashboardDomain)

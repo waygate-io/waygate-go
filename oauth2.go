@@ -12,6 +12,7 @@ import (
 	"time"
 
 	oauth "github.com/anderspitman/little-oauth2-go"
+	"github.com/lastlogin-net/decent-auth-go"
 	"github.com/mdp/qrterminal/v3"
 	"github.com/waygate-io/waygate-go/josencillo"
 )
@@ -20,7 +21,7 @@ type OAuth2Handler struct {
 	mux *http.ServeMux
 }
 
-func NewOAuth2Handler(db *ServerDatabase, serverUri, prefix string, jose *josencillo.JOSE, tmpl *template.Template) *OAuth2Handler {
+func NewOAuth2Handler(db *ServerDatabase, serverUri, prefix string, jose *josencillo.JOSE, tmpl *template.Template, authHandler *decentauth.Handler) *OAuth2Handler {
 
 	mux := http.NewServeMux()
 
@@ -75,11 +76,17 @@ func NewOAuth2Handler(db *ServerDatabase, serverUri, prefix string, jose *josenc
 
 		domain := randomHost + "." + serverHost
 
+		session := authHandler.GetSession(r)
+		if session == nil {
+			http.Error(w, "No session", 401)
+		}
+
 		issuedAt := time.Now().UTC()
 		accessTokenJwt, err := jose.NewJWT(map[string]interface{}{
-			"iat":    issuedAt,
-			"type":   "access_token",
-			"domain": domain,
+			"iat":     issuedAt,
+			"type":    "access_token",
+			"domain":  domain,
+			"user_id": session.Id,
 		})
 
 		tokenRes := &oauth.TokenResponse{
@@ -197,13 +204,19 @@ func NewOAuth2Handler(db *ServerDatabase, serverUri, prefix string, jose *josenc
 			return
 		}
 
+		session := authHandler.GetSession(r)
+		if session == nil {
+			http.Error(w, "No session", 401)
+		}
+
 		domain := randomHost + "." + serverHost
 
 		issuedAt := time.Now().UTC()
 		codeJwt, err := jose.NewJWT(map[string]interface{}{
-			"iat":    issuedAt,
-			"type":   "code",
-			"domain": domain,
+			"iat":     issuedAt,
+			"type":    "code",
+			"domain":  domain,
+			"user_id": session.Id,
 		})
 		if err != nil {
 			w.WriteHeader(500)
@@ -246,9 +259,10 @@ func NewOAuth2Handler(db *ServerDatabase, serverUri, prefix string, jose *josenc
 
 		issuedAt := time.Now().UTC()
 		accessTokenJwt, err := jose.NewJWT(map[string]interface{}{
-			"iat":    issuedAt,
-			"type":   "access_token",
-			"domain": claims["domain"].(string),
+			"iat":     issuedAt,
+			"type":    "access_token",
+			"domain":  claims["domain"].(string),
+			"user_id": claims["user_id"].(string),
 		})
 
 		w.Header().Set("Access-Control-Allow-Origin", "*")
