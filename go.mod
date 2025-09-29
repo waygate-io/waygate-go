@@ -26,7 +26,6 @@ require (
 	github.com/caddyserver/certmagic v0.22.0
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/lastlogin-net/decent-auth-go v0.0.0-20250904173551-cc123f5587e6
-	github.com/lestrrat-go/jwx/v2 v2.1.4
 	github.com/libdns/libdns v0.2.3
 	github.com/libdns/namedotcom v0.3.4-0.20241104014758-c641e4a2a4c9
 	github.com/mailgun/proxyproto v1.0.0
@@ -52,7 +51,6 @@ require (
 	github.com/caddyserver/zerossl v0.1.3 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/coder/websocket v1.8.13 // indirect
-	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
 	github.com/dylibso/observe-sdk/go v0.0.0-20240819160327-2d926c5d788a // indirect
 	github.com/extism/go-sdk v1.6.2-0.20241121002538-bef00f39873e // indirect
 	github.com/gdamore/encoding v1.0.1 // indirect
@@ -63,16 +61,10 @@ require (
 	github.com/gobwas/httphead v0.1.0 // indirect
 	github.com/gobwas/pool v0.2.1 // indirect
 	github.com/gobwas/ws v1.4.0 // indirect
-	github.com/goccy/go-json v0.10.3 // indirect
 	github.com/google/pprof v0.0.0-20241210010833-40e02aabc2ad // indirect
 	github.com/ianlancetaylor/demangle v0.0.0-20240805132620-81f5be970eca // indirect
 	github.com/klauspost/cpuid/v2 v2.2.10 // indirect
 	github.com/lastlogin-net/decent-auth-build v0.0.0-20250917165336-0c82e8a9d03f // indirect
-	github.com/lestrrat-go/blackmagic v1.0.2 // indirect
-	github.com/lestrrat-go/httpcc v1.0.1 // indirect
-	github.com/lestrrat-go/httprc v1.0.6 // indirect
-	github.com/lestrrat-go/iter v1.0.2 // indirect
-	github.com/lestrrat-go/option v1.0.1 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/mattn/go-sqlite3 v1.14.24 // indirect
@@ -87,7 +79,7 @@ require (
 	github.com/quic-go/qpack v0.4.0 // indirect
 	github.com/rivo/tview v0.0.0-20240616192244-23476fa0bab2 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
-	github.com/segmentio/asm v1.2.0 // indirect
+	github.com/stretchr/testify v1.10.0 // indirect
 	github.com/tetratelabs/wabin v0.0.0-20230304001439-f6f874872834 // indirect
 	github.com/tetratelabs/wazero v1.8.1 // indirect
 	github.com/zeebo/blake3 v0.2.4 // indirect

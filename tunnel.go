@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/lastlogin-net/decent-auth-go"
-	"github.com/waygate-io/waygate-go/josencillo"
 )
 
 type Tunnel interface {
@@ -192,7 +191,7 @@ func handleRequests(t Tunnel, callback func(interface{}) interface{}) error {
 	return nil
 }
 
-func processRequest(tunnelReq TunnelRequest, tunnelDomains []string, jose *josencillo.JOSE, session *decentauth.Session, public bool) (*TunnelConfig, error) {
+func processRequest(tunnelReq TunnelRequest, tunnelDomains []string, session *decentauth.Session, public bool) (*TunnelConfig, error) {
 
 	var host string
 	if DebugMode {

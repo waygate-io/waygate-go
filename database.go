@@ -46,7 +46,6 @@ func NewServerDatabase(path string) (*ServerDatabase, error) {
 
 	stmt := `
         CREATE TABLE IF NOT EXISTS config(
-		jwks_json TEXT UNIQUE,
 		acme_email TEXT UNIQUE DEFAULT ''
         );
         `
@@ -123,31 +122,6 @@ func (d *ServerDatabase) SetACMEEmail(val string) error {
 	return setACMEEmail(d.db, val)
 }
 
-func (d *ServerDatabase) GetJWKS() (string, error) {
-	var jwks_json string
-
-	stmt := `
-        SELECT jwks_json FROM config;
-        `
-	err := d.db.QueryRow(stmt).Scan(&jwks_json)
-	if err != nil {
-		return "", err
-	}
-
-	return jwks_json, nil
-}
-
-func (d *ServerDatabase) SetJWKS(jwks string) error {
-	stmt := `
-        UPDATE config SET jwks_json=?;
-        `
-	_, err := d.db.Exec(stmt, jwks)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
 
 type ClientDatabase struct {
 	db *sqlx.DB

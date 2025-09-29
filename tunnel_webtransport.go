@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/quic-go/webtransport-go"
-	"github.com/waygate-io/waygate-go/josencillo"
 	"github.com/lastlogin-net/decent-auth-go"
 )
 
@@ -90,7 +89,6 @@ func NewWebTransportServerTunnel(
 	w http.ResponseWriter,
 	r *http.Request,
 	wtServer webtransport.Server,
-	jose *josencillo.JOSE,
 	authServer *decentauth.Handler,
 	public bool,
 	tunnelDomains []string,
@@ -104,7 +102,7 @@ func NewWebTransportServerTunnel(
 
 	session := authServer.GetSession(r)
 
-	tunConfig, err := processRequest(tunnelReq, tunnelDomains, jose, session, public)
+	tunConfig, err := processRequest(tunnelReq, tunnelDomains, session, public)
 	if err != nil {
 		return nil, err
 	}

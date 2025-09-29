@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/waygate-io/waygate-go/josencillo"
 	"golang.ngrok.com/muxado/v2"
 	"nhooyr.io/websocket"
 	"github.com/lastlogin-net/decent-auth-go"
@@ -97,7 +96,6 @@ func (t *MuxadoTunnel) Events() chan TunnelEvent {
 func NewWebSocketMuxadoServerTunnel(
 	w http.ResponseWriter,
 	r *http.Request,
-	jose *josencillo.JOSE,
 	authServer *decentauth.Handler,
 	public bool,
 	tunnelDomains []string,
@@ -112,7 +110,7 @@ func NewWebSocketMuxadoServerTunnel(
 
 	session := authServer.GetSession(r)
 
-	tunConfig, err := processRequest(tunnelReq, tunnelDomains, jose, session, public)
+	tunConfig, err := processRequest(tunnelReq, tunnelDomains, session, public)
 	if err != nil {
 		return nil, err
 	}
@@ -219,7 +217,7 @@ func NewWebSocketMuxadoClientTunnel(tunReq TunnelRequest) (*MuxadoTunnel, error)
 	return t, nil
 }
 
-func NewTlsMuxadoServerTunnel(tlsConn *tls.Conn, jose *josencillo.JOSE, public bool) (*MuxadoTunnel, error) {
+func NewTlsMuxadoServerTunnel(tlsConn *tls.Conn, public bool) (*MuxadoTunnel, error) {
 	msgSizeBuf := make([]byte, 4)
 
 	_, err := tlsConn.Read(msgSizeBuf)
@@ -255,12 +253,12 @@ func NewTlsMuxadoServerTunnel(tlsConn *tls.Conn, jose *josencillo.JOSE, public b
 	}
 
 	if !public {
-		claims, err := jose.ParseJWT(tokenJwt)
-		if err != nil {
-			return nil, err
-		}
+		//claims, err := jose.ParseJWT(tokenJwt)
+		//if err != nil {
+		//	return nil, err
+		//}
 
-		domain = claims["domain"].(string)
+		//domain = claims["domain"].(string)
 	}
 
 	tunConfig := TunnelConfig{

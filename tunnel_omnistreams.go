@@ -17,7 +17,6 @@ import (
 	"github.com/omnistreams/omnistreams-go"
 	"github.com/omnistreams/omnistreams-go/transports"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/waygate-io/waygate-go/josencillo"
 	//"github.com/gizak/termui/v3"
 	//"github.com/gizak/termui/v3/widgets"
 )
@@ -168,7 +167,6 @@ func (t *OmnistreamsTunnel) emit(evt interface{}) {
 func NewOmnistreamsServerTunnel(
 	w http.ResponseWriter,
 	r *http.Request,
-	jose *josencillo.JOSE,
 	authServer *decentauth.Handler,
 	public bool,
 	tunnelDomains []string,
@@ -185,7 +183,7 @@ func NewOmnistreamsServerTunnel(
 
 	session := authServer.GetSession(r)
 
-	tunConfig, err := processRequest(tunnelReq, tunnelDomains, jose, session, public)
+	tunConfig, err := processRequest(tunnelReq, tunnelDomains, session, public)
 	if err != nil {
 		return nil, err
 	}

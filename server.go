@@ -33,7 +33,6 @@ import (
 	"github.com/quic-go/webtransport-go"
 	"github.com/takingnames/namedrop-go"
 	namedropdns "github.com/takingnames/namedrop-libdns"
-	"github.com/waygate-io/waygate-go/josencillo"
 )
 
 type ServerConfig struct {
@@ -51,7 +50,6 @@ type ServerConfig struct {
 }
 
 type Server struct {
-	jose   *josencillo.JOSE
 	config *ServerConfig
 	mut    *sync.Mutex
 	db     *ServerDatabase
@@ -224,21 +222,6 @@ func (s *Server) Run() int {
 		},
 	})
 	exitOnError(err)
-
-	jwksJson, err := db.GetJWKS()
-	if err != nil {
-		s.jose, err = josencillo.NewJOSE()
-		exitOnError(err)
-
-		jwksJson, err := s.jose.GetJwksJson()
-		exitOnError(err)
-
-		err = db.SetJWKS(jwksJson)
-		exitOnError(err)
-	} else {
-		s.jose, err = josencillo.NewWithJwkJson(jwksJson)
-		exitOnError(err)
-	}
 
 	tmpl, err := template.ParseFS(fs, "templates/*")
 	exitOnError(err)
@@ -566,7 +549,7 @@ func (s *Server) Run() int {
 
 		var tunnel Tunnel
 		if r.ProtoMajor == 3 {
-			wtTun, err := NewWebTransportServerTunnel(w, r, wtServer, s.jose, authHandler, s.config.Public, s.config.TunnelDomains)
+			wtTun, err := NewWebTransportServerTunnel(w, r, wtServer, authHandler, s.config.Public, s.config.TunnelDomains)
 			if err != nil {
 				w.WriteHeader(500)
 				log.Println(err)
@@ -577,7 +560,7 @@ func (s *Server) Run() int {
 
 		} else {
 			//tunnel, err = NewWebSocketMuxadoServerTunnel(w, r, s.jose, s.config.Public, s.config.TunnelDomains, numStreamsGauge)
-			tunnel, err = NewOmnistreamsServerTunnel(w, r, s.jose, authHandler, s.config.Public, s.config.TunnelDomains, numStreamsGauge, dash)
+			tunnel, err = NewOmnistreamsServerTunnel(w, r, authHandler, s.config.Public, s.config.TunnelDomains, numStreamsGauge, dash)
 			if httpErr, ok := err.(*httpError); ok {
 				w.WriteHeader(httpErr.statusCode)
 				io.WriteString(w, httpErr.message)
