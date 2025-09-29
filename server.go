@@ -86,6 +86,10 @@ func (s *Server) Run() int {
 	exitOnError(err)
 	s.db = db
 
+	if len(s.config.TunnelDomains) < 1 {
+		exitOnError(errors.New("Must have at least 1 tunnel domain"))
+	}
+
 	for _, userID := range s.config.Users {
 		err := db.SetUser(user{
 			ID: userID,
@@ -358,6 +362,48 @@ func (s *Server) Run() int {
 		}
 	})
 
+	mux.HandleFunc(authPrefix+"/oauth/authorize", func(w http.ResponseWriter, r *http.Request) {
+
+		submitTarget := fmt.Sprintf("%s/oauth/approve?%s", authPrefix, r.URL.RawQuery)
+
+		tmplData := struct {
+			ClientID     string
+			SubmitTarget string
+		}{
+			ClientID:     r.URL.Query().Get("client_id"),
+			SubmitTarget: submitTarget,
+		}
+
+		err = tmpl.ExecuteTemplate(w, "authorize.html", tmplData)
+		if err != nil {
+			w.WriteHeader(500)
+			io.WriteString(w, err.Error())
+			return
+		}
+	})
+	mux.HandleFunc(authPrefix+"/oauth/approve", func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "bad form", http.StatusBadRequest)
+			return
+		}
+
+		nameGen, err := NewNameGenerator()
+		if err != nil {
+			http.Error(w, "Failed to generate domain name", 500)
+			return
+		}
+
+		host := nameGen.GenerateName()
+		domain := strings.ToLower(host) + "." + s.config.TunnelDomains[0]
+
+		form := url.Values{}
+		form.Set("domain", domain)
+		encoded := form.Encode()
+		r.Body = io.NopCloser(strings.NewReader(encoded))
+		r.ContentLength = int64(len(encoded))
+
+		authHandler.ServeHTTP(w, r)
+	})
 	mux.Handle(authPrefix+"/", authHandler)
 
 	mux.HandleFunc("/shutdown", func(w http.ResponseWriter, r *http.Request) {
@@ -520,7 +566,7 @@ func (s *Server) Run() int {
 
 		var tunnel Tunnel
 		if r.ProtoMajor == 3 {
-			wtTun, err := NewWebTransportServerTunnel(w, r, wtServer, s.jose, s.config.Public, s.config.TunnelDomains)
+			wtTun, err := NewWebTransportServerTunnel(w, r, wtServer, s.jose, authHandler, s.config.Public, s.config.TunnelDomains)
 			if err != nil {
 				w.WriteHeader(500)
 				log.Println(err)
@@ -531,7 +577,7 @@ func (s *Server) Run() int {
 
 		} else {
 			//tunnel, err = NewWebSocketMuxadoServerTunnel(w, r, s.jose, s.config.Public, s.config.TunnelDomains, numStreamsGauge)
-			tunnel, err = NewOmnistreamsServerTunnel(w, r, s.jose, s.config.Public, s.config.TunnelDomains, numStreamsGauge, dash)
+			tunnel, err = NewOmnistreamsServerTunnel(w, r, s.jose, authHandler, s.config.Public, s.config.TunnelDomains, numStreamsGauge, dash)
 			if httpErr, ok := err.(*httpError); ok {
 				w.WriteHeader(httpErr.statusCode)
 				io.WriteString(w, httpErr.message)
@@ -734,13 +780,6 @@ func (s *Server) Run() int {
 
 	err = certConfig.ManageSync(ctx, certDomains)
 	exitOnError(err)
-
-	// TODO: had to move this down here because oauth.Server doesn't support
-	// updated the serverURI at runtime. Need to implement that
-	serverUri := "https://" + dashboardDomain
-	oauth2Prefix := "/oauth2"
-	oauth2Handler := NewOAuth2Handler(db, serverUri, oauth2Prefix, s.jose, tmpl, authHandler)
-	mux.Handle(oauth2Prefix+"/", http.StripPrefix(oauth2Prefix, oauth2Handler))
 
 	dashURL := fmt.Sprintf("https://%s", dashboardDomain)
 	qrterminal.GenerateHalfBlock(dashURL, qrterminal.L, os.Stdout)
@@ -972,7 +1011,8 @@ func (m *ServerMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	authPrefix := "/auth"
 
-	if !strings.HasPrefix(r.URL.Path, authPrefix) && r.URL.Path != "/waygate" && r.URL.Path != "/oauth2/token" && r.URL.Path != "/oauth2/device" && r.URL.Path != "/oauth2/device-verify" {
+	if !strings.HasPrefix(r.URL.Path, authPrefix) && r.URL.Path != "/waygate" {
+		//if !strings.HasPrefix(r.URL.Path, authPrefix) && r.URL.Path != "/waygate" && r.URL.Path != "/oauth2/token" && r.URL.Path != "/oauth2/device" && r.URL.Path != "/oauth2/device-verify" {
 
 		session := m.authHandler.GetSession(r)
 		if session == nil {

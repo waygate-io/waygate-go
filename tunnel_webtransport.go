@@ -11,6 +11,7 @@ import (
 
 	"github.com/quic-go/webtransport-go"
 	"github.com/waygate-io/waygate-go/josencillo"
+	"github.com/lastlogin-net/decent-auth-go"
 )
 
 const WebTransportCodeCancel = 0
@@ -90,6 +91,7 @@ func NewWebTransportServerTunnel(
 	r *http.Request,
 	wtServer webtransport.Server,
 	jose *josencillo.JOSE,
+	authServer *decentauth.Handler,
 	public bool,
 	tunnelDomains []string,
 ) (*WebTransportTunnel, error) {
@@ -100,7 +102,9 @@ func NewWebTransportServerTunnel(
 		UseProxyProtocol: r.URL.Query().Get("use-proxy-protocol") == "true",
 	}
 
-	tunConfig, err := processRequest(tunnelReq, tunnelDomains, jose, public)
+	session := authServer.GetSession(r)
+
+	tunConfig, err := processRequest(tunnelReq, tunnelDomains, jose, session, public)
 	if err != nil {
 		return nil, err
 	}

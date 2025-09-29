@@ -6,8 +6,7 @@
   <strong>{{.ClientID}}</strong> is requesting a session for creating tunnels.
 </p>
 
-<form action='{{.Prefix}}/approve'>
-  <input type='hidden' name='redirect_uri' value='{{.RedirectUri}}' />
+<form method='POST' action='{{.SubmitTarget}}'>
   <button type='submit'>Approve</button>
 </form>
 

@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	"github.com/anderspitman/dashtui"
+	"github.com/lastlogin-net/decent-auth-go"
 	"github.com/mailgun/proxyproto"
 	"github.com/omnistreams/omnistreams-go"
 	"github.com/omnistreams/omnistreams-go/transports"
@@ -168,6 +169,7 @@ func NewOmnistreamsServerTunnel(
 	w http.ResponseWriter,
 	r *http.Request,
 	jose *josencillo.JOSE,
+	authServer *decentauth.Handler,
 	public bool,
 	tunnelDomains []string,
 	numStreamsGauge prometheus.Gauge,
@@ -181,7 +183,9 @@ func NewOmnistreamsServerTunnel(
 		ClientName:       r.URL.Query().Get("client-name"),
 	}
 
-	tunConfig, err := processRequest(tunnelReq, tunnelDomains, jose, public)
+	session := authServer.GetSession(r)
+
+	tunConfig, err := processRequest(tunnelReq, tunnelDomains, jose, session, public)
 	if err != nil {
 		return nil, err
 	}
@@ -252,7 +256,7 @@ func NewOmnistreamsClientTunnel(tunReq TunnelRequest) (*OmnistreamsTunnel, error
 
 	ctx := context.Background()
 
-	uri := fmt.Sprintf("wss://%s/waygate?token=%s&termination-type=%s&use-proxy-protocol=%t&client-name=%s",
+	uri := fmt.Sprintf("wss://%s/waygate?access_token=%s&termination-type=%s&use-proxy-protocol=%t&client-name=%s",
 		WaygateServerDomain,
 		tunReq.Token,
 		tunReq.TerminationType,

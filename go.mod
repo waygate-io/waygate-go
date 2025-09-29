@@ -2,9 +2,9 @@ module github.com/waygate-io/waygate-go
 
 go 1.24.1
 
-//replace github.com/lastlogin-net/decent-auth-go => ../decent-auth-go
+replace github.com/lastlogin-net/decent-auth-go => ../decent-auth-go
 
-//replace github.com/lastlogin-net/decent-auth-build => ../decent-auth-build
+replace github.com/lastlogin-net/decent-auth-build => ../decent-auth-build
 
 //replace github.com/omnistreams/omnistreams-go => ../omnistreams-go
 

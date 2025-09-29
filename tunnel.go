@@ -8,6 +8,7 @@ import (
 	"net"
 	"strings"
 
+	"github.com/lastlogin-net/decent-auth-go"
 	"github.com/waygate-io/waygate-go/josencillo"
 )
 
@@ -191,7 +192,7 @@ func handleRequests(t Tunnel, callback func(interface{}) interface{}) error {
 	return nil
 }
 
-func processRequest(tunnelReq TunnelRequest, tunnelDomains []string, jose *josencillo.JOSE, public bool) (*TunnelConfig, error) {
+func processRequest(tunnelReq TunnelRequest, tunnelDomains []string, jose *josencillo.JOSE, session *decentauth.Session, public bool) (*TunnelConfig, error) {
 
 	var host string
 	if DebugMode {
@@ -208,7 +209,7 @@ func processRequest(tunnelReq TunnelRequest, tunnelDomains []string, jose *josen
 	}
 
 	var domain string
-	if tunnelReq.Token == "" {
+	if session == nil {
 		if !public {
 			return nil, newHTTPError(401, "No token provided")
 		}
@@ -219,12 +220,12 @@ func processRequest(tunnelReq TunnelRequest, tunnelDomains []string, jose *josen
 
 		domain = strings.ToLower(host) + "." + tunnelDomains[0]
 	} else {
-		claims, err := jose.ParseJWT(tunnelReq.Token)
-		if err != nil {
-			return nil, newHTTPError(401, err.Error())
+		dom, exists := session.CustomData["domain"]
+		if !exists {
+			return nil, newHTTPError(500, "No domain assigned to session")
 		}
 
-		domain = claims["domain"].(string)
+		domain = dom
 	}
 
 	tunConfig := &TunnelConfig{
@@ -273,3 +274,5 @@ type stream interface {
 	Close() error
 	CloseWrite() error
 }
+
+

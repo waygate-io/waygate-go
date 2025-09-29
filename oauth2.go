@@ -299,7 +299,8 @@ type TokenFlow struct {
 
 func NewTokenFlow() (*TokenFlow, error) {
 
-	authServerUri := fmt.Sprintf("https://%s/oauth2", WaygateServerDomain)
+	// TODO: use authPrefix instead of hard-coding
+	authServerUri := fmt.Sprintf("https://%s/auth/oauth", WaygateServerDomain)
 
 	port, err := randomOpenPort()
 	if err != nil {

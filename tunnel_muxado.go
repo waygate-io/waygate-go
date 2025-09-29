@@ -1,5 +1,6 @@
 package waygate
 
+
 import (
 	"context"
 	"crypto/tls"
@@ -17,6 +18,7 @@ import (
 	"github.com/waygate-io/waygate-go/josencillo"
 	"golang.ngrok.com/muxado/v2"
 	"nhooyr.io/websocket"
+	"github.com/lastlogin-net/decent-auth-go"
 )
 
 type MuxadoTunnel struct {
@@ -96,6 +98,7 @@ func NewWebSocketMuxadoServerTunnel(
 	w http.ResponseWriter,
 	r *http.Request,
 	jose *josencillo.JOSE,
+	authServer *decentauth.Handler,
 	public bool,
 	tunnelDomains []string,
 	gauge prometheus.Gauge,
@@ -107,7 +110,9 @@ func NewWebSocketMuxadoServerTunnel(
 		UseProxyProtocol: r.URL.Query().Get("use-proxy-protocol") == "true",
 	}
 
-	tunConfig, err := processRequest(tunnelReq, tunnelDomains, jose, public)
+	session := authServer.GetSession(r)
+
+	tunConfig, err := processRequest(tunnelReq, tunnelDomains, jose, session, public)
 	if err != nil {
 		return nil, err
 	}
