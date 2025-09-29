@@ -37,8 +37,6 @@ func NewNameGenerator() (generator *NameGenerator, err error) {
 		words: &words,
 	}
 
-	printJson(words)
-
 	return
 }
 
