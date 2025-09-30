@@ -184,20 +184,6 @@ func NewOmnistreamsServerTunnel(
 
 	session := authServer.GetSession(r)
 
-	var host string
-	if DebugMode {
-		host = "debug"
-	} else {
-		var err error
-
-		nameGen, err := NewNameGenerator()
-		if err != nil {
-			return nil, err
-		}
-
-		host = nameGen.GenerateName()
-	}
-
 	var domain string
 	if session == nil {
 		if !public {
@@ -208,6 +194,12 @@ func NewOmnistreamsServerTunnel(
 			return nil, newHTTPError(400, "No tunnel domains")
 		}
 
+		nameGen, err := NewNameGenerator()
+		if err != nil {
+			return nil, err
+		}
+
+		host := nameGen.GenerateName()
 		domain = strings.ToLower(host) + "." + tunnelDomains[0]
 	} else {
 		dom, exists := session.CustomData["domain"]
