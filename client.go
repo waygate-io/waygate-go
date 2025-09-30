@@ -326,6 +326,13 @@ func (c *Client) Run() error {
 
 	tunConfig := listener.GetTunnelConfig()
 
+	if tunConfig.Token != "" {
+		err = c.db.SetToken(tunConfig.Token)
+		if err != nil {
+			return err
+		}
+	}
+
 	dashUri := "https://" + tunConfig.Domain
 
 	if tunConfig.TerminationType == TerminationTypeClient {

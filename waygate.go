@@ -37,6 +37,7 @@ type TunnelRequest struct {
 
 type TunnelConfig struct {
 	Domain           string `json:"domain"`
+	Token            string `json:"token"`
 	TerminationType  string `json:"termination_type"`
 	UseProxyProtocol bool   `json:"use_proxy_protocol"`
 	ClientName       string `json:"client_name"`

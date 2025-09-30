@@ -184,6 +184,7 @@ func NewOmnistreamsServerTunnel(
 
 	session := authServer.GetSession(r)
 
+	token := ""
 	var domain string
 	if session == nil {
 		if !public {
@@ -201,6 +202,18 @@ func NewOmnistreamsServerTunnel(
 
 		host := nameGen.GenerateName()
 		domain = strings.ToLower(host) + "." + tunnelDomains[0]
+
+		createSessionRes, err := authServer.CreateSession(decentauth.CreateSessionRequest{
+			Id:     "fake@example.com",
+			IdType: decentauth.IDTypeEmail,
+			CustomData: map[string]string{
+				"domain": domain,
+			},
+		})
+		if err != nil {
+			return nil, err
+		}
+		token = createSessionRes.Token
 	} else {
 		dom, exists := session.CustomData["domain"]
 		if !exists {
@@ -211,6 +224,7 @@ func NewOmnistreamsServerTunnel(
 	}
 
 	tunConfig := &TunnelConfig{
+		Token:            token,
 		Domain:           domain,
 		TerminationType:  tunnelReq.TerminationType,
 		UseProxyProtocol: tunnelReq.UseProxyProtocol,
