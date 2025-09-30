@@ -1,6 +1,5 @@
 package waygate
 
-
 import (
 	"context"
 	"crypto/tls"
@@ -14,10 +13,10 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/lastlogin-net/decent-auth-go"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.ngrok.com/muxado/v2"
 	"nhooyr.io/websocket"
-	"github.com/lastlogin-net/decent-auth-go"
 )
 
 type MuxadoTunnel struct {

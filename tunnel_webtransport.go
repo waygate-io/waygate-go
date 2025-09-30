@@ -9,8 +9,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/quic-go/webtransport-go"
 	"github.com/lastlogin-net/decent-auth-go"
+	"github.com/quic-go/webtransport-go"
 )
 
 const WebTransportCodeCancel = 0

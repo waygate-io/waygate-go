@@ -9,6 +9,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 
 	"github.com/anderspitman/dashtui"
@@ -175,7 +176,7 @@ func NewOmnistreamsServerTunnel(
 ) (*OmnistreamsTunnel, error) {
 
 	tunnelReq := TunnelRequest{
-		Token:            r.URL.Query().Get("token"),
+		Token:            r.URL.Query().Get("access_token"),
 		TerminationType:  r.URL.Query().Get("termination-type"),
 		UseProxyProtocol: r.URL.Query().Get("use-proxy-protocol") == "true",
 		ClientName:       r.URL.Query().Get("client-name"),
@@ -183,9 +184,45 @@ func NewOmnistreamsServerTunnel(
 
 	session := authServer.GetSession(r)
 
-	tunConfig, err := processRequest(tunnelReq, tunnelDomains, session, public)
-	if err != nil {
-		return nil, err
+	var host string
+	if DebugMode {
+		host = "debug"
+	} else {
+		var err error
+
+		nameGen, err := NewNameGenerator()
+		if err != nil {
+			return nil, err
+		}
+
+		host = nameGen.GenerateName()
+	}
+
+	var domain string
+	if session == nil {
+		if !public {
+			return nil, newHTTPError(401, "No token provided")
+		}
+
+		if len(tunnelDomains) == 0 {
+			return nil, newHTTPError(400, "No tunnel domains")
+		}
+
+		domain = strings.ToLower(host) + "." + tunnelDomains[0]
+	} else {
+		dom, exists := session.CustomData["domain"]
+		if !exists {
+			return nil, newHTTPError(500, "No domain assigned to session")
+		}
+
+		domain = dom
+	}
+
+	tunConfig := &TunnelConfig{
+		Domain:           domain,
+		TerminationType:  tunnelReq.TerminationType,
+		UseProxyProtocol: tunnelReq.UseProxyProtocol,
+		ClientName:       tunnelReq.ClientName,
 	}
 
 	wr, err := transports.NewWebSocketServerTransport(w, r)

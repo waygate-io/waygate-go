@@ -122,7 +122,6 @@ func (d *ServerDatabase) SetACMEEmail(val string) error {
 	return setACMEEmail(d.db, val)
 }
 
-
 type ClientDatabase struct {
 	db *sqlx.DB
 }
