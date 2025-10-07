@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
 	"sort"
 	//"net/url"
 	"strings"
@@ -547,6 +548,8 @@ func (s *Server) Run() int {
 
 		fmt.Println("/waygate")
 
+		session := authHandler.GetSession(r)
+
 		var tunnel Tunnel
 		if r.ProtoMajor == 3 {
 			wtTun, err := NewWebTransportServerTunnel(w, r, wtServer, authHandler, s.config.Public, s.config.TunnelDomains)
@@ -655,8 +658,30 @@ func (s *Server) Run() int {
 
 			case *ListenRequest:
 				if strings.HasPrefix(r.Network, "tls") {
-					fmt.Println(r)
+					sessionDomain, exists := session.CustomData["domain"]
+					if !exists {
+						return &ListenResponse{
+							Success: false,
+							Message: "Missing domain in custom data",
+						}
+					}
+
 					domain := r.Address
+
+					if !isValidDomain(domain) {
+						return &ListenResponse{
+							Success: false,
+							Message: "Invalid domain",
+						}
+					}
+
+					if !strings.HasSuffix(domain, sessionDomain) {
+						return &ListenResponse{
+							Success: false,
+							Message: "You don't have perms for that domain",
+						}
+					}
+
 					s.mut.Lock()
 					tunnels[domain] = tunnel
 					s.mut.Unlock()
@@ -1037,4 +1062,10 @@ func isTlsMuxado(clientHello *tls.ClientHelloInfo) bool {
 		}
 	}
 	return false
+}
+
+var domainRegex = regexp.MustCompile(`^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[A-Za-z]{2,}$`)
+
+func isValidDomain(domain string) bool {
+	return domainRegex.MatchString(domain)
 }
