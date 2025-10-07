@@ -27,7 +27,7 @@ type ClientSession struct {
 	tlsTermination string
 	listenMap      map[string]*Listener
 	//udpMap         map[string]*UDPConn
-	mut            *sync.Mutex
+	mut *sync.Mutex
 }
 
 func NewClientSession(token string, db *ClientDatabase, certConfig *certmagic.Config, terminationType TerminationType) (*ClientSession, error) {
@@ -88,7 +88,7 @@ func NewClientSession(token string, db *ClientDatabase, certConfig *certmagic.Co
 		tlsTermination: tunnel.GetConfig().TerminationType,
 		listenMap:      make(map[string]*Listener),
 		//udpMap:         make(map[string]*UDPConn),
-		mut:            &sync.Mutex{},
+		mut: &sync.Mutex{},
 	}
 
 	s.start()

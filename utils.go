@@ -22,15 +22,16 @@ import (
 	"time"
 
 	"github.com/caddyserver/certmagic"
-	"github.com/libdns/namedotcom"
-	//"github.com/libdns/route53"
 	"github.com/libdns/libdns"
+	"github.com/libdns/namedotcom"
+	"github.com/libdns/route53"
 	proxyproto "github.com/pires/go-proxyproto"
 	//"github.com/takingnames/namedrop-libdns"
 	"go.uber.org/zap"
 )
 
 type DNSProvider interface {
+	// TODO: re-enable libdns.ZoneLister
 	libdns.ZoneLister
 	libdns.RecordGetter
 	libdns.RecordSetter
@@ -238,14 +239,15 @@ func getDnsProvider(provider, token, user string) (DNSProvider, error) {
 			Token:  token,
 			User:   user,
 		}, nil
-	//case "route53":
-	//	return &route53.Provider{
-	//		WaitForPropagation: true,
-	//		MaxWaitDur:         5 * time.Minute,
-	//		// AccessKeyId and SecretAccessKey are grabbed from the environment
-	//		//AccessKeyId:     user,
-	//		//SecretAccessKey: token,
-	//	}, nil
+	case "route53":
+		return &route53.Provider{
+			WaitForPropagation: true,
+			MaxWaitDur:         5 * time.Minute,
+			// AccessKeyId and SecretAccessKey are grabbed from the environment
+			AccessKeyId:     user,
+			SecretAccessKey: token,
+			Region:          "us-east-1",
+		}, nil
 	default:
 		return nil, errors.New("Invalid DNS provider")
 		//if !strings.HasPrefix(provider, "https://") {

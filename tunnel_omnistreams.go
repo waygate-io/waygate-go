@@ -23,11 +23,11 @@ import (
 )
 
 type OmnistreamsTunnel struct {
-	conn           *omnistreams.Connection
-	tunConfig      *TunnelConfig
-	eventChans     []chan TunnelEvent
+	conn       *omnistreams.Connection
+	tunConfig  *TunnelConfig
+	eventChans []chan TunnelEvent
 	//datagramStream *omnistreams.Stream
-	mut            *sync.Mutex
+	mut *sync.Mutex
 }
 
 type authError error
@@ -378,10 +378,10 @@ func NewOmnistreamsClientTunnel(tunReq TunnelRequest) (*OmnistreamsTunnel, error
 	//}
 
 	t := &OmnistreamsTunnel{
-		conn:           conn,
-		tunConfig:      &tunConfig,
-		mut:            &sync.Mutex{},
-		eventChans:     []chan TunnelEvent{},
+		conn:       conn,
+		tunConfig:  &tunConfig,
+		mut:        &sync.Mutex{},
+		eventChans: []chan TunnelEvent{},
 		//datagramStream: datagramStream,
 	}
 
