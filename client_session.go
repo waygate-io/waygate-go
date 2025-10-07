@@ -26,7 +26,7 @@ type ClientSession struct {
 	tlsConfig      *tls.Config
 	tlsTermination string
 	listenMap      map[string]*Listener
-	udpMap         map[string]*UDPConn
+	//udpMap         map[string]*UDPConn
 	mut            *sync.Mutex
 }
 
@@ -87,7 +87,7 @@ func NewClientSession(token string, db *ClientDatabase, certConfig *certmagic.Co
 		tlsConfig:      tlsConfig,
 		tlsTermination: tunnel.GetConfig().TerminationType,
 		listenMap:      make(map[string]*Listener),
-		udpMap:         make(map[string]*UDPConn),
+		//udpMap:         make(map[string]*UDPConn),
 		mut:            &sync.Mutex{},
 	}
 
@@ -98,43 +98,43 @@ func NewClientSession(token string, db *ClientDatabase, certConfig *certmagic.Co
 
 func (s *ClientSession) start() {
 
-	go func() {
+	//go func() {
 
-		for {
-			msg, srcAddr, dstAddr, err := s.tunnel.ReceiveDatagram()
-			if err != nil {
-				fmt.Println("ClientSession.start ReceiveDatagram:", err)
-				break
-			}
+	//	for {
+	//		msg, srcAddr, dstAddr, err := s.tunnel.ReceiveDatagram()
+	//		if err != nil {
+	//			fmt.Println("ClientSession.start ReceiveDatagram:", err)
+	//			break
+	//		}
 
-			//dst := fmt.Sprintf("%s:%d", dstAddr.IP, dstAddr.Port)
+	//		//dst := fmt.Sprintf("%s:%d", dstAddr.IP, dstAddr.Port)
 
-			udpConn, ok := s.udpMap[dstAddr.String()]
-			if !ok {
-				fmt.Println("ClientSession.start udpMap: no such UDPConn")
-				break
-			}
+	//		udpConn, ok := s.udpMap[dstAddr.String()]
+	//		if !ok {
+	//			fmt.Println("ClientSession.start udpMap: no such UDPConn")
+	//			break
+	//		}
 
-			srcUDPAddr, err := net.ResolveUDPAddr("udp", srcAddr.String())
-			if err != nil {
-				fmt.Println("ClientSession.start ResolveUDPAddr:", err)
-				break
-			}
+	//		srcUDPAddr, err := net.ResolveUDPAddr("udp", srcAddr.String())
+	//		if err != nil {
+	//			fmt.Println("ClientSession.start ResolveUDPAddr:", err)
+	//			break
+	//		}
 
-			dstUDPAddr, err := net.ResolveUDPAddr("udp", dstAddr.String())
-			if err != nil {
-				fmt.Println("ClientSession.start ResolveUDPAddr:", err)
-				break
-			}
+	//		dstUDPAddr, err := net.ResolveUDPAddr("udp", dstAddr.String())
+	//		if err != nil {
+	//			fmt.Println("ClientSession.start ResolveUDPAddr:", err)
+	//			break
+	//		}
 
-			udpConn.recvCh <- datagram{
-				msg:     msg,
-				srcAddr: srcUDPAddr,
-				dstAddr: dstUDPAddr,
-			}
-		}
+	//		udpConn.recvCh <- datagram{
+	//			msg:     msg,
+	//			srcAddr: srcUDPAddr,
+	//			dstAddr: dstUDPAddr,
+	//		}
+	//	}
 
-	}()
+	//}()
 
 	go func() {
 
@@ -244,99 +244,99 @@ func (s *ClientSession) GetTunnelConfig() TunnelConfig {
 	return s.tunnel.GetConfig()
 }
 
-func (s *ClientSession) DialUDP(network string, dstAddr *net.UDPAddr) (*UDPConn, error) {
+//func (s *ClientSession) DialUDP(network string, dstAddr *net.UDPAddr) (*UDPConn, error) {
+//
+//	address := fmt.Sprintf("%s:%d", dstAddr.IP, dstAddr.Port)
+//
+//	req := &DialRequest{
+//		Network: network,
+//		Address: address,
+//	}
+//
+//	res, err := s.tunnel.Request(req)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	dialRes := res.(*DialResponse)
+//
+//	if !dialRes.Success {
+//		return nil, errors.New(dialRes.Message)
+//	}
+//
+//	srcAddr, err := net.ResolveUDPAddr("udp", dialRes.Address)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	conn := &UDPConn{
+//		recvCh: make(chan datagram),
+//		sendCh: make(chan datagram),
+//	}
+//
+//	go func() {
+//		for {
+//			datagram := <-conn.sendCh
+//			s.tunnel.SendDatagram(datagram.msg, srcAddr, dstAddr)
+//		}
+//	}()
+//
+//	s.mut.Lock()
+//	s.udpMap[dialRes.Address] = conn
+//	s.mut.Unlock()
+//
+//	printJson(s.udpMap)
+//
+//	return conn, nil
+//}
 
-	address := fmt.Sprintf("%s:%d", dstAddr.IP, dstAddr.Port)
-
-	req := &DialRequest{
-		Network: network,
-		Address: address,
-	}
-
-	res, err := s.tunnel.Request(req)
-	if err != nil {
-		return nil, err
-	}
-
-	dialRes := res.(*DialResponse)
-
-	if !dialRes.Success {
-		return nil, errors.New(dialRes.Message)
-	}
-
-	srcAddr, err := net.ResolveUDPAddr("udp", dialRes.Address)
-	if err != nil {
-		return nil, err
-	}
-
-	conn := &UDPConn{
-		recvCh: make(chan datagram),
-		sendCh: make(chan datagram),
-	}
-
-	go func() {
-		for {
-			datagram := <-conn.sendCh
-			s.tunnel.SendDatagram(datagram.msg, srcAddr, dstAddr)
-		}
-	}()
-
-	s.mut.Lock()
-	s.udpMap[dialRes.Address] = conn
-	s.mut.Unlock()
-
-	printJson(s.udpMap)
-
-	return conn, nil
-}
-
-func (s *ClientSession) ListenUDP(network string, udpAddr *net.UDPAddr) (*UDPConn, error) {
-
-	address := fmt.Sprintf("%s:%d", udpAddr.IP, udpAddr.Port)
-
-	listenReq := &ListenRequest{
-		Network: network,
-		Address: address,
-	}
-
-	listenRes, err := s.tunnel.Request(listenReq)
-	if err != nil {
-		return nil, err
-	}
-
-	lres := listenRes.(*ListenResponse)
-
-	printJson(lres)
-
-	localAddr, err := net.ResolveUDPAddr("udp", address)
-	if err != nil {
-		return nil, err
-	}
-
-	c := &UDPConn{
-		recvCh:    make(chan datagram),
-		sendCh:    make(chan datagram),
-		localAddr: localAddr,
-	}
-
-	s.mut.Lock()
-	s.udpMap[address] = c
-	s.mut.Unlock()
-
-	go func() {
-		for {
-			dgram := <-c.sendCh
-			// TODO: should probably use the conn localAddr here
-			err := s.tunnel.SendDatagram(dgram.msg, dgram.srcAddr, dgram.dstAddr)
-			if err != nil {
-				fmt.Println(err)
-				continue
-			}
-		}
-	}()
-
-	return c, nil
-}
+//func (s *ClientSession) ListenUDP(network string, udpAddr *net.UDPAddr) (*UDPConn, error) {
+//
+//	address := fmt.Sprintf("%s:%d", udpAddr.IP, udpAddr.Port)
+//
+//	listenReq := &ListenRequest{
+//		Network: network,
+//		Address: address,
+//	}
+//
+//	listenRes, err := s.tunnel.Request(listenReq)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	lres := listenRes.(*ListenResponse)
+//
+//	printJson(lres)
+//
+//	localAddr, err := net.ResolveUDPAddr("udp", address)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	c := &UDPConn{
+//		recvCh:    make(chan datagram),
+//		sendCh:    make(chan datagram),
+//		localAddr: localAddr,
+//	}
+//
+//	s.mut.Lock()
+//	s.udpMap[address] = c
+//	s.mut.Unlock()
+//
+//	go func() {
+//		for {
+//			dgram := <-c.sendCh
+//			// TODO: should probably use the conn localAddr here
+//			err := s.tunnel.SendDatagram(dgram.msg, dgram.srcAddr, dgram.dstAddr)
+//			if err != nil {
+//				fmt.Println(err)
+//				continue
+//			}
+//		}
+//	}()
+//
+//	return c, nil
+//}
 
 func (s *ClientSession) Listen(network, address string) (*Listener, error) {
 
@@ -461,40 +461,40 @@ func (l *Listener) GetTunnelConfig() TunnelConfig {
 //	return s.Listen(network, address)
 //}
 
-type UDPConn struct {
-	recvCh    chan datagram
-	sendCh    chan datagram
-	localAddr *net.UDPAddr
-}
-
-func (c *UDPConn) ReadFromUDP(buf []byte) (int, *net.UDPAddr, error) {
-	dgram := <-c.recvCh
-	if len(dgram.msg) > len(buf) {
-		return 0, nil, errors.New("UDPConn.ReadFromUDP: buf not big enough")
-	}
-
-	n := copy(buf, dgram.msg)
-
-	return n, dgram.srcAddr, nil
-}
-
-func (c *UDPConn) WriteToUDP(p []byte, addr *net.UDPAddr) (int, error) {
-
-	buf := make([]byte, len(p))
-
-	copy(buf, p)
-
-	c.sendCh <- datagram{
-		msg:     buf,
-		srcAddr: c.localAddr,
-		dstAddr: addr,
-	}
-
-	return len(p), nil
-}
-
-type datagram struct {
-	msg     []byte
-	srcAddr *net.UDPAddr
-	dstAddr *net.UDPAddr
-}
+//type UDPConn struct {
+//	recvCh    chan datagram
+//	sendCh    chan datagram
+//	localAddr *net.UDPAddr
+//}
+//
+//func (c *UDPConn) ReadFromUDP(buf []byte) (int, *net.UDPAddr, error) {
+//	dgram := <-c.recvCh
+//	if len(dgram.msg) > len(buf) {
+//		return 0, nil, errors.New("UDPConn.ReadFromUDP: buf not big enough")
+//	}
+//
+//	n := copy(buf, dgram.msg)
+//
+//	return n, dgram.srcAddr, nil
+//}
+//
+//func (c *UDPConn) WriteToUDP(p []byte, addr *net.UDPAddr) (int, error) {
+//
+//	buf := make([]byte, len(p))
+//
+//	copy(buf, p)
+//
+//	c.sendCh <- datagram{
+//		msg:     buf,
+//		srcAddr: c.localAddr,
+//		dstAddr: addr,
+//	}
+//
+//	return len(p), nil
+//}
+//
+//type datagram struct {
+//	msg     []byte
+//	srcAddr *net.UDPAddr
+//	dstAddr *net.UDPAddr
+//}

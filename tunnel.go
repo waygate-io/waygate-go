@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"strings"
 
 	"github.com/lastlogin-net/decent-auth-go"
@@ -19,8 +18,8 @@ type Tunnel interface {
 	GetConfig() TunnelConfig
 	Request(req interface{}) (interface{}, error)
 	HandleRequests(callback func(interface{}) interface{}) error
-	SendDatagram(msg []byte, srcAddr, dstAddr net.Addr) error
-	ReceiveDatagram() ([]byte, net.Addr, net.Addr, error)
+	//SendDatagram(msg []byte, srcAddr, dstAddr net.Addr) error
+	//ReceiveDatagram() ([]byte, net.Addr, net.Addr, error)
 	Events() chan TunnelEvent
 }
 

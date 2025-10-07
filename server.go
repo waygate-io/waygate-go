@@ -575,86 +575,86 @@ func (s *Server) Run() int {
 			}
 		}
 
-		udpMap := make(map[string]*net.UDPConn)
-		mut := &sync.Mutex{}
+		//udpMap := make(map[string]*net.UDPConn)
+		//mut := &sync.Mutex{}
 
-		// TODO: if this goroutine exits unexpectedly we probably need to shut it down.
-		go func() {
+		//// TODO: if this goroutine exits unexpectedly we probably need to shut it down.
+		//go func() {
 
-			for {
-				dgram, _, dstAddr, err := tunnel.ReceiveDatagram()
-				if err != nil {
-					fmt.Println(err)
-					break
-				}
+		//	for {
+		//		dgram, _, dstAddr, err := tunnel.ReceiveDatagram()
+		//		if err != nil {
+		//			fmt.Println(err)
+		//			break
+		//		}
 
-				mut.Lock()
-				conn := udpMap[dstAddr.String()]
-				mut.Unlock()
+		//		mut.Lock()
+		//		conn := udpMap[dstAddr.String()]
+		//		mut.Unlock()
 
-				dstUDPAddr, err := net.ResolveUDPAddr("udp", dstAddr.String())
-				if err != nil {
-					fmt.Println("ResolveUDPAddr:", err)
-					break
-				}
+		//		dstUDPAddr, err := net.ResolveUDPAddr("udp", dstAddr.String())
+		//		if err != nil {
+		//			fmt.Println("ResolveUDPAddr:", err)
+		//			break
+		//		}
 
-				n, err := conn.WriteToUDP(dgram, dstUDPAddr)
-				if err != nil {
-					fmt.Println(err)
-					break
-				}
+		//		n, err := conn.WriteToUDP(dgram, dstUDPAddr)
+		//		if err != nil {
+		//			fmt.Println(err)
+		//			break
+		//		}
 
-				if n != len(dgram) {
-					fmt.Println(err)
-					break
-				}
-			}
-		}()
+		//		if n != len(dgram) {
+		//			fmt.Println(err)
+		//			break
+		//		}
+		//	}
+		//}()
 
 		tunnel.HandleRequests(func(req interface{}) interface{} {
 			switch r := req.(type) {
-			case *DialRequest:
-				udpAddr, err := net.ResolveUDPAddr("udp", r.Address)
-				if err != nil {
-					return &DialResponse{
-						Success: false,
-						Message: err.Error(),
-					}
-				}
+			//case *DialRequest:
+			//	udpAddr, err := net.ResolveUDPAddr("udp", r.Address)
+			//	if err != nil {
+			//		return &DialResponse{
+			//			Success: false,
+			//			Message: err.Error(),
+			//		}
+			//	}
 
-				conn, err := net.DialUDP("udp", nil, udpAddr)
-				if err != nil {
-					return &DialResponse{
-						Success: false,
-						Message: err.Error(),
-					}
-				}
+			//	conn, err := net.DialUDP("udp", nil, udpAddr)
+			//	if err != nil {
+			//		return &DialResponse{
+			//			Success: false,
+			//			Message: err.Error(),
+			//		}
+			//	}
 
-				mut.Lock()
-				udpMap[r.Address] = conn
-				mut.Unlock()
+			//	mut.Lock()
+			//	udpMap[r.Address] = conn
+			//	mut.Unlock()
 
-				srcAddr := conn.RemoteAddr()
-				dstAddr := conn.LocalAddr()
+			//	srcAddr := conn.RemoteAddr()
+			//	dstAddr := conn.LocalAddr()
 
-				go func() {
-					buf := make([]byte, 64*1024)
+			//	go func() {
+			//		buf := make([]byte, 64*1024)
 
-					for {
-						n, err := conn.Read(buf)
-						if err != nil {
-							fmt.Println("Failed to forward:", err)
-							continue
-						}
+			//		for {
+			//			n, err := conn.Read(buf)
+			//			if err != nil {
+			//				fmt.Println("Failed to forward:", err)
+			//				continue
+			//			}
 
-						tunnel.SendDatagram(buf[:n], srcAddr, dstAddr)
-					}
-				}()
+			//			tunnel.SendDatagram(buf[:n], srcAddr, dstAddr)
+			//		}
+			//	}()
 
-				return &DialResponse{
-					Success: true,
-					Address: dstAddr.String(),
-				}
+			//	return &DialResponse{
+			//		Success: true,
+			//		Address: dstAddr.String(),
+			//	}
 
 			case *ListenRequest:
 				if strings.HasPrefix(r.Network, "tls") {
@@ -694,13 +694,13 @@ func (s *Server) Run() int {
 						}
 					}
 				} else {
-					_, err = handleListenUDP(tunnel, r.Address, udpMap, s.mut)
-					if err != nil {
-						return &ListenResponse{
-							Success: false,
-							Message: err.Error(),
-						}
-					}
+					//_, err = handleListenUDP(tunnel, r.Address, udpMap, s.mut)
+					//if err != nil {
+					//	return &ListenResponse{
+					//		Success: false,
+					//		Message: err.Error(),
+					//	}
+					//}
 				}
 
 				return &ListenResponse{
@@ -944,59 +944,59 @@ func handleListenTCP(wtTun Tunnel, addr string) (net.Listener, error) {
 	return ln, nil
 }
 
-func handleListenUDP(tunnel Tunnel, listenAddr string, udpMap map[string]*net.UDPConn, mut *sync.Mutex) (*net.UDPConn, error) {
-
-	udpAddr, err := net.ResolveUDPAddr("udp", listenAddr)
-	if err != nil {
-		return nil, err
-	}
-
-	downstreamConn, err := net.ListenUDP("udp4", udpAddr)
-	if err != nil {
-		return nil, err
-	}
-
-	go func() {
-
-		buf := make([]byte, 64*1024)
-
-		for {
-			n, srcAddr, err := downstreamConn.ReadFromUDP(buf)
-			if err != nil {
-				fmt.Println("Failed to forward")
-				break
-			}
-
-			_, exists := udpMap[srcAddr.String()]
-			if !exists {
-				mut.Lock()
-				udpMap[srcAddr.String()] = downstreamConn
-				mut.Unlock()
-			}
-
-			dstAddr := downstreamConn.LocalAddr()
-
-			err = tunnel.SendDatagram(buf[:n], srcAddr, dstAddr)
-			if err != nil {
-				fmt.Println(err)
-			}
-		}
-	}()
-
-	go func() {
-		events := tunnel.Events()
-		evt := <-events
-		switch evt.(type) {
-		case TunnelEventClose:
-			err := downstreamConn.Close()
-			if err != nil {
-				fmt.Println("handleListenUDP close downstreamConn", err)
-			}
-		}
-	}()
-
-	return downstreamConn, nil
-}
+//func handleListenUDP(tunnel Tunnel, listenAddr string, udpMap map[string]*net.UDPConn, mut *sync.Mutex) (*net.UDPConn, error) {
+//
+//	udpAddr, err := net.ResolveUDPAddr("udp", listenAddr)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	downstreamConn, err := net.ListenUDP("udp4", udpAddr)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	go func() {
+//
+//		buf := make([]byte, 64*1024)
+//
+//		for {
+//			n, srcAddr, err := downstreamConn.ReadFromUDP(buf)
+//			if err != nil {
+//				fmt.Println("Failed to forward")
+//				break
+//			}
+//
+//			_, exists := udpMap[srcAddr.String()]
+//			if !exists {
+//				mut.Lock()
+//				udpMap[srcAddr.String()] = downstreamConn
+//				mut.Unlock()
+//			}
+//
+//			dstAddr := downstreamConn.LocalAddr()
+//
+//			err = tunnel.SendDatagram(buf[:n], srcAddr, dstAddr)
+//			if err != nil {
+//				fmt.Println(err)
+//			}
+//		}
+//	}()
+//
+//	go func() {
+//		events := tunnel.Events()
+//		evt := <-events
+//		switch evt.(type) {
+//		case TunnelEventClose:
+//			err := downstreamConn.Close()
+//			if err != nil {
+//				fmt.Println("handleListenUDP close downstreamConn", err)
+//			}
+//		}
+//	}()
+//
+//	return downstreamConn, nil
+//}
 
 type ServerMux struct {
 	mux         *http.ServeMux

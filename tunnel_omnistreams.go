@@ -1,20 +1,20 @@
 package waygate
 
 import (
-	"bytes"
+	//"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"net"
+	//"net"
 	"net/http"
 	"strings"
 	"sync"
 
 	"github.com/anderspitman/dashtui"
 	"github.com/lastlogin-net/decent-auth-go"
-	"github.com/mailgun/proxyproto"
+	//"github.com/mailgun/proxyproto"
 	"github.com/omnistreams/omnistreams-go"
 	"github.com/omnistreams/omnistreams-go/transports"
 	"github.com/prometheus/client_golang/prometheus"
@@ -26,7 +26,7 @@ type OmnistreamsTunnel struct {
 	conn           *omnistreams.Connection
 	tunConfig      *TunnelConfig
 	eventChans     []chan TunnelEvent
-	datagramStream *omnistreams.Stream
+	//datagramStream *omnistreams.Stream
 	mut            *sync.Mutex
 }
 
@@ -78,60 +78,60 @@ func (t *OmnistreamsTunnel) SendMessage(msg interface{}) (interface{}, error) {
 	return request(t, msg)
 }
 
-func (t *OmnistreamsTunnel) ReceiveDatagram() ([]byte, net.Addr, net.Addr, error) {
-
-	msg, err := t.datagramStream.ReadMessage()
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	reader := bytes.NewReader(msg)
-
-	ppHeader, err := proxyproto.ReadHeader(reader)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	remaining, err := io.ReadAll(reader)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	return remaining, ppHeader.Source, ppHeader.Destination, nil
-}
-
-func (t *OmnistreamsTunnel) SendDatagram(msg []byte, srcAddr, dstAddr net.Addr) error {
-
-	conn := &wrapperConn{
-		localAddr:  dstAddr,
-		remoteAddr: srcAddr,
-	}
-
-	// TODO: maybe pass addr.IP as serverName?
-	proxyHeader, err := buildProxyProtoHeader(conn, "")
-	if err != nil {
-		return err
-	}
-
-	prependedBuf := &bytes.Buffer{}
-
-	_, err = proxyHeader.WriteTo(prependedBuf)
-	if err != nil {
-		return err
-	}
-
-	_, err = prependedBuf.Write(msg)
-	if err != nil {
-		return err
-	}
-
-	_, err = t.datagramStream.Write(prependedBuf.Bytes())
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
+//func (t *OmnistreamsTunnel) ReceiveDatagram() ([]byte, net.Addr, net.Addr, error) {
+//
+//	msg, err := t.datagramStream.ReadMessage()
+//	if err != nil {
+//		return nil, nil, nil, err
+//	}
+//
+//	reader := bytes.NewReader(msg)
+//
+//	ppHeader, err := proxyproto.ReadHeader(reader)
+//	if err != nil {
+//		return nil, nil, nil, err
+//	}
+//
+//	remaining, err := io.ReadAll(reader)
+//	if err != nil {
+//		return nil, nil, nil, err
+//	}
+//
+//	return remaining, ppHeader.Source, ppHeader.Destination, nil
+//}
+//
+//func (t *OmnistreamsTunnel) SendDatagram(msg []byte, srcAddr, dstAddr net.Addr) error {
+//
+//	conn := &wrapperConn{
+//		localAddr:  dstAddr,
+//		remoteAddr: srcAddr,
+//	}
+//
+//	// TODO: maybe pass addr.IP as serverName?
+//	proxyHeader, err := buildProxyProtoHeader(conn, "")
+//	if err != nil {
+//		return err
+//	}
+//
+//	prependedBuf := &bytes.Buffer{}
+//
+//	_, err = proxyHeader.WriteTo(prependedBuf)
+//	if err != nil {
+//		return err
+//	}
+//
+//	_, err = prependedBuf.Write(msg)
+//	if err != nil {
+//		return err
+//	}
+//
+//	_, err = t.datagramStream.Write(prependedBuf.Bytes())
+//	if err != nil {
+//		return err
+//	}
+//
+//	return nil
+//}
 
 func (t *OmnistreamsTunnel) GetConfig() TunnelConfig {
 	return *t.tunConfig
@@ -278,19 +278,19 @@ func NewOmnistreamsServerTunnel(
 		return nil, err
 	}
 
-	datagramStream, err := conn.OpenStream()
-	if err != nil {
-		return nil, err
-	}
+	//datagramStream, err := conn.OpenStream()
+	//if err != nil {
+	//	return nil, err
+	//}
 
-	// TODO: feels hacky. We need to send some data because the receiving
-	// side doesn't know a stream has been created until data arrives.
-	// Consider adding an explicit "Open Stream" frame in omnistreams, or
-	// use heartbeat/ping frames once those are implemented since we'll
-	// need them anyway
-	datagramStream.Write([]byte("open-datagram-stream"))
+	//// TODO: feels hacky. We need to send some data because the receiving
+	//// side doesn't know a stream has been created until data arrives.
+	//// Consider adding an explicit "Open Stream" frame in omnistreams, or
+	//// use heartbeat/ping frames once those are implemented since we'll
+	//// need them anyway
+	//datagramStream.Write([]byte("open-datagram-stream"))
 
-	t.datagramStream = datagramStream
+	//t.datagramStream = datagramStream
 
 	return t, nil
 }
@@ -358,31 +358,31 @@ func NewOmnistreamsClientTunnel(tunReq TunnelRequest) (*OmnistreamsTunnel, error
 		return nil, err
 	}
 
-	datagramStream, err := conn.AcceptStream()
-	if err != nil {
-		return nil, err
-	}
+	//datagramStream, err := conn.AcceptStream()
+	//if err != nil {
+	//	return nil, err
+	//}
 
-	if datagramStream.StreamID() != 4 {
-		return nil, fmt.Errorf("Wrong streamID for datagram stream: %d", datagramStream.StreamID())
-	}
+	//if datagramStream.StreamID() != 4 {
+	//	return nil, fmt.Errorf("Wrong streamID for datagram stream: %d", datagramStream.StreamID())
+	//}
 
-	msg, err := datagramStream.ReadMessage()
-	if err != nil {
-		return nil, err
-	}
+	//msg, err := datagramStream.ReadMessage()
+	//if err != nil {
+	//	return nil, err
+	//}
 
-	msgStr := string(msg)
-	if msgStr != "open-datagram-stream" {
-		return nil, fmt.Errorf("Incorrect first datagram message: %s", msgStr)
-	}
+	//msgStr := string(msg)
+	//if msgStr != "open-datagram-stream" {
+	//	return nil, fmt.Errorf("Incorrect first datagram message: %s", msgStr)
+	//}
 
 	t := &OmnistreamsTunnel{
 		conn:           conn,
 		tunConfig:      &tunConfig,
 		mut:            &sync.Mutex{},
 		eventChans:     []chan TunnelEvent{},
-		datagramStream: datagramStream,
+		//datagramStream: datagramStream,
 	}
 
 	return t, nil

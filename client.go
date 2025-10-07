@@ -1077,8 +1077,8 @@ func openTunnel(session *ClientSession, mux *ClientMux, tunnel *ClientTunnel) (d
 	var listener *Listener
 
 	switch tunnel.Type {
-	case TunnelTypeUDP:
-		go proxyUdp(session, tunnel)
+	//case TunnelTypeUDP:
+	//	go proxyUdp(session, tunnel)
 
 	case TunnelTypeTCP:
 		fmt.Println("listen tcp")
@@ -1161,87 +1161,87 @@ func proxyTcp(downstreamConn net.Conn, upstreamAddr string) {
 	ConnectConns(cwConn, cwUpstreamConn)
 }
 
-func proxyUdp(session *ClientSession, tunnel *ClientTunnel) {
-
-	downstreamAddr := tunnel.ServerAddress
-
-	udpAddr, err := net.ResolveUDPAddr("udp", downstreamAddr)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	downstreamConn, err := session.ListenUDP("udp", udpAddr)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	upstreamUDPAddr, err := net.ResolveUDPAddr("udp", tunnel.ClientAddress)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	upbuf := make([]byte, 64*1024)
-	downbuf := make([]byte, 64*1024)
-
-	connMap := make(map[string]*net.UDPConn)
-	mut := &sync.Mutex{}
-
-	go func() {
-		for {
-			n, srcAddr, err := downstreamConn.ReadFromUDP(upbuf)
-			if err != nil {
-				fmt.Println(err)
-				return
-			}
-
-			mut.Lock()
-			upstreamConn, exists := connMap[srcAddr.String()]
-			mut.Unlock()
-
-			if !exists {
-				upstreamConn, err = net.DialUDP("udp", nil, upstreamUDPAddr)
-				if err != nil {
-					fmt.Println(err)
-					return
-				}
-
-				mut.Lock()
-				connMap[srcAddr.String()] = upstreamConn
-				mut.Unlock()
-
-				// TODO: clean up this nesting
-				go func() {
-
-					srcUDPAddr, err := net.ResolveUDPAddr("udp", srcAddr.String())
-					if err != nil {
-						fmt.Println(err)
-						return
-					}
-
-					for {
-						n, _, err := upstreamConn.ReadFromUDP(downbuf)
-						if err != nil {
-							fmt.Println(err)
-							return
-						}
-
-						_, err = downstreamConn.WriteToUDP(downbuf[:n], srcUDPAddr)
-						if err != nil {
-							fmt.Println(err)
-							return
-						}
-					}
-				}()
-			}
-
-			_, err = upstreamConn.Write(upbuf[:n])
-			if err != nil {
-				fmt.Println(err)
-				return
-			}
-		}
-	}()
-}
+//func proxyUdp(session *ClientSession, tunnel *ClientTunnel) {
+//
+//	downstreamAddr := tunnel.ServerAddress
+//
+//	udpAddr, err := net.ResolveUDPAddr("udp", downstreamAddr)
+//	if err != nil {
+//		fmt.Println(err)
+//		return
+//	}
+//
+//	downstreamConn, err := session.ListenUDP("udp", udpAddr)
+//	if err != nil {
+//		fmt.Println(err)
+//		return
+//	}
+//
+//	upstreamUDPAddr, err := net.ResolveUDPAddr("udp", tunnel.ClientAddress)
+//	if err != nil {
+//		fmt.Println(err)
+//		return
+//	}
+//
+//	upbuf := make([]byte, 64*1024)
+//	downbuf := make([]byte, 64*1024)
+//
+//	connMap := make(map[string]*net.UDPConn)
+//	mut := &sync.Mutex{}
+//
+//	go func() {
+//		for {
+//			n, srcAddr, err := downstreamConn.ReadFromUDP(upbuf)
+//			if err != nil {
+//				fmt.Println(err)
+//				return
+//			}
+//
+//			mut.Lock()
+//			upstreamConn, exists := connMap[srcAddr.String()]
+//			mut.Unlock()
+//
+//			if !exists {
+//				upstreamConn, err = net.DialUDP("udp", nil, upstreamUDPAddr)
+//				if err != nil {
+//					fmt.Println(err)
+//					return
+//				}
+//
+//				mut.Lock()
+//				connMap[srcAddr.String()] = upstreamConn
+//				mut.Unlock()
+//
+//				// TODO: clean up this nesting
+//				go func() {
+//
+//					srcUDPAddr, err := net.ResolveUDPAddr("udp", srcAddr.String())
+//					if err != nil {
+//						fmt.Println(err)
+//						return
+//					}
+//
+//					for {
+//						n, _, err := upstreamConn.ReadFromUDP(downbuf)
+//						if err != nil {
+//							fmt.Println(err)
+//							return
+//						}
+//
+//						_, err = downstreamConn.WriteToUDP(downbuf[:n], srcUDPAddr)
+//						if err != nil {
+//							fmt.Println(err)
+//							return
+//						}
+//					}
+//				}()
+//			}
+//
+//			_, err = upstreamConn.Write(upbuf[:n])
+//			if err != nil {
+//				fmt.Println(err)
+//				return
+//			}
+//		}
+//	}()
+//}
