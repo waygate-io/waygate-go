@@ -204,7 +204,9 @@ func NewOmnistreamsServerTunnel(
 		domain = strings.ToLower(host) + "." + tunnelDomains[0]
 
 		createSessionRes, err := authServer.CreateSession(decentauth.CreateSessionRequest{
-			Id:     "fake@example.com",
+			// TODO: would prefer for ID to be blank for anonymous sessions, but it
+			// seems to be failing so this is a hack for now.
+			Id:     "fake-id",
 			IdType: decentauth.IDTypeEmail,
 			CustomData: map[string]string{
 				"domain": domain,
