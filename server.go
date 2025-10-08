@@ -683,9 +683,10 @@ func (s *Server) Run() int {
 					}
 
 					if !strings.HasSuffix(domain, sessionDomain) {
+						msg := fmt.Sprintf("You don't have perms for '%s'", domain)
 						return &ListenResponse{
 							Success: false,
-							Message: "You don't have perms for that domain",
+							Message: msg,
 						}
 					}
 
