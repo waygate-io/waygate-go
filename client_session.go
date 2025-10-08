@@ -19,6 +19,15 @@ const PROXY_PROTO_PP2_TYPE_MIN_CUSTOM = 0xe0
 const PROXY_PROTO_SERVER_NAME_OFFSET = PROXY_PROTO_PP2_TYPE_MIN_CUSTOM + 0
 const ListenerDefaultKey = "default-listener"
 
+type ListenError struct {
+	Code    int32
+	Message string
+}
+
+func (e *ListenError) Error() string {
+	return fmt.Sprintf("ListenError: Code: %d - Message: %s", e.Code, e.Message)
+}
+
 type ClientSession struct {
 	DoneChan chan int
 	tunnel   Tunnel
@@ -370,7 +379,12 @@ func (s *ClientSession) Listen(network, address string) (*Listener, error) {
 
 		lres := listenRes.(*ListenResponse)
 
-		printJson(lres)
+		if !lres.Success {
+			return nil, &ListenError{
+				Code:    lres.Code,
+				Message: lres.Message,
+			}
+		}
 	}
 
 	//ip := net.ParseIP(address)

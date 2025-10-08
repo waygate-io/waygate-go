@@ -653,6 +653,23 @@ func (c *Client) Run() error {
 		err := c.AddTunnel(r.Context(), r.Form)
 
 		if httpErr, ok := err.(*httpError); ok {
+			if httpErr.statusCode == 401 {
+				authServerUri := fmt.Sprintf("https://%s/auth/oauth", WaygateServerDomain)
+				flowState, err = oauth.StartAuthCodeFlow(authServerUri+"/authorize", &oauth.AuthRequest{
+					ClientId:    dashUri,
+					RedirectUri: fmt.Sprintf("%s/oauth2/callback", dashUri),
+					Scopes:      []string{"waygate"},
+				})
+				if err != nil {
+					w.WriteHeader(500)
+					io.WriteString(w, "/add-tunnel error")
+					return
+				}
+
+				http.Redirect(w, r, flowState.AuthUri, 303)
+				return
+			}
+
 			w.WriteHeader(httpErr.statusCode)
 			io.WriteString(w, httpErr.message)
 			return
@@ -661,6 +678,38 @@ func (c *Client) Run() error {
 			io.WriteString(w, "/add-tunnel error")
 			return
 		}
+
+		http.Redirect(w, r, "/", 303)
+	})
+
+	mux.HandleFunc("/oauth2/callback", func(w http.ResponseWriter, r *http.Request) {
+		code := r.URL.Query().Get("code")
+		state := r.URL.Query().Get("state")
+
+		authServerUri := fmt.Sprintf("https://%s/auth/oauth", WaygateServerDomain)
+		tokenUri := authServerUri + "/token"
+		resBytes, err := oauth.CompleteAuthCodeFlow(tokenUri, code, state, flowState)
+		if err != nil {
+			w.WriteHeader(500)
+			io.WriteString(w, err.Error())
+			return
+		}
+
+		var tokenRes *oauth.TokenResponse
+
+		err = json.Unmarshal(resBytes, &tokenRes)
+		if err != nil {
+			w.WriteHeader(500)
+			io.WriteString(w, err.Error())
+			return
+		}
+
+		printJson(tokenRes)
+
+		//err = c.db.SetToken(tokenRes.AccessToken)
+		//if err != nil {
+		//	return
+		//}
 
 		http.Redirect(w, r, "/", 303)
 	})
@@ -916,12 +965,17 @@ func (c *Client) AddTunnel(ctx context.Context, params url.Values) error {
 		TLSPassthrough: tlsPassthrough,
 	}
 
-	err := c.db.SetTunnel(tunnel)
+	serverTunnelDomain, err := openTunnel(c.session, c.tunMux, tunnel)
 	if err != nil {
-		return newHTTPError(500, err.Error())
+		var listenErr *ListenError
+		if errors.As(err, &listenErr) {
+			return newHTTPError(401, err.Error())
+		} else {
+			return newHTTPError(500, err.Error())
+		}
 	}
 
-	serverTunnelDomain, err := openTunnel(c.session, c.tunMux, tunnel)
+	err = c.db.SetTunnel(tunnel)
 	if err != nil {
 		return newHTTPError(500, err.Error())
 	}

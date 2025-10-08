@@ -686,6 +686,7 @@ func (s *Server) Run() int {
 						msg := fmt.Sprintf("You don't have perms for '%s'", domain)
 						return &ListenResponse{
 							Success: false,
+							Code:    401,
 							Message: msg,
 						}
 					}
