@@ -32,7 +32,7 @@ import (
 
 type DNSProvider interface {
 	// TODO: re-enable libdns.ZoneLister
-	libdns.ZoneLister
+	//libdns.ZoneLister
 	libdns.RecordGetter
 	libdns.RecordSetter
 	libdns.RecordAppender
