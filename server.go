@@ -658,6 +658,13 @@ func (s *Server) Run() int {
 
 			case *ListenRequest:
 				if strings.HasPrefix(r.Network, "tls") {
+					if session == nil || session.CustomData == nil {
+						return &ListenResponse{
+							Success: false,
+							Message: "No session",
+						}
+					}
+
 					sessionDomain, exists := session.CustomData["domain"]
 					if !exists {
 						return &ListenResponse{
