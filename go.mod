@@ -2,9 +2,9 @@ module github.com/waygate-io/waygate-go
 
 go 1.24.1
 
-replace github.com/lastlogin-net/decent-auth-go => ../decent-auth-go
+//replace github.com/lastlogin-net/decent-auth-go => ../decent-auth-go
 
-replace github.com/lastlogin-net/decent-auth-build => ../decent-auth-build
+//replace github.com/lastlogin-net/decent-auth-build => ../decent-auth-build
 
 //replace github.com/omnistreams/omnistreams-go => ../omnistreams-go
 
@@ -25,9 +25,10 @@ require (
 	github.com/anderspitman/reanimator-go v0.0.0-20250417150941-e646c05959ad
 	github.com/caddyserver/certmagic v0.22.0
 	github.com/jmoiron/sqlx v1.3.5
-	github.com/lastlogin-net/decent-auth-go v0.0.0-20250904173551-cc123f5587e6
+	github.com/lastlogin-net/decent-auth-go v0.0.0-20250930130658-cd02ca43630e
 	github.com/libdns/libdns v0.2.3
 	github.com/libdns/namedotcom v0.3.4-0.20241104014758-c641e4a2a4c9
+	github.com/libdns/route53 v1.5.1
 	github.com/mailgun/proxyproto v1.0.0
 	github.com/mdp/qrterminal/v3 v3.2.0
 	github.com/omnistreams/omnistreams-go v0.0.0-20250418155357-eeb2fa59dfab
@@ -79,8 +80,7 @@ require (
 	github.com/ianlancetaylor/demangle v0.0.0-20240805132620-81f5be970eca // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.10 // indirect
-	github.com/lastlogin-net/decent-auth-build v0.0.0-20250917165336-0c82e8a9d03f // indirect
-	github.com/libdns/route53 v1.5.1 // indirect
+	github.com/lastlogin-net/decent-auth-build v0.0.0-20251016122153-736114cfc907 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/mattn/go-sqlite3 v1.14.24 // indirect
