@@ -68,6 +68,39 @@
 </div>
 {{end}}
 
+<h3>Create Custom HTTPS Tunnel</h3>
+
+<form action='/add-tunnel' method='POST'>
+  <input type='hidden' name='type' value='HTTPS' />
+  <div class='list'>
+    <div>
+      <label>Server Address:</label>
+      <input type='text' name='host' placeholder='host' />
+      .
+      <input type='text' name='domain' placeholder='domain' />
+    </div>
+    <div>
+      <label for='client-address-text'>Client Address:</label>
+      <input id='client-address-text' type='text' name='client_address' value='localhost' />
+    </div>
+    <div>
+      <label for='client-port-text'>Client Port:</label>
+      <input id='client-port-text' type='text' name='client_port' value='8000' />
+    </div>
+    <div>
+      <label for='protected-checkbox'>Protected:</label>
+      <input id='protected-checkbox' type='checkbox' name='protected' />
+    </div>
+    <div>
+      <label for='tls-passthrough-checkbox'>TLS Passthrough:</label>
+      <input id='tls-passthrough-checkbox' type='checkbox' name='tls_passthrough' />
+    </div>
+    <div>
+      <button>Submit</button>
+    </div>
+  </div>
+</form>
+
 
 <h3>Create HTTPS Tunnel</h3>
 

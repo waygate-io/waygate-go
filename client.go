@@ -706,10 +706,12 @@ func (c *Client) Run() error {
 
 		printJson(tokenRes)
 
-		//err = c.db.SetToken(tokenRes.AccessToken)
-		//if err != nil {
-		//	return
-		//}
+		err = c.db.SetToken(tokenRes.AccessToken)
+		if err != nil {
+			w.WriteHeader(500)
+			io.WriteString(w, err.Error())
+			return
+		}
 
 		http.Redirect(w, r, "/", 303)
 	})

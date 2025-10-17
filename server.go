@@ -371,14 +371,27 @@ func (s *Server) Run() int {
 			return
 		}
 
-		nameGen, err := NewNameGenerator()
+		u, err := url.Parse(r.Form.Get("client_id"))
 		if err != nil {
-			http.Error(w, "Failed to generate domain name", 500)
+			http.Error(w, "client_id must be a URL", 400)
 			return
 		}
 
-		host := nameGen.GenerateName()
-		domain := strings.ToLower(host) + "." + s.config.TunnelDomains[0]
+		// TODO: Hack. This exists because we need a way to combine the new session being
+		// created right now with the session the client already has. Currently we're
+		// doing this by setting the approved domain to the oauth2 client_id instead of
+		// generating a new one. It would be nice to have a clearer, more semantic way of
+		// doing this.
+		domain := u.Host
+
+		//nameGen, err := NewNameGenerator()
+		//if err != nil {
+		//	http.Error(w, "Failed to generate domain name", 500)
+		//	return
+		//}	
+
+		//host := nameGen.GenerateName()
+		//domain := strings.ToLower(host) + "." + s.config.TunnelDomains[0]
 
 		form := url.Values{}
 		form.Set("domain", domain)
