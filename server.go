@@ -195,11 +195,13 @@ func (s *Server) Run() int {
 
 	behindProxy := false
 
+	adminID := users[len(users)-1].ID
+
 	authHandler, err := decentauth.NewHandler(&decentauth.HandlerOptions{
 		KvStore: authKV,
 		Config: decentauth.Config{
 			PathPrefix:  authPrefix,
-			AdminID:     users[len(users)-1].ID,
+			AdminID:     adminID,
 			BehindProxy: behindProxy,
 			LoginMethods: []decentauth.LoginMethod{
 				decentauth.LoginMethod{
@@ -228,7 +230,7 @@ func (s *Server) Run() int {
 	exitOnError(err)
 
 	//mux := http.NewServeMux()
-	mux := NewServerMux(authHandler, users[len(users)-1].ID)
+	mux := NewServerMux(authHandler, adminID)
 
 	numStreamsGauge := promauto.NewGauge(prometheus.GaugeOpts{
 		Name: "waygate_num_streams",
@@ -695,7 +697,7 @@ func (s *Server) Run() int {
 						}
 					}
 
-					if !strings.HasSuffix(domain, sessionDomain) {
+					if session.Id != adminID && !strings.HasSuffix(domain, sessionDomain) {
 						msg := fmt.Sprintf("You don't have perms for '%s'", domain)
 						return &ListenResponse{
 							Success: false,
