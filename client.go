@@ -18,6 +18,7 @@ import (
 	oauth "github.com/anderspitman/little-oauth2-go"
 	//"github.com/anderspitman/treemess-go"
 	"github.com/caddyserver/certmagic"
+	"github.com/mdp/qrterminal/v3"
 	//"github.com/gemdrive/gemdrive-go"
 	"github.com/lastlogin-net/decent-auth-go"
 	"github.com/takingnames/namedrop-go"
@@ -820,6 +821,9 @@ func (c *Client) Run() error {
 	//}()
 
 	go func() {
+		qrterminal.GenerateHalfBlock(dashUri, qrterminal.L, os.Stdout)
+		fmt.Fprintf(os.Stdout, "Client dashboard is available at %s\n", dashUri)
+
 		err = httpServer.Serve(listener)
 		if err != nil {
 			fmt.Println("listener done", err)

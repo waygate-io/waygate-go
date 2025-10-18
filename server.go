@@ -388,7 +388,7 @@ func (s *Server) Run() int {
 		//if err != nil {
 		//	http.Error(w, "Failed to generate domain name", 500)
 		//	return
-		//}	
+		//}
 
 		//host := nameGen.GenerateName()
 		//domain := strings.ToLower(host) + "." + s.config.TunnelDomains[0]
