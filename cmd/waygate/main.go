@@ -95,11 +95,9 @@ func runClient() {
 	dnsProviderArg := flagSet.String("dns-provider", "", "DNS Provider")
 	dnsTokenArg := flagSet.String("dns-token", "", "DNS Token")
 	dnsUserArg := flagSet.String("dns-user", "", "DNS User")
-	noBrowserArg := flagSet.Bool("no-browser", false, "Use OAuth2 device flow to get tokens")
 	acmeEmailArg := flagSet.String("acme-email", "", "ACME Email")
 	clientName := flagSet.String("client-name", "", "Client Name")
 	terminationType := flagSet.String("tls-termination-type", waygate.TerminationTypeClient, "TLS termination client/server")
-	public := flagSet.Bool("public", false, "Create tunnels for unauthenticated clients")
 	var tunnels arrayFlags
 	flagSet.Var(&tunnels, "tunnel", "Tunnels")
 
@@ -110,14 +108,12 @@ func runClient() {
 	config := &waygate.ClientConfig{
 		ServerURI:       *serverURIArg,
 		Token:           *tokenArg,
-		NoBrowser:       *noBrowserArg,
 		DNSProvider:     *dnsProviderArg,
 		DNSUser:         *dnsUserArg,
 		DNSToken:        *dnsTokenArg,
 		ACMEEmail:       *acmeEmailArg,
 		ClientName:      *clientName,
 		TerminationType: waygate.TerminationType(*terminationType),
-		Public:          *public,
 	}
 
 	if *userArg != "" {
@@ -152,8 +148,6 @@ func runClient() {
 	for {
 		event := <-eventCh
 		switch evt := event.(type) {
-		case waygate.OAuth2AuthUriEvent:
-			fmt.Println(evt.Uri)
 		case waygate.ErrorEvent:
 			fmt.Println("ErrorEvent received. Exiting...")
 			os.Exit(evt.Code)

@@ -41,8 +41,6 @@ type ClientConfig struct {
 	ServerURI       string
 	Token           string
 	Dir             string
-	Public          bool
-	NoBrowser       bool
 	DNSProvider     string
 	DNSUser         string
 	DNSToken        string
@@ -228,7 +226,6 @@ func (c *Client) Run() error {
 	exitOnError(err)
 
 	token := c.config.Token
-	redirUriCh := make(chan string)
 
 	if token == "" {
 		var err error
@@ -236,50 +233,6 @@ func (c *Client) Run() error {
 		if err != nil {
 			return err
 		}
-	}
-
-	if (token == "" && !c.config.Public) || os.Getenv("WAYGATE_DEBUG_TOKEN") == "reset" {
-
-		var err error
-
-		if c.config.NoBrowser {
-
-			token, err = DoDeviceFlow()
-			if err != nil {
-				return err
-			}
-
-			go func() {
-				<-redirUriCh
-			}()
-
-		} else {
-			tokenFlow, err := NewTokenFlow()
-			if err != nil {
-				return err
-			}
-
-			if c.eventCh != nil {
-				c.eventCh <- OAuth2AuthUriEvent{
-					Uri: tokenFlow.GetAuthUri(),
-				}
-			}
-
-			token, err = tokenFlow.GetTokenWithRedirect(redirUriCh)
-			if err != nil {
-				return err
-			}
-
-		}
-
-		err = c.db.SetToken(token)
-		if err != nil {
-			return err
-		}
-	} else {
-		go func() {
-			<-redirUriCh
-		}()
 	}
 
 	if os.Getenv("WAYGATE_DEBUG_TOKEN") == "reset" {
@@ -341,8 +294,6 @@ func (c *Client) Run() error {
 		err = c.certConfig.ManageAsync(ctx, []string{tunConfig.Domain})
 		exitOnError(err)
 	}
-
-	redirUriCh <- dashUri
 
 	kvStore, err := decentauth.NewSqliteKvStore(&decentauth.SqliteKvOptions{
 		Db:        db.db.DB,
@@ -1021,10 +972,6 @@ func (c *Client) CreateSession(id string) (code string, err error) {
 
 type TunnelConnectedEvent struct {
 	TunnelConfig TunnelConfig
-}
-
-type OAuth2AuthUriEvent struct {
-	Uri string
 }
 
 type SessionCreatedEvent struct {
