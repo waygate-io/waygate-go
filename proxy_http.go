@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"os"
 )
 
 type flushWriter struct {
@@ -36,6 +37,8 @@ func ProxyHttp(w http.ResponseWriter, r *http.Request, httpClient *http.Client, 
 		io.WriteString(w, errMessage)
 		return
 	}
+
+	upstreamReq = upstreamReq.WithContext(r.Context())
 
 	// ContentLength needs to be set manually because otherwise it is
 	// stripped by golang. See:
@@ -110,7 +113,10 @@ func ProxyHttp(w http.ResponseWriter, r *http.Request, httpClient *http.Client, 
 	fw := &flushWriter{w: w, f: flusher}
 
 	w.WriteHeader(upstreamRes.StatusCode)
-	io.Copy(fw, upstreamRes.Body)
+	_, err = io.Copy(fw, upstreamRes.Body)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "ProxyHttp request cancelled: %s\n", r.URL.Path)
+	}
 }
 
 //// Need to strip out headers that shouldn't be forwarded from HTTP/1.1 to
