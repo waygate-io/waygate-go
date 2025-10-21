@@ -138,6 +138,8 @@ github.com/navidys/tvxwidgets v0.10.0 h1:rnTJCbOdgtHUC5to9lzDed5I1GYlLsJFlp3vCe5
 github.com/navidys/tvxwidgets v0.10.0/go.mod h1:eWUu9zHru+7JrtNv0oaPlWXYGxBYlD8RZ0P9tOshQXY=
 github.com/omnistreams/omnistreams-go v0.0.0-20250418155357-eeb2fa59dfab h1:nw1RxBP9yLSqzYQ4PsJ668VIJsI4Z4Svq929gDlJzJk=
 github.com/omnistreams/omnistreams-go v0.0.0-20250418155357-eeb2fa59dfab/go.mod h1:crSgI15J0f9o6aBu/s5AKTCevb1Xdyp/EFTInYIuFl4=
+github.com/omnistreams/omnistreams-go v0.0.0-20251021142516-4462d78575ca h1:jbskzzmIOX1e3QTVoUcCEXtZRQ6bRJV9QgE5dtD3b0A=
+github.com/omnistreams/omnistreams-go v0.0.0-20251021142516-4462d78575ca/go.mod h1:crSgI15J0f9o6aBu/s5AKTCevb1Xdyp/EFTInYIuFl4=
 github.com/omnistreams/omnistreams-go/transports v0.0.0-20250418155357-eeb2fa59dfab h1:WtSsFqJsnkCYE1Ip7bsko0SiEKfOlXbg4Qg4GH0VxYE=
 github.com/omnistreams/omnistreams-go/transports v0.0.0-20250418155357-eeb2fa59dfab/go.mod h1:lLiRgGxcJlG+4ntmScOcEsfCXze32p+mOU1tS/chPng=
 github.com/onsi/ginkgo v1.6.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
