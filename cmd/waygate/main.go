@@ -89,7 +89,7 @@ func runServer() {
 
 func runClient() {
 	flagSet := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
-	serverURIArg := flagSet.String("server-uri", waygate.WaygateServerDomain, "Server API URI")
+	serverURIArg := flagSet.String("server", waygate.WaygateServerDomain, "Server API URI")
 	tokenArg := flagSet.String("token", "", "Token")
 	userArg := flagSet.String("user", "", "User")
 	dnsProviderArg := flagSet.String("dns-provider", "", "DNS Provider")
